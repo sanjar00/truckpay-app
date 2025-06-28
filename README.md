@@ -33,3 +33,8 @@ A comprehensive truck driver earnings and expense management system built with R
    npm i
    npm run dev
    ```
+## Environment Setup
+
+1. Copy the environment template:
+   ```bash
+   cp .env.example .env.local
