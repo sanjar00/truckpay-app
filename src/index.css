@@ -1,0 +1,251 @@
+/* Neo-Brutalist Design System */
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&family=Space+Grotesk:wght@400;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Updated Neo-Brutalist Color Palette */
+    --background: 0 0% 90%; /* Light gray background */
+    --foreground: 0 0% 0%; /* Pure black */
+
+    --card: 0 0% 100%; /* White cards */
+    --card-foreground: 0 0% 0%; /* Black text on cards */
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 0%;
+
+    /* Primary colors - Dark Navy Blue */
+    --primary: 214 50% 18%; /* #14213d - Dark Navy Blue */
+    --primary-foreground: 0 0% 100%; /* White text on primary */
+
+    /* Secondary colors - Orange */
+    --secondary: 39 94% 52%; /* #fca311 - Orange */
+    --secondary-foreground: 0 0% 0%; /* Black text on orange */
+
+    --muted: 0 0% 90%; /* Light gray */
+    --muted-foreground: 214 50% 18%; /* Dark navy for muted text */
+
+    /* Accent - Orange (same as secondary for consistency) */
+    --accent: 39 94% 52%; /* #fca311 - Orange */
+    --accent-foreground: 0 0% 0%; /* Black text on accent */
+
+    /* Status colors */
+    --destructive: 0 100% 50%; /* Keep red for errors */
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 120 100% 25%; /* Keep green for success */
+    --success-foreground: 0 0% 100%;
+
+    --warning: 39 94% 52%; /* Use orange for warnings */
+    --warning-foreground: 0 0% 0%;
+
+    --info: 214 50% 18%; /* Use dark navy for info */
+    --info-foreground: 0 0% 100%;
+
+    /* UI elements */
+    --border: 0 0% 0%; /* Black borders */
+    --input: 0 0% 100%; /* White inputs */
+    --ring: 214 50% 18%; /* Dark navy focus rings */
+
+    --radius: 0rem; /* No rounded corners */
+
+    /* Sidebar colors */
+    --sidebar-background: 0 0% 90%; /* Light gray */
+    --sidebar-foreground: 0 0% 0%; /* Black */
+    --sidebar-primary: 214 50% 18%; /* Dark navy */
+    --sidebar-primary-foreground: 0 0% 100%; /* White */
+    --sidebar-accent: 39 94% 52%; /* Orange */
+    --sidebar-accent-foreground: 0 0% 0%; /* Black */
+
+    /* Mobile-optimized shadows and borders */
+    --shadow-brutal: 4px 4px 0px 0px;
+    --shadow-brutal-lg: 6px 6px 0px 0px;
+    --shadow-brutal-xl: 8px 8px 0px 0px;
+    --border-width: 3px;
+    
+    /* Mobile-specific variables */
+    --shadow-brutal-mobile: 2px 2px 0px 0px;
+    --shadow-brutal-lg-mobile: 3px 3px 0px 0px;
+    --border-width-mobile: 2px;
+  }
+
+  .dark {
+    --background: 0 0% 0%; /* Pure black background */
+    --foreground: 0 0% 90%; /* Light gray text */
+    --card: 214 50% 18%; /* Dark navy cards */
+    --card-foreground: 0 0% 90%; /* Light gray text on cards */
+    --popover: 214 50% 18%; /* Dark navy */
+    --popover-foreground: 0 0% 90%; /* Light gray */
+    --primary: 0 0% 90%; /* Light gray primary in dark mode */
+    --primary-foreground: 0 0% 0%; /* Black text */
+    --secondary: 39 94% 52%; /* Keep orange */
+    --secondary-foreground: 0 0% 0%; /* Black text */
+    --muted: 214 50% 18%; /* Dark navy */
+    --muted-foreground: 0 0% 70%; /* Light gray */
+    --accent: 39 94% 52%; /* Orange */
+    --accent-foreground: 0 0% 0%; /* Black text */
+    --border: 0 0% 90%; /* Light gray borders */
+    --input: 214 50% 18%; /* Dark navy inputs */
+    --ring: 0 0% 90%; /* Light gray focus rings */
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 400;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: -0.02em;
+  }
+
+  code, pre {
+    font-family: 'JetBrains Mono', monospace;
+  }
+}
+
+/* Improved Neo-Brutalist Utility Classes with Mobile Responsiveness */
+@layer utilities {
+  .brutal-shadow {
+    box-shadow: var(--shadow-brutal) hsl(var(--foreground));
+  }
+
+  .brutal-shadow-lg {
+    box-shadow: var(--shadow-brutal-lg) hsl(var(--foreground));
+  }
+
+  .brutal-shadow-xl {
+    box-shadow: var(--shadow-brutal-xl) hsl(var(--foreground));
+  }
+
+  .brutal-border {
+    border: var(--border-width) solid hsl(var(--foreground));
+  }
+
+  .brutal-border-accent {
+    border: var(--border-width) solid hsl(var(--accent));
+  }
+
+  .brutal-border-secondary {
+    border: var(--border-width) solid hsl(var(--secondary));
+  }
+
+  .brutal-border-destructive {
+    border: var(--border-width) solid hsl(var(--destructive));
+  }
+
+  .brutal-border-success {
+    border: var(--border-width) solid hsl(var(--success));
+  }
+
+  .brutal-border-warning {
+    border: var(--border-width) solid hsl(var(--warning));
+  }
+
+  .brutal-border-info {
+    border: var(--border-width) solid hsl(var(--info));
+  }
+
+  .brutal-text {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: -0.02em;
+  }
+
+  .brutal-mono {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+  }
+
+  .brutal-hover {
+    transition: all 0.1s ease;
+  }
+
+  .brutal-hover:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: calc(var(--shadow-brutal) + 2px) calc(var(--shadow-brutal) + 2px) 0px 0px hsl(var(--foreground));
+  }
+
+  .brutal-active:active {
+    transform: translate(2px, 2px);
+    box-shadow: 2px 2px 0px 0px hsl(var(--foreground));
+  }
+
+  .brutal-grid {
+    background-image: 
+      linear-gradient(hsl(var(--foreground) / 0.1) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--foreground) / 0.1) 1px, transparent 1px);
+    background-size: 20px 20px;
+  }
+
+  /* Mobile-specific optimizations */
+  @media (max-width: 768px) {
+    .brutal-shadow {
+      box-shadow: var(--shadow-brutal-mobile) hsl(var(--foreground));
+    }
+
+    .brutal-shadow-lg {
+      box-shadow: var(--shadow-brutal-lg-mobile) hsl(var(--foreground));
+    }
+
+    .brutal-shadow-xl {
+      box-shadow: var(--shadow-brutal-lg-mobile) hsl(var(--foreground));
+    }
+
+    .brutal-border,
+    .brutal-border-accent,
+    .brutal-border-secondary,
+    .brutal-border-destructive,
+    .brutal-border-success,
+    .brutal-border-warning,
+    .brutal-border-info {
+      border-width: var(--border-width-mobile);
+    }
+
+    .brutal-hover:hover {
+      transform: translate(-1px, -1px);
+      box-shadow: calc(var(--shadow-brutal-mobile) + 1px) calc(var(--shadow-brutal-mobile) + 1px) 0px 0px hsl(var(--foreground));
+    }
+
+    .brutal-grid {
+      background-size: 15px 15px;
+    }
+
+    /* Mobile text scaling */
+    .brutal-text {
+      letter-spacing: -0.01em;
+    }
+
+    /* Mobile-specific text truncation */
+    .mobile-truncate {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .mobile-text-wrap {
+      word-break: break-word;
+      hyphens: auto;
+    }
+  }
+
+  /* Mobile text utilities */
+  .text-mobile-xs { font-size: 0.75rem; line-height: 1rem; }
+  .text-mobile-sm { font-size: 0.875rem; line-height: 1.25rem; }
+  .text-mobile-base { font-size: 1rem; line-height: 1.5rem; }
+  .text-mobile-lg { font-size: 1.125rem; line-height: 1.75rem; }
+  .text-mobile-xl { font-size: 1.25rem; line-height: 1.75rem; }
+  .text-mobile-2xl { font-size: 1.5rem; line-height: 2rem; }
+  .text-mobile-3xl { font-size: 1.875rem; line-height: 2.25rem; }
+}
