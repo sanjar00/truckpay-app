@@ -137,11 +137,8 @@ const Index = () => {
       case 'forecast':
         return (
           <ForecastSummary 
-            grossPay={0}
-            driverPay={0}
-            totalDeductions={0}
-            netIncome={0}
             onBack={() => setCurrentView('dashboard')}
+            deductions={deductions}
           />
         );
       case 'settings':
