@@ -257,8 +257,9 @@ const ForecastSummary = ({ onBack, deductions }: ForecastSummaryProps) => {
   }, 0);
   
   // Calculate total fixed deductions (multiply by number of weeks)
+  // Calculate total fixed deductions (multiply by number of weeks)
   const numberOfWeeks = isValidDateStart && isValidDateEnd 
-    ? Math.ceil((dateEnd.getTime() - dateStart.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1
+    ? Math.floor((dateEnd.getTime() - dateStart.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1
     : 1; // Default to 1 week if dates are invalid
   const totalFixedDeductions = deductions
     ?.filter(d => d.isFixed)
