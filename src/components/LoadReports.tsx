@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { ArrowLeft, Plus, Truck, Calendar, DollarSign } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -31,7 +30,6 @@ interface LoadReportsProps {
 }
 
 const LoadReports = ({ onBack, user, userProfile, deductions }: LoadReportsProps) => {
-  // Fix: Remove duplicate state declarations and use consistent week start
   const [currentWeek, setCurrentWeek] = useState(startOfWeek(new Date(), { weekStartsOn: 0 }));
   const [allDeductionTypes, setAllDeductionTypes] = useState<string[]>([]);
   const [weeklyDeductions, setWeeklyDeductions] = useState<Record<string, string>>({});
@@ -50,7 +48,6 @@ const LoadReports = ({ onBack, user, userProfile, deductions }: LoadReportsProps
   const [showAddExtraDeduction, setShowAddExtraDeduction] = useState(false);
   const [newExtraDeduction, setNewExtraDeduction] = useState({ name: '', amount: '' });
 
-  // Fix: Use consistent week start configuration
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 0 });
   const weekEnd = endOfWeek(currentWeek, { weekStartsOn: 0 });
 
@@ -66,7 +63,7 @@ const LoadReports = ({ onBack, user, userProfile, deductions }: LoadReportsProps
     if (user) {
       fetchLoads();
       fetchWeeklyDeductions();
-      fetchExtraDeductions(); // Add this line
+      fetchExtraDeductions();
     }
   }, [user, currentWeek]);
 
@@ -86,7 +83,6 @@ const LoadReports = ({ onBack, user, userProfile, deductions }: LoadReportsProps
     }
   };
 
-  // Fetch weekly deductions for current week
   const fetchWeeklyDeductions = async () => {
     if (!user) return;
     
@@ -114,7 +110,6 @@ const LoadReports = ({ onBack, user, userProfile, deductions }: LoadReportsProps
     }
   };
 
-  // Save weekly deduction to database
   const saveWeeklyDeduction = async (type: string, amount: string) => {
     if (!user) return;
     
@@ -122,7 +117,6 @@ const LoadReports = ({ onBack, user, userProfile, deductions }: LoadReportsProps
       const weekStartDate = weekStart.toISOString().split('T')[0];
       
       if (!amount || parseFloat(amount) === 0) {
-        // Delete if amount is 0 or empty
         const { error } = await supabase
           .from('weekly_deductions')
           .delete()
@@ -134,7 +128,6 @@ const LoadReports = ({ onBack, user, userProfile, deductions }: LoadReportsProps
           console.error('Error deleting weekly deduction:', error);
         }
       } else {
-        // Upsert the deduction
         const { error } = await supabase
           .from('weekly_deductions')
           .upsert({
@@ -156,27 +149,23 @@ const LoadReports = ({ onBack, user, userProfile, deductions }: LoadReportsProps
     }
   };
 
-  // Handle weekly deduction changes with auto-save
   const handleWeeklyDeductionChange = async (type: string, amount: string) => {
     setWeeklyDeductions(prev => ({
       ...prev,
       [type]: amount
     }));
     
-    // Auto-save after a short delay (debounced)
     clearTimeout((window as any).deductionSaveTimeout);
     (window as any).deductionSaveTimeout = setTimeout(() => {
       saveWeeklyDeduction(type, amount);
-    }, 1000); // Save 1 second after user stops typing
+    }, 1000);
   };
 
-  // Get deduction types that are not marked as fixed
   const availableDeductionTypes = allDeductionTypes.filter(type => {
     const fixedDeduction = deductions?.find(d => d.type === type && d.isFixed);
     return !fixedDeduction;
   });
 
-  // Filter loads for current week - client-side filtering only
   const currentWeekLoads = loads.filter(load => {
     if (!load.dateAdded) return false;
     const loadDate = typeof load.dateAdded === 'string' ? parseISO(load.dateAdded) : load.dateAdded;
@@ -185,14 +174,12 @@ const LoadReports = ({ onBack, user, userProfile, deductions }: LoadReportsProps
     return isInWeek;
   });
 
-  // Fixed fetchLoads function - remove database date filtering to avoid conflicts
   const fetchLoads = async () => {
     if (!user) return;
     
     try {
       console.log('Fetching loads for user:', user.id);
       
-      // Remove date filtering from database query - let client-side handle it
       const { data, error } = await supabase
         .from('load_reports')
         .select('*')
@@ -235,8 +222,6 @@ const LoadReports = ({ onBack, user, userProfile, deductions }: LoadReportsProps
       try {
         const driverPay = parseFloat(newLoad.rate) * (1 - parseFloat(newLoad.companyDeduction) / 100);
         const weekPeriod = `${format(weekStart, 'MMM dd')} - ${format(weekEnd, 'MMM dd, yyyy')}`;
-        
-        // Use date-only format to match database structure
         const loadDate = weekStart.toISOString().split('T')[0];
         
         const { data, error } = await supabase
@@ -321,10 +306,6 @@ const LoadReports = ({ onBack, user, userProfile, deductions }: LoadReportsProps
     }
   };
 
-  // Add function to handle extra deduction types
-  // Add these functions after the existing saveWeeklyDeduction function (around line 150)
-  
-  // Fetch extra deductions for current week
   const fetchExtraDeductions = async () => {
     if (!user) return;
     
@@ -353,45 +334,87 @@ const LoadReports = ({ onBack, user, userProfile, deductions }: LoadReportsProps
     }
   };
   
-  // Save extra deduction to database
   const saveExtraDeduction = async (deduction: {id: string, name: string, amount: string}) => {
     if (!user) return;
     
     try {
       const weekStartDate = weekStart.toISOString().split('T')[0];
       
-      const { error } = await supabase
-        .from('weekly_extra_deductions')
-        .upsert({
-          id: parseInt(deduction.id),
-          user_id: user.id,
-          week_start: weekStartDate,
-          name: deduction.name,
-          amount: parseFloat(deduction.amount),
-          updated_at: new Date().toISOString()
-        });
+      if (deduction.id.includes('_')) {
+        // Insert new deduction
+        const { data, error } = await supabase
+          .from('weekly_extra_deductions')
+          .insert({
+            user_id: user.id,
+            week_start: weekStartDate,
+            name: deduction.name,
+            amount: parseFloat(deduction.amount),
+            updated_at: new Date().toISOString()
+          })
+          .select();
+      
+        if (error) {
+          console.error('Error saving extra deduction:', error);
+          // Update the local state to reflect the failed save
+          setExtraDeductionTypes(prev => prev.filter(item => item.id !== deduction.id));
+          return false;
+        }
+        
+        // Update the local state with the actual database ID
+        if (data && data[0]) {
+          setExtraDeductionTypes(prev => 
+            prev.map(item => 
+              item.id === deduction.id 
+                ? { ...item, id: data[0].id.toString() }
+                : item
+            )
+          );
+        }
+        
+        console.log('Extra deduction saved successfully:', data);
+        return true;
+      } else {
+        // Update existing deduction
+        const { error } = await supabase
+          .from('weekly_extra_deductions')
+          .update({
+            name: deduction.name,
+            amount: parseFloat(deduction.amount),
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', parseInt(deduction.id))
+          .eq('user_id', user.id);
   
-      if (error) {
-        console.error('Error saving extra deduction:', error);
+        if (error) {
+          console.error('Error updating extra deduction:', error);
+          return false;
+        }
+        
+        console.log('Extra deduction updated successfully');
+        return true;
       }
     } catch (error) {
       console.error('Error saving extra deduction:', error);
+      // Remove the failed entry from local state
+      setExtraDeductionTypes(prev => prev.filter(item => item.id !== deduction.id));
+      return false;
     }
   };
   
-  // Delete extra deduction from database
   const deleteExtraDeduction = async (id: string) => {
     if (!user) return;
     
     try {
-      const { error } = await supabase
-        .from('weekly_extra_deductions')
-        .delete()
-        .eq('id', parseInt(id))
-        .eq('user_id', user.id);
+      if (!id.includes('_')) {
+        const { error } = await supabase
+          .from('weekly_extra_deductions')
+          .delete()
+          .eq('id', parseInt(id))
+          .eq('user_id', user.id);
   
-      if (error) {
-        console.error('Error deleting extra deduction:', error);
+        if (error) {
+          console.error('Error deleting extra deduction:', error);
+        }
       }
     } catch (error) {
       console.error('Error deleting extra deduction:', error);
@@ -409,38 +432,78 @@ const LoadReports = ({ onBack, user, userProfile, deductions }: LoadReportsProps
       setNewExtraDeduction({ name: '', amount: '' });
       setShowAddExtraDeduction(false);
       
-      // Save to database
       await saveExtraDeduction(newExtra);
     }
   };
 
   const handleRemoveExtraDeduction = async (id: string) => {
     setExtraDeductionTypes(prev => prev.filter(item => item.id !== id));
-    
-    // Delete from database
     await deleteExtraDeduction(id);
   };
 
-  // Calculate weekly summary totals
+  // Calculate fixed deductions for the current week
+  const calculateFixedDeductionsForWeek = (weekStartDate: Date) => {
+    if (!deductions) return 0;
+    
+    const weekStartString = weekStartDate.toISOString().split('T')[0];
+    
+    // Group deductions by type
+    const deductionsByType = deductions
+      .filter(d => d.isFixed)
+      .reduce((acc, deduction) => {
+        if (!acc[deduction.type]) {
+          acc[deduction.type] = [];
+        }
+        acc[deduction.type].push(deduction);
+        return acc;
+      }, {} as Record<string, typeof deductions>);
+    
+    let totalFixedDeductions = 0;
+    
+    // For each deduction type, find the amount that was effective for this week
+    Object.values(deductionsByType).forEach(typeDeductions => {
+      // Get all deductions for this type that were effective on or before this week
+      const applicableDeductions = typeDeductions
+        .filter(d => (d.dateAdded || d.created_at) <= weekStartString)
+        .sort((a, b) => (b.dateAdded || b.created_at).localeCompare(a.dateAdded || a.created_at));
+      
+      // Use the most recent amount that was effective for this week
+      if (applicableDeductions.length > 0) {
+        totalFixedDeductions += applicableDeductions[0].amount;
+      }
+    });
+    
+    return totalFixedDeductions;
+  };
+
   const totalGrossPay = currentWeekLoads.reduce((total, load) => total + (load.rate || 0), 0);
   const totalDriverPay = currentWeekLoads.reduce((total, load) => total + (load.driverPay || 0), 0);
   
-  // Fix: Calculate total weekly deductions (variable amounts)
+  const handleAddDeductionFromType = async (type: string, amount: string) => {
+    if (amount && parseFloat(amount) > 0) {
+      const newExtra = {
+        id: `${type}_${Date.now()}`,
+        name: type,
+        amount: amount
+      };
+      setExtraDeductionTypes(prev => [...prev, newExtra]);
+      const success = await saveExtraDeduction(newExtra);
+      if (!success) {
+        console.error('Failed to save deduction:', newExtra);
+        // The saveExtraDeduction function already removes it from state on failure
+      }
+    }
+  };
+
   const totalWeeklyDeductions = Object.values(weeklyDeductions).reduce((total, amount) => {
     return total + (parseFloat(amount) || 0);
   }, 0);
   
-  // Fix: Calculate total extra deductions
   const totalExtraDeductions = extraDeductionTypes.reduce((total, extra) => {
     return total + (parseFloat(extra.amount) || 0);
   }, 0);
   
-  // Calculate total fixed deductions
-  const totalFixedDeductions = deductions
-    ?.filter(d => d.isFixed)
-    .reduce((total, deduction) => total + (deduction.amount || 0), 0) || 0;
-  
-  // Calculate net pay after both weekly and fixed deductions
+  const totalFixedDeductions = calculateFixedDeductionsForWeek(weekStart);
   const netPay = totalDriverPay - totalWeeklyDeductions - totalExtraDeductions - totalFixedDeductions;
 
   return (
@@ -453,10 +516,9 @@ const LoadReports = ({ onBack, user, userProfile, deductions }: LoadReportsProps
               variant="ghost" 
               size="sm" 
               onClick={onBack}
-              className="brutal-border-accent bg-accent text-accent-foreground"
+              className="brutal-border brutal-shadow mobile-h mobile-w brutal-hover"
             >
-              <ArrowLeft className="w-5 h-5 mr-2" />
-              BACK
+              <ArrowLeft className="mobile-icon" />
             </Button>
             <div>
               <h1 className="brutal-text text-3xl text-foreground">LOAD REPORTS</h1>
@@ -508,8 +570,8 @@ const LoadReports = ({ onBack, user, userProfile, deductions }: LoadReportsProps
           
           <div className="brutal-border-info bg-info p-6 brutal-shadow text-center">
             <DollarSign className="w-12 h-12 text-info-foreground mx-auto mb-4" />
-            <p className="brutal-mono text-sm text-info-foreground mb-2">TOTAL_DRIVER_PAY</p>
-            <p className="brutal-text text-3xl text-info-foreground">${formatCurrency(totalDriverPay)}</p>
+            <p className="brutal-mono text-sm text-info-foreground mb-2">GROSS_PAY</p>
+            <p className="brutal-text text-3xl text-info-foreground">${formatCurrency(totalGrossPay)}</p>
             <p className="brutal-mono text-xs text-info-foreground mt-2">{currentWeekLoads.length}_LOADS_THIS_WEEK</p>
           </div>
         </div>
@@ -517,7 +579,7 @@ const LoadReports = ({ onBack, user, userProfile, deductions }: LoadReportsProps
         {/* Add New Load Button */}
         <Button 
           onClick={() => setShowAddForm(true)}
-          className="w-full h-16 brutal-border-accent hover: brutal-border-info bg-accent hover:bg-accent text-accent-foreground brutal-hover brutal-active"
+          className="w-full h-16 brutal-border-accent hover:brutal-border-info bg-accent hover:bg-accent text-accent-foreground brutal-hover brutal-active"
           size="lg"
         >
           <Plus className="w-8 h-8 mr-3" />
@@ -571,6 +633,7 @@ const LoadReports = ({ onBack, user, userProfile, deductions }: LoadReportsProps
             onWeeklyDeductionChange={handleWeeklyDeductionChange}
             availableDeductionTypes={availableDeductionTypes}
             fixedDeductions={deductions?.filter(d => d.isFixed) || []}
+            totalGrossPay={totalGrossPay}
             totalDriverPay={totalDriverPay}
             totalWeeklyDeductions={totalWeeklyDeductions}
             totalFixedDeductions={totalFixedDeductions}
@@ -578,6 +641,7 @@ const LoadReports = ({ onBack, user, userProfile, deductions }: LoadReportsProps
             netPay={netPay}
             extraDeductionTypes={extraDeductionTypes}
             onAddExtraDeduction={handleAddExtraDeduction}
+            onAddDeductionFromType={handleAddDeductionFromType}
             onRemoveExtraDeduction={handleRemoveExtraDeduction}
             showAddExtraDeduction={showAddExtraDeduction}
             setShowAddExtraDeduction={setShowAddExtraDeduction}

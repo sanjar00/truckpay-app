@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { Truck, Calculator, Settings, DollarSign, FileText, LogOut } from 'lucide-react';
+import { Truck, Calculator, Settings, DollarSign, FileText, LogOut, Receipt } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -10,6 +10,7 @@ import LoadReports from '@/components/LoadReports';
 import Deductions from '@/components/Deductions';
 import ForecastSummary from '@/components/ForecastSummary';
 import SettingsPanel from '@/components/SettingsPanel';
+import PersonalExpenses from '@/components/PersonalExpenses';
 
 const Index = () => {
   const { user, loading, signOut } = useAuth();
@@ -141,6 +142,12 @@ const Index = () => {
             deductions={deductions}
           />
         );
+      case 'expenses':
+        return (
+          <PersonalExpenses 
+            onBack={() => setCurrentView('dashboard')}
+          />
+        );
       case 'settings':
         return (
           <SettingsPanel 
@@ -165,16 +172,26 @@ const Index = () => {
                       <h2 className="brutal-text text-lg sm:text-2xl text-accent">DRIVE SMART. EARN MORE.</h2>
                     </div>
                   </div>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={handleLogout}
-                    className="brutal-border-destructive bg-destructive hover:bg-destructive text-destructive-foreground brutal-shadow brutal-hover brutal-active brutal-text text-xs sm:text-sm"
-                  >
-                    <LogOut className="w-4 h-4 sm:w-6 sm:h-6 mr-1 sm:mr-2" />
-                    <span className="hidden sm:inline">LOGOUT</span>
-                    <span className="sm:hidden">OUT</span>
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button 
+                      onClick={() => setCurrentView('settings')}
+                      variant="outline" 
+                      size="sm"
+                      className="brutal-border-secondary bg-secondary hover:bg-secondary text-secondary-foreground brutal-shadow brutal-hover brutal-active"
+                    >
+                      <Settings className="w-4 h-4 sm:w-6 sm:h-6" />
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={handleLogout}
+                      className="brutal-border-destructive bg-destructive hover:bg-destructive text-destructive-foreground brutal-shadow brutal-hover brutal-active brutal-text text-xs sm:text-sm"
+                    >
+                      <LogOut className="w-4 h-4 sm:w-6 sm:h-6 mr-1 sm:mr-2" />
+                      <span className="hidden sm:inline">LOGOUT</span>
+                      <span className="sm:hidden">OUT</span>
+                    </Button>
+                  </div>
                 </div>
                 
                 <div className="space-y-3 sm:space-y-4">
@@ -218,7 +235,7 @@ const Index = () => {
                   <Calculator className="w-6 h-6 sm:w-10 sm:h-10 mb-2 sm:mb-3" />
                   <div className="text-left">
                     <p className="brutal-text text-sm sm:text-xl mb-1">DEDUCTIONS</p>
-                    <p className="brutal-mono text-xs sm:text-sm opacity-80 mobile-text-wrap">TRACK EXPENSES</p>
+                    <p className="brutal-mono text-xs sm:text-sm opacity-80 mobile-text-wrap">TRUCK EXPENSES</p>
                   </div>
                 </Button>
 
@@ -234,13 +251,13 @@ const Index = () => {
                 </Button>
 
                 <Button 
-                  onClick={() => setCurrentView('settings')}
+                  onClick={() => setCurrentView('expenses')}
                   className="h-24 sm:h-32 brutal-border bg-info hover:bg-accent text-info-foreground hover:text-accent-foreground brutal-shadow-lg brutal-hover brutal-active p-4 sm:p-6 flex flex-col items-start justify-center"
                 >
-                  <Settings className="w-6 h-6 sm:w-10 sm:h-10 mb-2 sm:mb-3" />
+                  <Receipt className="w-6 h-6 sm:w-10 sm:h-10 mb-2 sm:mb-3" />
                   <div className="text-left">
-                    <p className="brutal-text text-sm sm:text-xl mb-1">SETTINGS</p>
-                    <p className="brutal-mono text-xs sm:text-sm opacity-80 mobile-text-wrap">CONFIGURE</p>
+                    <p className="brutal-text text-sm sm:text-xl mb-1">PERSONAL EXPENSES</p>
+                    <p className="brutal-mono text-xs sm:text-sm opacity-80 mobile-text-wrap">TRACK EXPENSES</p>
                   </div>
                 </Button>
               </div>
@@ -248,7 +265,7 @@ const Index = () => {
               {/* Footer */}
               <div className="brutal-border bg-muted p-3 sm:p-6 brutal-shadow text-center">
                 <p className="brutal-mono text-xs sm:text-sm text-muted-foreground mobile-text-wrap">
-                  TRUCKPAY V1.0
+                  TRUCKPAY V1.2
                 </p>
               </div>
             </div>

@@ -20,6 +20,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import DeductionsSummary from './DeductionsSummary';
 import { formatCurrency } from '@/lib/utils';
+import { startOfWeek } from 'date-fns';
 
 const Deductions = ({ onBack, deductions, setDeductions }: DeductionsProps) => {
   const { user } = useAuth();
@@ -137,48 +138,62 @@ const Deductions = ({ onBack, deductions, setDeductions }: DeductionsProps) => {
 
   const handleSaveFixedDeduction = async (type) => {
     const deductionData = fixedDeductions[type];
-    if (deductionData && deductionData.amount && user) {
+    const existingDeduction = deductions.find(d => d.type === type && d.isFixed);
+    
+    // Use existing amount if no new amount is provided
+    const amountToSave = deductionData?.amount || (existingDeduction ? existingDeduction.amount.toString() : '');
+    
+    if (amountToSave && user) {
       setLoading(true);
       
       try {
-        // Check if deduction already exists
-        const existingDeduction = deductions.find(d => d.type === type && d.isFixed);
+        const currentWeekStart = startOfWeek(new Date(), { weekStartsOn: 0 }).toISOString().split('T')[0];
         
         if (existingDeduction) {
-          // Update existing deduction
-          const { error } = await supabase
-            .from('deductions')
-            .update({
-              amount: parseFloat(deductionData.amount),
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', existingDeduction.id)
-            .eq('user_id', user.id);
-
-          if (error) {
-            console.error('Error updating deduction:', error);
+          // Check if the amount is actually changing
+          if (parseFloat(amountToSave) === existingDeduction.amount) {
+            // No change needed
+            setLoading(false);
             return;
           }
-        } else {
-          // Insert new deduction
-          const { data, error } = await supabase
+          
+          // Create a new record with the new amount effective from current week
+          // Keep the old record unchanged for historical data
+          const { error } = await supabase
             .from('deductions')
             .insert({
               user_id: user.id,
               type: type,
-              amount: parseFloat(deductionData.amount),
+              amount: parseFloat(amountToSave),
               is_fixed: true,
-              is_custom_type: customDeductionTypes.includes(type)
-            })
-            .select()
-            .single();
-
+              is_custom_type: customDeductionTypes.includes(type),
+              date_added: currentWeekStart, // Effective from current week
+              created_at: new Date().toISOString()
+            });
+    
+          if (error) {
+            console.error('Error creating new deduction version:', error);
+            return;
+          }
+        } else {
+          // Insert new deduction
+          const { error } = await supabase
+            .from('deductions')
+            .insert({
+              user_id: user.id,
+              type: type,
+              amount: parseFloat(amountToSave),
+              is_fixed: true,
+              is_custom_type: customDeductionTypes.includes(type),
+              date_added: currentWeekStart
+            });
+    
           if (error) {
             console.error('Error saving deduction:', error);
             return;
           }
         }
-
+    
         // Refresh deductions from database
         await fetchDeductions();
         
@@ -354,10 +369,9 @@ const Deductions = ({ onBack, deductions, setDeductions }: DeductionsProps) => {
               variant="ghost" 
               size="sm" 
               onClick={onBack}
-              className="brutal-border-accent bg-accent text-accent-foreground"
+              className="brutal-border brutal-shadow mobile-h mobile-w brutal-hover"
             >
-              <ArrowLeft className="w-5 h-5 mr-2" />
-              BACK
+              <ArrowLeft className="mobile-icon" />
             </Button>
             <div>
               <h1 className="brutal-text text-3xl text-foreground">DEDUCTIONS</h1>
@@ -465,22 +479,29 @@ const Deductions = ({ onBack, deductions, setDeductions }: DeductionsProps) => {
                             placeholder="150.00"
                             step="0.01"
                             min="0"
-                            value={existingDeduction ? existingDeduction.amount : (fixedDeductions[type]?.amount || '')}
+                            value={fixedDeductions[type]?.amount || (existingDeduction ? existingDeduction.amount : '')}
                             onChange={(e) => handleAmountChange(type, e.target.value)}
                             className="brutal-border bg-background text-lg font-bold flex-1"
                           />
                           <Button
                             onClick={() => handleSaveFixedDeduction(type)}
-                            disabled={!fixedDeductions[type]?.amount}
+                            disabled={!fixedDeductions[type]?.amount && !existingDeduction}
                             className="brutal-border-success bg-success text-success-foreground brutal-shadow"
                           >
-                            <span className="brutal-text">SAVE</span>
+                            <span className="brutal-text">{existingDeduction ? 'UPDATE' : 'SAVE'}</span>
                           </Button>
                         </div>
                         {existingDeduction && (
                           <div className="brutal-border-success bg-success/10 p-3 brutal-shadow">
                             <p className="brutal-mono text-sm text-success font-bold">
                               ✓ FIXED_AT_${existingDeduction.amount.toFixed(2)}/WEEK
+                            </p>
+                            <p className="brutal-mono text-xs text-success opacity-80">
+                              EFFECTIVE_FROM_{existingDeduction.dateAdded ? new Date(existingDeduction.dateAdded).toLocaleDateString('en-US', { 
+                                year: 'numeric', 
+                                month: 'short', 
+                                day: 'numeric' 
+                              }).replace(/\s/g, '_').toUpperCase() : 'CURRENT_WEEK'}
                             </p>
                           </div>
                         )}
