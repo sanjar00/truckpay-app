@@ -45,7 +45,7 @@ const LoadReports = ({ onBack, user, userProfile, deductions }: LoadReportsProps
   const [showAddForm, setShowAddForm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loads, setLoads] = useState<Load[]>([]);
-  const [extraDeductionTypes, setExtraDeductionTypes] = useState<Array<{id: string, name: string, amount: string}>>([]);
+  const [extraDeductionTypes, setExtraDeductionTypes] = useState<Array<{id: string, name: string, amount: string, dateAdded?: string}>>([]);
   const [showAddExtraDeduction, setShowAddExtraDeduction] = useState(false);
   const [newExtraDeduction, setNewExtraDeduction] = useState({ name: '', amount: '' });
 
@@ -326,7 +326,8 @@ const LoadReports = ({ onBack, user, userProfile, deductions }: LoadReportsProps
         const extraDeductions = data.map(item => ({
           id: item.id.toString(),
           name: item.name,
-          amount: item.amount.toString()
+          amount: item.amount.toString(),
+          dateAdded: item.updated_at
         }));
         setExtraDeductionTypes(extraDeductions);
       }
@@ -427,7 +428,8 @@ const LoadReports = ({ onBack, user, userProfile, deductions }: LoadReportsProps
       const newExtra = {
         id: Date.now().toString(),
         name: newExtraDeduction.name.trim(),
-        amount: newExtraDeduction.amount
+        amount: newExtraDeduction.amount,
+        dateAdded: new Date().toISOString()
       };
       setExtraDeductionTypes(prev => [...prev, newExtra]);
       setNewExtraDeduction({ name: '', amount: '' });
@@ -485,7 +487,8 @@ const LoadReports = ({ onBack, user, userProfile, deductions }: LoadReportsProps
       const newExtra = {
         id: `${type}_${Date.now()}`,
         name: type,
-        amount: amount
+        amount: amount,
+        dateAdded: new Date().toISOString()
       };
       setExtraDeductionTypes(prev => [...prev, newExtra]);
       const success = await saveExtraDeduction(newExtra);

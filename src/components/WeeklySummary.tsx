@@ -11,7 +11,7 @@ interface WeeklySummaryProps {
   availableDeductionTypes: string[];
   weeklyDeductions: Record<string, string>;
   onWeeklyDeductionChange: (type: string, amount: string) => void;
-  extraDeductionTypes: Array<{id: string, name: string, amount: string}>;
+  extraDeductionTypes: Array<{id: string, name: string, amount: string, dateAdded?: string}>;
   onAddExtraDeduction: () => void;
   onAddDeductionFromType: (type: string, amount: string) => void;
   onRemoveExtraDeduction: (id: string) => void;
@@ -115,7 +115,9 @@ const WeeklySummary = ({
                 <div className="flex items-center gap-4">
                   <span className="brutal-mono text-sm text-foreground">{extra.name.toUpperCase()}</span>
                   <span className="brutal-text text-foreground">${formatCurrency(parseFloat(extra.amount))}</span>
-                  <span className="brutal-mono text-xs text-muted-foreground">{new Date().toLocaleDateString()}</span>
+                  <span className="brutal-mono text-xs text-muted-foreground">
+                    {extra.dateAdded ? new Date(extra.dateAdded).toLocaleDateString() : new Date().toLocaleDateString()}
+                  </span>
                 </div>
                 <Button 
                   onClick={() => onRemoveExtraDeduction(extra.id)}
