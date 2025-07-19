@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { formatCurrency } from '@/lib/utils';
 import LoadCard from './LoadCard';
 import { useAuth } from '@/hooks/useAuth';
+import { getUserWeekStart, getUserWeekEnd, getWeekStartForPeriod, getWeekEndForPeriod } from '../lib/weeklyPeriodUtils';
 
 interface Load {
   id: string;
@@ -37,7 +38,7 @@ interface ForecastSummaryProps {
   deductions: Deduction[];
 }
 
-const ForecastSummary = ({ onBack, deductions }: ForecastSummaryProps) => {
+const ForecastSummary = ({ onBack, deductions, userProfile }: ForecastSummaryProps) => {
   const { user } = useAuth();
   const [periodFilter, setPeriodFilter] = useState('last2');
   const [customDateRange, setCustomDateRange] = useState<{from: Date, to: Date} | undefined>();
@@ -49,47 +50,44 @@ const ForecastSummary = ({ onBack, deductions }: ForecastSummaryProps) => {
   // Calculate date range based on filter
   const getDateRange = () => {
     const today = new Date();
-    const currentWeekStart = startOfWeek(today, { weekStartsOn: 0 });
+    const currentWeekStart = getUserWeekStart(today, userProfile);
     
     switch (periodFilter) {
       case 'last2':
         return {
-          start: startOfWeek(subWeeks(currentWeekStart, 1), { weekStartsOn: 0 }),
-          end: endOfWeek(currentWeekStart, { weekStartsOn: 0 })
+          start: getUserWeekStart(subWeeks(currentWeekStart, 1), userProfile),
+          end: getUserWeekEnd(currentWeekStart, userProfile)
         };
       case 'last3':
         return {
-          start: startOfWeek(subWeeks(currentWeekStart, 2), { weekStartsOn: 0 }),
-          end: endOfWeek(currentWeekStart, { weekStartsOn: 0 })
+          start: getUserWeekStart(subWeeks(currentWeekStart, 2), userProfile),
+          end: getUserWeekEnd(currentWeekStart, userProfile)
         };
       case 'last4':
         return {
-          start: startOfWeek(subWeeks(currentWeekStart, 3), { weekStartsOn: 0 }),
-          end: endOfWeek(currentWeekStart, { weekStartsOn: 0 })
+          start: getUserWeekStart(subWeeks(currentWeekStart, 3), userProfile),
+          end: getUserWeekEnd(currentWeekStart, userProfile)
         };
       case 'custom':
-        // Add validation for custom date range
         if (customDateRange && customDateRange.from && customDateRange.to) {
           const fromDate = new Date(customDateRange.from);
           const toDate = new Date(customDateRange.to);
           
-          // Check if dates are valid
           if (!isNaN(fromDate.getTime()) && !isNaN(toDate.getTime())) {
             return {
-              start: startOfWeek(fromDate, { weekStartsOn: 0 }),
-              end: endOfWeek(toDate, { weekStartsOn: 0 })
+              start: getUserWeekStart(fromDate, userProfile),
+              end: getUserWeekEnd(toDate, userProfile)
             };
           }
         }
-        // Fallback to current week if custom range is invalid
         return {
           start: currentWeekStart,
-          end: endOfWeek(currentWeekStart, { weekStartsOn: 0 })
+          end: getUserWeekEnd(currentWeekStart, userProfile)
         };
       default:
         return {
           start: currentWeekStart,
-          end: endOfWeek(currentWeekStart, { weekStartsOn: 0 })
+          end: getUserWeekEnd(currentWeekStart, userProfile)
         };
     }
   };
@@ -145,14 +143,15 @@ const ForecastSummary = ({ onBack, deductions }: ForecastSummaryProps) => {
     if (!user) return;
     
     try {
-      // Get all weeks in the date range
+      // Get all weeks in the date range using user's weekly period for each week
       const weeks = [];
-      let currentWeek = startOfWeek(dateStart, { weekStartsOn: 0 });
+      let currentWeek = dateStart;
       while (currentWeek <= dateEnd) {
-        weeks.push(currentWeek.toISOString().split('T')[0]);
-        currentWeek = startOfWeek(new Date(currentWeek.getTime() + 7 * 24 * 60 * 60 * 1000), { weekStartsOn: 0 });
+        const weekStart = getUserWeekStart(currentWeek, userProfile);
+        weeks.push(weekStart.toISOString().split('T')[0]);
+        currentWeek = new Date(currentWeek.getTime() + 7 * 24 * 60 * 60 * 1000);
       }
-
+      
       const { data, error } = await supabase
         .from('weekly_deductions')
         .select('*')

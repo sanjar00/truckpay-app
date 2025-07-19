@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { format, startOfWeek, endOfWeek, subWeeks, addDays } from 'date-fns';
 import { DatePickerWithRange } from '@/components/ui/date-picker';
 import { DateRange } from 'react-day-picker';
+import { getUserWeekStart, getUserWeekEnd } from '../lib/weeklyPeriodUtils';
 
 interface ExpenseType {
   id: string;
@@ -33,7 +34,7 @@ interface PersonalExpensesProps {
   onBack: () => void;
 }
 
-const PersonalExpenses: React.FC<PersonalExpensesProps> = ({ onBack }) => {
+const PersonalExpenses: React.FC<PersonalExpensesProps> = ({ onBack, userProfile }) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [expenseTypes, setExpenseTypes] = useState<ExpenseType[]>([]);
@@ -58,30 +59,29 @@ const PersonalExpenses: React.FC<PersonalExpensesProps> = ({ onBack }) => {
 
     switch (periodFilter) {
       case 'last2':
-        startDate = startOfWeek(subWeeks(today, 1), { weekStartsOn: 1 }); // Monday
-        endDate = endOfWeek(today, { weekStartsOn: 1 }); // Sunday
+        startDate = getUserWeekStart(subWeeks(today, 1), userProfile);
+        endDate = getUserWeekEnd(today, userProfile);
         break;
       case 'last3':
-        startDate = startOfWeek(subWeeks(today, 2), { weekStartsOn: 1 });
-        endDate = endOfWeek(today, { weekStartsOn: 1 });
+        startDate = getUserWeekStart(subWeeks(today, 2), userProfile);
+        endDate = getUserWeekEnd(today, userProfile);
         break;
       case 'last4':
-        startDate = startOfWeek(subWeeks(today, 3), { weekStartsOn: 1 });
-        endDate = endOfWeek(today, { weekStartsOn: 1 });
+        startDate = getUserWeekStart(subWeeks(today, 3), userProfile);
+        endDate = getUserWeekEnd(today, userProfile);
         break;
       case 'custom':
         if (customDateRange?.from && customDateRange?.to) {
           startDate = customDateRange.from;
           endDate = customDateRange.to;
         } else {
-          // Default to current week if custom range is not set
-          startDate = startOfWeek(today, { weekStartsOn: 1 });
-          endDate = endOfWeek(today, { weekStartsOn: 1 });
+          startDate = getUserWeekStart(today, userProfile);
+          endDate = getUserWeekEnd(today, userProfile);
         }
         break;
       default:
-        startDate = startOfWeek(subWeeks(today, 1), { weekStartsOn: 1 });
-        endDate = endOfWeek(today, { weekStartsOn: 1 });
+        startDate = getUserWeekStart(subWeeks(today, 1), userProfile);
+        endDate = getUserWeekEnd(today, userProfile);
     }
 
     return { startDate, endDate };

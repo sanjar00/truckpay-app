@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { Calendar } from 'lucide-react';
 
 const SettingsPanel = ({ userProfile, setUserProfile, onBack }) => {
   const [formData, setFormData] = useState({ ...userProfile });
@@ -32,6 +33,9 @@ const SettingsPanel = ({ userProfile, setUserProfile, onBack }) => {
       // Check if email has changed
       const emailChanged = formData.email !== userProfile.email;
       
+      // Check if weekly period has changed
+      const weeklyPeriodChanged = formData.weeklyPeriod !== userProfile.weeklyPeriod;
+      
       // Update profile data in Supabase
       const { error: profileError } = await supabase
         .from('profiles')
@@ -39,7 +43,9 @@ const SettingsPanel = ({ userProfile, setUserProfile, onBack }) => {
           full_name: formData.name,
           phone: formData.phone,
           driver_type: formData.driverType,
-          company_deduction: parseFloat(formData.companyDeduction)
+          company_deduction: parseFloat(formData.companyDeduction),
+          weekly_period: formData.weeklyPeriod,
+          weekly_period_updated_at: weeklyPeriodChanged ? new Date().toISOString() : undefined
         })
         .eq('id', user.id);
 
@@ -70,7 +76,9 @@ const SettingsPanel = ({ userProfile, setUserProfile, onBack }) => {
       
       toast({
         title: "Settings saved",
-        description: emailChanged 
+        description: weeklyPeriodChanged 
+          ? "Profile updated. New weekly period will apply to future weeks starting from next week."
+          : emailChanged 
           ? "Profile updated. Please confirm your new email address."
           : "Your profile has been updated successfully.",
         duration: 3000,
@@ -402,6 +410,34 @@ const SettingsPanel = ({ userProfile, setUserProfile, onBack }) => {
                 onChange={(e) => handleInputChange('companyDeduction', e.target.value)}
                 className="h-12 brutal-border text-sm"
               />
+            </div>
+
+            {/* Add Weekly Period Setting after Company Deduction Rate */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Calendar className="w-4 h-4" />
+                Weekly Period
+              </Label>
+              <Select 
+                value={formData.weeklyPeriod || 'sunday'} 
+                onValueChange={(value) => handleInputChange('weeklyPeriod', value)}
+              >
+                <SelectTrigger className="h-12">
+                  <SelectValue placeholder="Select your weekly period" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="sunday">Sunday to Saturday</SelectItem>
+                  <SelectItem value="monday">Monday to Sunday</SelectItem>
+                  <SelectItem value="tuesday">Tuesday to Monday</SelectItem>
+                  <SelectItem value="wednesday">Wednesday to Tuesday</SelectItem>
+                  <SelectItem value="thursday">Thursday to Wednesday</SelectItem>
+                  <SelectItem value="friday">Friday to Thursday</SelectItem>
+                  <SelectItem value="saturday">Saturday to Friday</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-sm text-gray-500">
+                Changes to weekly period will be effective from today and won't affect historical data.
+              </p>
             </div>
           </div>
         </div>

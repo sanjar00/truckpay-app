@@ -1,6 +1,6 @@
 
 import { useState } from 'react';
-import { Truck, User, Phone, Mail, Percent, Users, ArrowLeft } from 'lucide-react';
+import { Truck, User, Phone, Mail, Percent, Users, ArrowLeft, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -21,7 +21,8 @@ const Registration = ({ onComplete, onBackToLogin }: RegistrationProps) => {
     email: '',
     password: '',
     driverType: '',
-    companyDeduction: ''
+    companyDeduction: '',
+    weeklyPeriod: 'sunday' // Default to Sunday-Saturday
   });
   const [loading, setLoading] = useState(false);
   const { signUp } = useAuth();
@@ -29,7 +30,7 @@ const Registration = ({ onComplete, onBackToLogin }: RegistrationProps) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.fullName || !formData.email || !formData.password || !formData.driverType || !formData.companyDeduction) {
+    if (!formData.fullName || !formData.email || !formData.password || !formData.driverType || !formData.companyDeduction || !formData.weeklyPeriod) {
       toast({
         title: "Missing fields",
         description: "Please fill in all required fields.",
@@ -43,7 +44,8 @@ const Registration = ({ onComplete, onBackToLogin }: RegistrationProps) => {
       full_name: formData.fullName,
       phone: formData.phone,
       driver_type: formData.driverType,
-      company_deduction: formData.companyDeduction
+      company_deduction: formData.companyDeduction,
+      weekly_period: formData.weeklyPeriod
     });
 
     if (error) {
@@ -182,6 +184,30 @@ const Registration = ({ onComplete, onBackToLogin }: RegistrationProps) => {
               />
             </div>
 
+            {/* Weekly Period Selection - Add this after Company Deduction Rate */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Calendar className="w-4 h-4" />
+                Weekly Period *
+              </Label>
+              <Select value={formData.weeklyPeriod} onValueChange={(value) => handleInputChange('weeklyPeriod', value)}>
+                <SelectTrigger className="h-12">
+                  <SelectValue placeholder="Select your weekly period" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="sunday">Sunday to Saturday</SelectItem>
+                  <SelectItem value="monday">Monday to Sunday</SelectItem>
+                  <SelectItem value="tuesday">Tuesday to Monday</SelectItem>
+                  <SelectItem value="wednesday">Wednesday to Tuesday</SelectItem>
+                  <SelectItem value="thursday">Thursday to Wednesday</SelectItem>
+                  <SelectItem value="friday">Friday to Thursday</SelectItem>
+                  <SelectItem value="saturday">Saturday to Friday</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-sm text-gray-500">
+                Choose when your work week starts. For example, if you select Saturday, your week will run from Saturday to Friday.
+              </p>
+            </div>
             <Button 
               type="submit" 
               className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white"

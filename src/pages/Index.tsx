@@ -73,7 +73,9 @@ const Index = () => {
         phone: data.phone,
         email: user.email,
         driverType: data.driver_type,
-        companyDeduction: data.company_deduction
+        companyDeduction: data.company_deduction,
+        weeklyPeriod: data.weekly_period || 'sunday',
+        weeklyPeriodUpdatedAt: data.weekly_period_updated_at
       });
     }
   };

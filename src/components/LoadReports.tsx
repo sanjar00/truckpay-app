@@ -7,6 +7,7 @@ import AddLoadForm from './AddLoadForm';
 import LoadCard from './LoadCard';
 import WeeklySummary from './WeeklySummary';
 import { formatCurrency } from '@/lib/utils';
+import { getUserWeekStart, getUserWeekEnd } from '@/lib/weeklyPeriodUtils';
 
 // Define Load interface
 interface Load {
@@ -30,7 +31,7 @@ interface LoadReportsProps {
 }
 
 const LoadReports = ({ onBack, user, userProfile, deductions }: LoadReportsProps) => {
-  const [currentWeek, setCurrentWeek] = useState(startOfWeek(new Date(), { weekStartsOn: 0 }));
+  const [currentWeek, setCurrentWeek] = useState(getUserWeekStart(new Date(), userProfile));
   const [allDeductionTypes, setAllDeductionTypes] = useState<string[]>([]);
   const [weeklyDeductions, setWeeklyDeductions] = useState<Record<string, string>>({});
   const [newLoad, setNewLoad] = useState({
@@ -48,8 +49,8 @@ const LoadReports = ({ onBack, user, userProfile, deductions }: LoadReportsProps
   const [showAddExtraDeduction, setShowAddExtraDeduction] = useState(false);
   const [newExtraDeduction, setNewExtraDeduction] = useState({ name: '', amount: '' });
 
-  const weekStart = startOfWeek(currentWeek, { weekStartsOn: 0 });
-  const weekEnd = endOfWeek(currentWeek, { weekStartsOn: 0 });
+  const weekStart = getUserWeekStart(currentWeek, userProfile);
+  const weekEnd = getUserWeekEnd(currentWeek, userProfile);
 
   // Fetch all deduction types from database
   useEffect(() => {
@@ -546,7 +547,9 @@ const LoadReports = ({ onBack, user, userProfile, deductions }: LoadReportsProps
               <p className="brutal-mono text-sm text-info-foreground">
                 {format(weekStart, 'MMM_dd')} - {format(weekEnd, 'MMM_dd,_yyyy')}
               </p>
-              <p className="brutal-mono text-xs text-info-foreground opacity-80">(SUNDAY_TO_SATURDAY)</p>
+              <p className="brutal-mono text-xs text-info-foreground opacity-80">
+                ({getWeeklyPeriodDisplay(userProfile?.weeklyPeriod || 'sunday')})
+              </p>
             </div>
             <Button 
               variant="outline" 
@@ -655,3 +658,17 @@ const LoadReports = ({ onBack, user, userProfile, deductions }: LoadReportsProps
 };
 
 export default LoadReports;
+
+// Add this helper function near the top of the component
+const getWeeklyPeriodDisplay = (weeklyPeriod: string) => {
+  const periodMap = {
+    'sunday': 'SUNDAY_TO_SATURDAY',
+    'monday': 'MONDAY_TO_SUNDAY',
+    'tuesday': 'TUESDAY_TO_MONDAY',
+    'wednesday': 'WEDNESDAY_TO_TUESDAY',
+    'thursday': 'THURSDAY_TO_WEDNESDAY',
+    'friday': 'FRIDAY_TO_THURSDAY',
+    'saturday': 'SATURDAY_TO_FRIDAY'
+  };
+  return periodMap[weeklyPeriod] || 'SUNDAY_TO_SATURDAY';
+};

@@ -102,6 +102,9 @@ const AddLoadForm = ({
                   setNewLoad({ ...newLoad, pickupDate: date });
                   setPickupCalendarOpen(false);
                 }}
+                disabled={(date) => 
+                  date < weekStart || date > weekEnd
+                }
                 initialFocus
               />
             </PopoverContent>
@@ -136,9 +139,17 @@ const AddLoadForm = ({
                   setDeliveryCalendarOpen(false);
                 }}
                 initialFocus
-                disabled={(date) => 
-                  newLoad.pickupDate ? date < newLoad.pickupDate : false
-                }
+                disabled={(date) => {
+                  // Disable dates outside weekly period
+                  if (date < weekStart || date > weekEnd) {
+                    return true;
+                  }
+                  // Also disable dates before pickup date if pickup is selected
+                  if (newLoad.pickupDate && date < newLoad.pickupDate) {
+                    return true;
+                  }
+                  return false;
+                }}
               />
             </PopoverContent>
           </Popover>
