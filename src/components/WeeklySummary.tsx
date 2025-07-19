@@ -202,7 +202,7 @@ const WeeklySummary = ({
               <span>${formatCurrency(totalGrossPay)}</span>
             </div>
             <div className="flex justify-between">
-              <span>DRIVER_PAY_(AFTER_COMPANY_CUT):</span>
+              <span>AFTER_COMPANY_CUT:</span>
               <span>${formatCurrency(totalDriverPay)}</span>
             </div>
             {totalWeeklyDeductions > 0 && (

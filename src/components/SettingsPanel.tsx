@@ -119,7 +119,7 @@ const SettingsPanel = ({ userProfile, setUserProfile, onBack }) => {
         loadReports: loadReportsResponse.data || [],
         deductions: deductionsResponse.data || [],
         exportDate: new Date().toISOString(),
-        version: '1.0.0'
+        version: '1.2.0'
       };
 
       // Create and download file
