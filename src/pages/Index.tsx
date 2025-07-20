@@ -166,9 +166,13 @@ const Index = () => {
               <div className="brutal-border bg-card p-4 sm:p-8 brutal-shadow-xl">
                 <div className="flex items-center justify-between mb-4 sm:mb-6 flex-wrap gap-4">
                   <div className="flex items-center gap-2 sm:gap-4">
-                    <div className="brutal-border-accent bg-accent p-2 sm:p-4 brutal-shadow">
-                      <Truck className="w-8 h-8 sm:w-12 sm:h-12 text-accent-foreground" />
-                    </div>
+                    
+                      <img 
+                        src="/src/logo.png" 
+                        alt="TruckPay Logo" 
+                        className="w-12 h-12 sm:w-20 sm:h-20 object-contain brutal-shadow"
+                      />
+                    
                     <div>
                       <h1 className="brutal-text text-2xl sm:text-4xl text-foreground">TRUCKPAY</h1>
                       <h2 className="brutal-text text-lg sm:text-2xl text-accent">DRIVE SMART. EARN MORE.</h2>

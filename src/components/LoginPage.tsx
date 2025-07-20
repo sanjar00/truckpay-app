@@ -1,6 +1,6 @@
 
 import { useState } from 'react';
-import { Truck, Mail, Lock, LogIn, UserPlus } from 'lucide-react';
+import { Mail, Lock, LogIn, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -40,9 +40,13 @@ const LoginPage = ({ onShowRegistration }: LoginPageProps) => {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-orange-50 p-4 flex items-center justify-center">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <div className="flex items-center justify-center gap-2 mb-4">
-            <Truck className="w-8 h-8 text-blue-600" />
-            <CardTitle className="text-2xl text-blue-600">TruckPay</CardTitle>
+          <div className="flex flex-col items-center justify-center gap-2 mb-4">
+            <img 
+              src="/src/logo.png" 
+              alt="TruckPay Logo" 
+              className="w-20 h-20 object-contain brutal-shadow"
+            />
+            <CardTitle className="text-2xl brutal-text text-accent">TruckPay</CardTitle>
           </div>
           <p className="text-gray-600">Welcome back! Please sign in to continue.</p>
         </CardHeader>
@@ -82,7 +86,7 @@ const LoginPage = ({ onShowRegistration }: LoginPageProps) => {
 
             <Button 
               type="submit" 
-              className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white"
+              className="w-full h-12 brutal-border bg-info hover:bg-accent text-info-foreground hover:text-accent-foreground brutal-shadow-lg brutal-hover brutal-active"
               disabled={loading}
             >
               <LogIn className="w-5 h-5 mr-2" />
