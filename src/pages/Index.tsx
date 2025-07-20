@@ -168,7 +168,7 @@ const Index = () => {
                   <div className="flex items-center gap-2 sm:gap-4">
                     
                       <img 
-                        src="/src/logo.png" 
+                        src="/logo.png" 
                         alt="TruckPay Logo" 
                         className="w-12 h-12 sm:w-20 sm:h-20 object-contain brutal-shadow"
                       />

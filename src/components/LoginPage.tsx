@@ -42,7 +42,7 @@ const LoginPage = ({ onShowRegistration }: LoginPageProps) => {
         <CardHeader className="text-center">
           <div className="flex flex-col items-center justify-center gap-2 mb-4">
             <img 
-              src="/src/logo.png" 
+              src="/logo.png" 
               alt="TruckPay Logo" 
               className="w-20 h-20 object-contain brutal-shadow"
             />
