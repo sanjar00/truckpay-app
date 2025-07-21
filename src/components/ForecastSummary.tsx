@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, TrendingUp, DollarSign, Minus, Calculator, Calendar, Filter, Truck, FileText } from 'lucide-react';
+import { ArrowLeft, TrendingUp, DollarSign, Minus, Calculator, Calendar, Filter, Truck, FileText, Navigation } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DatePickerWithRange } from '@/components/ui/date-picker';
-import { format, startOfWeek, endOfWeek, subWeeks, isWithinInterval, parseISO } from 'date-fns';
+import { format, startOfWeek, endOfWeek, subWeeks, isWithinInterval, parseISO, addWeeks } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { formatCurrency } from '@/lib/utils';
 import LoadCard from './LoadCard';
@@ -36,6 +36,7 @@ interface Deduction {
 interface ForecastSummaryProps {
   onBack: () => void;
   deductions: Deduction[];
+  userProfile: any; // Add this line
 }
 
 const ForecastSummary = ({ onBack, deductions, userProfile }: ForecastSummaryProps) => {
@@ -46,6 +47,8 @@ const ForecastSummary = ({ onBack, deductions, userProfile }: ForecastSummaryPro
   const [weeklyDeductions, setWeeklyDeductions] = useState<Record<string, Record<string, number>>>({});
   const [extraDeductions, setExtraDeductions] = useState<Record<string, Array<{id: string, name: string, amount: number}>>>({});
   const [loading, setLoading] = useState(false);
+  // Add mileage state
+  const [weeklyMileageData, setWeeklyMileageData] = useState<Record<string, {startMileage: number, endMileage: number, totalMiles: number}>>({});
 
   // Calculate date range based on filter
   const getDateRange = () => {
@@ -149,7 +152,7 @@ const ForecastSummary = ({ onBack, deductions, userProfile }: ForecastSummaryPro
       while (currentWeek <= dateEnd) {
         const weekStart = getUserWeekStart(currentWeek, userProfile);
         weeks.push(weekStart.toISOString().split('T')[0]);
-        currentWeek = new Date(currentWeek.getTime() + 7 * 24 * 60 * 60 * 1000);
+        currentWeek = addWeeks(currentWeek, 1); // Use addWeeks instead of manual calculation
       }
       
       const { data, error } = await supabase
@@ -185,10 +188,11 @@ const ForecastSummary = ({ onBack, deductions, userProfile }: ForecastSummaryPro
     try {
       // Get all weeks in the date range
       const weeks = [];
-      let currentWeek = startOfWeek(dateStart, { weekStartsOn: 0 });
+      let currentWeek = dateStart;
       while (currentWeek <= dateEnd) {
-        weeks.push(currentWeek.toISOString().split('T')[0]);
-        currentWeek = startOfWeek(new Date(currentWeek.getTime() + 7 * 24 * 60 * 60 * 1000), { weekStartsOn: 0 });
+        const weekStart = getUserWeekStart(currentWeek, userProfile);
+        weeks.push(weekStart.toISOString().split('T')[0]);
+        currentWeek = addWeeks(currentWeek, 1); // Use addWeeks instead of manual calculation
       }
 
       const { data, error } = await supabase
@@ -270,12 +274,58 @@ const ForecastSummary = ({ onBack, deductions, userProfile }: ForecastSummaryPro
   const netIncome = (totalDriverPay || 0) - (totalDeductions || 0);
   const netIncomePercentage = totalDriverPay > 0 ? ((netIncome / totalDriverPay) * 100) : 0;
 
+  // Add mileage fetch function
+  const fetchWeeklyMileage = async () => {
+    if (!user) return;
+    
+    try {
+      // Get all weeks in the date range using user's weekly period for each week
+      const weeks = [];
+      let currentWeek = dateStart;
+      while (currentWeek <= dateEnd) {
+        const weekStart = getUserWeekStart(currentWeek, userProfile);
+        weeks.push(weekStart.toISOString().split('T')[0]);
+        currentWeek = addWeeks(currentWeek, 1);
+      }
+      
+      const { data, error } = await supabase
+        .from('weekly_mileage')
+        .select('*')
+        .eq('user_id', user.id)
+        .in('week_start', weeks);
+
+      if (error) {
+        console.error('Error fetching weekly mileage:', error);
+        return;
+      }
+
+      if (data) {
+        const mileageMap: Record<string, {startMileage: number, endMileage: number, totalMiles: number}> = {};
+        data.forEach(mileage => {
+          mileageMap[mileage.week_start] = {
+            startMileage: mileage.start_mileage || 0,
+            endMileage: mileage.end_mileage || 0,
+            totalMiles: mileage.total_miles || 0
+          };
+        });
+        setWeeklyMileageData(mileageMap);
+      }
+    } catch (error) {
+      console.error('Error fetching weekly mileage:', error);
+    }
+  };
+
+  const totalMileage = Object.values(weeklyMileageData).reduce((total, weekMileage) => {
+    return total + (weekMileage.totalMiles || 0);
+  }, 0);
+
   // Fetch data when period changes
   useEffect(() => {
     if (user) {
       fetchLoads();
       fetchWeeklyDeductions();
       fetchExtraDeductions();
+      fetchWeeklyMileage(); // Add mileage fetch
     }
   }, [user, periodFilter, customDateRange]);
 
@@ -398,6 +448,22 @@ const ForecastSummary = ({ onBack, deductions, userProfile }: ForecastSummaryPro
                 {netIncomePercentage.toFixed(1)}% of driver pay retained
               </span>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Total Mileage Card */}
+        <Card className="brutal-border brutal-shadow bg-accent/10 mb-8">
+          <CardContent className="p-6 text-center">
+            <Navigation className="mobile-icon-lg mx-auto mb-4 text-accent-foreground" />
+            <p className="mobile-text-base text-muted-foreground mb-2">
+              TOTAL MILES
+            </p>
+            <p className="mobile-text-2xl brutal-text font-bold text-accent-foreground">
+              {totalMileage.toLocaleString()}
+            </p>
+            <p className="brutal-mono text-xs text-muted-foreground mt-1">
+              {numberOfWeeks} WEEK{numberOfWeeks > 1 ? 'S' : ''}
+            </p>
           </CardContent>
         </Card>
 

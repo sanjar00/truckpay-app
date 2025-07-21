@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, X } from 'lucide-react';
+import { Plus, X, Navigation } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 
 interface WeeklySummaryProps {
@@ -25,6 +25,7 @@ interface WeeklySummaryProps {
   totalExtraDeductions: number;
   totalFixedDeductions: number;
   netPay: number;
+  weeklyMileage?: { totalMiles: number }; // Add mileage prop
 }
 
 const WeeklySummary = ({
@@ -44,7 +45,8 @@ const WeeklySummary = ({
   totalWeeklyDeductions,
   totalExtraDeductions,
   totalFixedDeductions,
-  netPay
+  netPay,
+  weeklyMileage
 }: WeeklySummaryProps) => {
   const [pendingDeductions, setPendingDeductions] = useState<Record<string, string>>({});
 
@@ -176,7 +178,7 @@ const WeeklySummary = ({
       )}
 
       {/* Summary Section */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Gross Pay Tab */}
         <div className="brutal-border-info bg-info p-6 brutal-shadow">
           <h3 className="brutal-text text-lg text-info-foreground mb-2">GROSS_PAY</h3>
@@ -190,6 +192,18 @@ const WeeklySummary = ({
           <p className="brutal-text text-3xl text-success-foreground">${formatCurrency(netPay)}</p>
           <p className="brutal-mono text-xs text-success-foreground opacity-80 mt-2">AFTER_ALL_DEDUCTIONS</p>
         </div>
+
+        {/* Mileage Tab */}
+        {weeklyMileage && (
+          <div className="brutal-border-accent bg-accent p-6 brutal-shadow">
+            <div className="flex items-center gap-2 mb-2">
+              <Navigation className="w-5 h-5 text-accent-foreground" />
+              <h3 className="brutal-text text-lg text-accent-foreground">MILES_DRIVEN</h3>
+            </div>
+            <p className="brutal-text text-3xl text-accent-foreground">{weeklyMileage.totalMiles.toLocaleString()}</p>
+            <p className="brutal-mono text-xs text-accent-foreground opacity-80 mt-2">THIS_WEEK</p>
+          </div>
+        )}
       </div>
 
       {/* Detailed Breakdown */}

@@ -142,6 +142,7 @@ const Index = () => {
           <ForecastSummary 
             onBack={() => setCurrentView('dashboard')}
             deductions={deductions}
+            userProfile={userProfile}
           />
         );
       case 'expenses':

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Plus, Truck, Calendar, DollarSign, Navigation } from 'lucide-react';
+import { ArrowLeft, Plus, Truck, Calendar, DollarSign } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, isWithinInterval, parseISO } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
@@ -49,13 +49,6 @@ const LoadReports = ({ onBack, user, userProfile, deductions }: LoadReportsProps
   const [showAddExtraDeduction, setShowAddExtraDeduction] = useState(false);
   const [newExtraDeduction, setNewExtraDeduction] = useState({ name: '', amount: '' });
 
-  // Add mileage state
-  const [weeklyMileage, setWeeklyMileage] = useState({
-    startMileage: '',
-    endMileage: '',
-    totalMiles: 0
-  });
-
   const weekStart = getUserWeekStart(currentWeek, userProfile);
   const weekEnd = getUserWeekEnd(currentWeek, userProfile);
 
@@ -72,7 +65,6 @@ const LoadReports = ({ onBack, user, userProfile, deductions }: LoadReportsProps
       fetchLoads();
       fetchWeeklyDeductions();
       fetchExtraDeductions();
-      fetchWeeklyMileage(); // Add mileage fetch
     }
   }, [user, currentWeek]);
 
@@ -326,82 +318,6 @@ const LoadReports = ({ onBack, user, userProfile, deductions }: LoadReportsProps
     } else {
       setCurrentWeek(addWeeks(currentWeek, 1));
     }
-  };
-
-  const fetchWeeklyMileage = async () => {
-    if (!user) return;
-    
-    try {
-      const { data, error } = await supabase
-        .from('weekly_mileage')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('week_start', weekStart.toISOString().split('T')[0])
-        .single();
-
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error fetching weekly mileage:', error);
-        return;
-      }
-
-      if (data) {
-        setWeeklyMileage({
-          startMileage: data.start_mileage?.toString() || '',
-          endMileage: data.end_mileage?.toString() || '',
-          totalMiles: data.total_miles || 0
-        });
-      } else {
-        setWeeklyMileage({
-          startMileage: '',
-          endMileage: '',
-          totalMiles: 0
-        });
-      }
-    } catch (error) {
-      console.error('Error fetching weekly mileage:', error);
-    }
-  };
-
-  const saveWeeklyMileage = async (startMileage: string, endMileage: string) => {
-    if (!user) return;
-    
-    try {
-      const weekStartDate = weekStart.toISOString().split('T')[0];
-      
-      const { error } = await supabase
-        .from('weekly_mileage')
-        .upsert({
-          user_id: user.id,
-          week_start: weekStartDate,
-          start_mileage: startMileage ? parseInt(startMileage) : null,
-          end_mileage: endMileage ? parseInt(endMileage) : null,
-          updated_at: new Date().toISOString()
-        }, {
-          onConflict: 'user_id,week_start'
-        });
-
-      if (error) {
-        console.error('Error saving weekly mileage:', error);
-      }
-    } catch (error) {
-      console.error('Error saving weekly mileage:', error);
-    }
-  };
-
-  const handleMileageChange = async (field: 'startMileage' | 'endMileage', value: string) => {
-    const newMileage = { ...weeklyMileage, [field]: value };
-    
-    // Calculate total miles
-    const start = parseInt(newMileage.startMileage) || 0;
-    const end = parseInt(newMileage.endMileage) || 0;
-    newMileage.totalMiles = Math.max(0, end - start);
-    
-    setWeeklyMileage(newMileage);
-    
-    clearTimeout((window as any).mileageSaveTimeout);
-    (window as any).mileageSaveTimeout = setTimeout(() => {
-      saveWeeklyMileage(newMileage.startMileage, newMileage.endMileage);
-    }, 1000);
   };
 
   const fetchExtraDeductions = async () => {
@@ -679,49 +595,6 @@ const LoadReports = ({ onBack, user, userProfile, deductions }: LoadReportsProps
           </div>
         </div>
 
-        {/* Mileage Tracking Section */}
-        <div className="brutal-border-accent bg-accent/10 p-6 brutal-shadow">
-          <div className="flex items-center gap-3 mb-4">
-            <Navigation className="w-6 h-6 text-accent-foreground" />
-            <h3 className="brutal-text text-xl text-accent-foreground">WEEKLY_MILEAGE</h3>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            <div>
-              <label className="brutal-mono text-sm text-accent-foreground mb-2 block">
-                START_OF_WEEK_MILEAGE
-              </label>
-              <input
-                type="number"
-                placeholder="0"
-                value={weeklyMileage.startMileage}
-                onChange={(e) => handleMileageChange('startMileage', e.target.value)}
-                className="w-full p-3 brutal-border bg-background text-foreground brutal-mono"
-              />
-            </div>
-            
-            <div>
-              <label className="brutal-mono text-sm text-accent-foreground mb-2 block">
-                END_OF_WEEK_MILEAGE
-              </label>
-              <input
-                type="number"
-                placeholder="0"
-                value={weeklyMileage.endMileage}
-                onChange={(e) => handleMileageChange('endMileage', e.target.value)}
-                className="w-full p-3 brutal-border bg-background text-foreground brutal-mono"
-              />
-            </div>
-          </div>
-          
-          {/* Miles Driven Display */}
-          <div className="brutal-border-success bg-success p-4 brutal-shadow text-center">
-            <p className="brutal-mono text-sm text-success-foreground mb-1">MILES_DRIVEN_THIS_WEEK</p>
-            <p className="brutal-text text-2xl text-success-foreground">{weeklyMileage.totalMiles.toLocaleString()}</p>
-            <p className="brutal-mono text-xs text-success-foreground opacity-80">TOTAL_MILES</p>
-          </div>
-        </div>
-
         {/* Add New Load Button */}
         <Button 
           onClick={() => setShowAddForm(true)}
@@ -793,7 +666,6 @@ const LoadReports = ({ onBack, user, userProfile, deductions }: LoadReportsProps
             setShowAddExtraDeduction={setShowAddExtraDeduction}
             newExtraDeduction={newExtraDeduction}
             setNewExtraDeduction={setNewExtraDeduction}
-            weeklyMileage={weeklyMileage} // Add mileage prop
           />
         )}
       </div>
