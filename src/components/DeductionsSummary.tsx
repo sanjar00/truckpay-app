@@ -17,8 +17,8 @@ interface DeductionsSummaryProps {
 }
 
 const DeductionsSummary = ({ deductions }: DeductionsSummaryProps) => {
-  const totalDeductions = deductions.reduce((total, deduction) => total + deduction.amount, 0);
   const fixedDeductions = deductions.filter(d => d.isFixed); // Keep as isFixed since we map it
+  const totalDeductions = fixedDeductions.reduce((total, deduction) => total + deduction.amount, 0);
 
   return (
     <>
