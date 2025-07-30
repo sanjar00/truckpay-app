@@ -111,7 +111,7 @@ const AddLoadForm = ({
           </Popover>
         </div>
 
-        {/* Delivery Date */}
+        {/* Delivery Date - Remove future date restriction */}
         <div className="space-y-2">
           <Label className="flex items-center gap-2">
             <CalendarIcon className="w-4 h-4" />
@@ -140,11 +140,8 @@ const AddLoadForm = ({
                 }}
                 initialFocus
                 disabled={(date) => {
-                  // Disable dates outside weekly period
-                  if (date < weekStart || date > weekEnd) {
-                    return true;
-                  }
-                  // Also disable dates before pickup date if pickup is selected
+                  // Only disable dates before pickup date if pickup is selected
+                  // Remove the weekly period restriction for delivery dates
                   if (newLoad.pickupDate && date < newLoad.pickupDate) {
                     return true;
                   }

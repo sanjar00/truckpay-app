@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, X, Navigation } from 'lucide-react';
+import { Plus, X, Navigation, Edit, Save } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 
 interface WeeklySummaryProps {
@@ -46,9 +46,14 @@ const WeeklySummary = ({
   totalExtraDeductions,
   totalFixedDeductions,
   netPay,
-  weeklyMileage
+  weeklyMileage,
+  onEditExtraDeduction,
+  editingDeduction,
+  setEditingDeduction
+  // Remove the duplicate weeklyMileage parameter here
 }: WeeklySummaryProps) => {
   const [pendingDeductions, setPendingDeductions] = useState<Record<string, string>>({});
+  const [editingData, setEditingData] = useState<{name: string, amount: string}>({name: '', amount: ''});
 
   const handleAddDeduction = async (type: string) => {
     const amount = pendingDeductions[type];
@@ -58,6 +63,26 @@ const WeeklySummary = ({
       
       // Clear the pending amount
       setPendingDeductions(prev => ({ ...prev, [type]: '' }));
+    }
+  };
+
+  const handleEditDeduction = (deduction: {id: string, name: string, amount: string}) => {
+    if (setEditingDeduction) {
+      setEditingDeduction(deduction.id);
+      setEditingData({ name: deduction.name, amount: deduction.amount });
+    }
+  };
+
+  const handleSaveEdit = (id: string) => {
+    if (onEditExtraDeduction) {
+      onEditExtraDeduction(id, editingData.name, editingData.amount);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    if (setEditingDeduction) {
+      setEditingDeduction(null);
+      setEditingData({ name: '', amount: '' });
     }
   };
 
@@ -107,28 +132,75 @@ const WeeklySummary = ({
         </Button>
       </div>
 
-      {/* Added Deductions Display */}
+      {/* Added Deductions Display with Edit Functionality */}
       {extraDeductionTypes.length > 0 && (
         <div className="space-y-4 mb-6">
           <h3 className="brutal-text text-lg text-foreground">ADDED_DEDUCTIONS_THIS_WEEK</h3>
           <div className="brutal-border bg-background p-4 brutal-shadow">
             {extraDeductionTypes.map((extra) => (
-              <div key={extra.id} className="flex items-center justify-between py-2 border-b border-border last:border-b-0">
-                <div className="flex items-center gap-4">
-                  <span className="brutal-mono text-sm text-foreground">{extra.name.toUpperCase()}</span>
-                  <span className="brutal-text text-foreground">${formatCurrency(parseFloat(extra.amount))}</span>
-                  <span className="brutal-mono text-xs text-muted-foreground">
-                    {extra.dateAdded ? new Date(extra.dateAdded).toLocaleDateString() : new Date().toLocaleDateString()}
-                  </span>
-                </div>
-                <Button 
-                  onClick={() => onRemoveExtraDeduction(extra.id)}
-                  variant="destructive"
-                  size="sm"
-                  className="brutal-border-destructive"
-                >
-                  <X className="w-4 h-4" />
-                </Button>
+              <div key={extra.id} className="py-2 border-b border-border last:border-b-0">
+                {editingDeduction === extra.id ? (
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={editingData.name}
+                      onChange={(e) => setEditingData(prev => ({ ...prev, name: e.target.value }))}
+                      placeholder="Deduction name"
+                      className="flex-1"
+                    />
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={editingData.amount}
+                      onChange={(e) => setEditingData(prev => ({ ...prev, amount: e.target.value }))}
+                      placeholder="Amount"
+                      className="w-24"
+                    />
+                    <Button
+                      onClick={() => handleSaveEdit(extra.id)}
+                      size="sm"
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      <Save className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      onClick={handleCancelEdit}
+                      variant="outline"
+                      size="sm"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <span className="brutal-mono text-sm text-foreground">{extra.name.toUpperCase()}</span>
+                      <span className="brutal-text text-foreground">${formatCurrency(parseFloat(extra.amount))}</span>
+                      <span className="brutal-mono text-xs text-muted-foreground">
+                        {extra.dateAdded ? new Date(extra.dateAdded).toLocaleDateString() : new Date().toLocaleDateString()}
+                      </span>
+                    </div>
+                    <div className="flex gap-1">
+                      {onEditExtraDeduction && setEditingDeduction && (
+                        <Button
+                          onClick={() => handleEditDeduction(extra)}
+                          variant="ghost"
+                          size="sm"
+                          className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                      )}
+                      <Button 
+                        onClick={() => onRemoveExtraDeduction(extra.id)}
+                        variant="destructive"
+                        size="sm"
+                        className="brutal-border-destructive"
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>
