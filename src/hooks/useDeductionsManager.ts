@@ -1,26 +1,42 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { ExtraDeduction } from '@/types/LoadReports';
 
 export const useDeductionsManager = (user: any, weekStart: Date) => {
   const [weeklyDeductions, setWeeklyDeductions] = useState<Record<string, string>>({});
   const [extraDeductionTypes, setExtraDeductionTypes] = useState<ExtraDeduction[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const fetchWeeklyDeductions = async () => {
-    if (!user) return;
+    if (!user || isLoading) return;
     
     try {
+      // Cancel previous request if still pending
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      
+      abortControllerRef.current = new AbortController();
+      
       const { data, error } = await supabase
         .from('weekly_deductions')
         .select('*')
         .eq('user_id', user.id)
-        .eq('week_start', weekStart.toISOString().split('T')[0]);
-
+        .eq('week_start', weekStart.toISOString().split('T')[0])
+        .abortSignal(abortControllerRef.current.signal);
+  
+      // Check for AbortError more thoroughly
       if (error) {
+        if (error.code === '20' || error.name === 'AbortError' || error.message?.includes('AbortError')) {
+          // Silently ignore abort errors as they are expected during cleanup
+          return;
+        }
         console.error('Error fetching weekly deductions:', error);
         return;
       }
-
+  
       if (data) {
         const deductionsMap: Record<string, string> = {};
         data.forEach(deduction => {
@@ -28,8 +44,71 @@ export const useDeductionsManager = (user: any, weekStart: Date) => {
         });
         setWeeklyDeductions(deductionsMap);
       }
-    } catch (error) {
+    } catch (error: any) {
+      // Check for AbortError more thoroughly
+      if (error.code === '20' || error.name === 'AbortError' || error.message?.includes('AbortError')) {
+        // Silently ignore abort errors as they are expected during cleanup
+        return;
+      }
       console.error('Error fetching weekly deductions:', error);
+    }
+  };
+
+  const fetchExtraDeductions = async () => {
+    if (!user || isLoading) return;
+    
+    try {
+      // Use the same abort controller for consistency
+      const signal = abortControllerRef.current?.signal;
+      
+      const { data, error } = await supabase
+        .from('weekly_extra_deductions')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('week_start', weekStart.toISOString().split('T')[0])
+        .abortSignal(signal);
+  
+      // Check for AbortError more thoroughly
+      if (error) {
+        if (error.code === '20' || error.name === 'AbortError' || error.message?.includes('AbortError')) {
+          // Silently ignore abort errors as they are expected during cleanup
+          return;
+        }
+        console.error('Error fetching extra deductions:', error);
+        return;
+      }
+  
+      if (data) {
+        const extraDeductions = data.map(item => ({
+          id: item.id.toString(),
+          name: item.name,
+          amount: item.amount.toString(),
+          dateAdded: item.updated_at
+        }));
+        setExtraDeductionTypes(extraDeductions);
+      }
+    } catch (error: any) {
+      // Check for AbortError more thoroughly
+      if (error.code === '20' || error.name === 'AbortError' || error.message?.includes('AbortError')) {
+        // Silently ignore abort errors as they are expected during cleanup
+        return;
+      }
+      console.error('Error fetching extra deductions:', error);
+    }
+  };
+
+  const fetchAllDeductions = async () => {
+    if (!user || isLoading) return;
+    
+    setIsLoading(true);
+    try {
+      // Fetch both types of deductions sequentially to avoid overwhelming the API
+      await fetchWeeklyDeductions();
+      // Add a small delay between requests
+      await new Promise(resolve => setTimeout(resolve, 100));
+      await fetchExtraDeductions();
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -82,35 +161,6 @@ export const useDeductionsManager = (user: any, weekStart: Date) => {
     (window as any).deductionSaveTimeout = setTimeout(() => {
       saveWeeklyDeduction(type, amount);
     }, 1000);
-  };
-
-  const fetchExtraDeductions = async () => {
-    if (!user) return;
-    
-    try {
-      const { data, error } = await supabase
-        .from('weekly_extra_deductions')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('week_start', weekStart.toISOString().split('T')[0]);
-  
-      if (error) {
-        console.error('Error fetching extra deductions:', error);
-        return;
-      }
-  
-      if (data) {
-        const extraDeductions = data.map(item => ({
-          id: item.id.toString(),
-          name: item.name,
-          amount: item.amount.toString(),
-          dateAdded: item.updated_at
-        }));
-        setExtraDeductionTypes(extraDeductions);
-      }
-    } catch (error) {
-      console.error('Error fetching extra deductions:', error);
-    }
   };
   
   const saveExtraDeduction = async (deduction: ExtraDeduction) => {
@@ -259,10 +309,25 @@ export const useDeductionsManager = (user: any, weekStart: Date) => {
 
   useEffect(() => {
     if (user) {
-      // Stagger the requests to prevent overwhelming the API
-      setTimeout(() => fetchWeeklyDeductions(), 100);
-      setTimeout(() => fetchExtraDeductions(), 200);
+      // Clear any existing timeout
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
+      }
+      
+      // Debounce the fetch requests with a longer delay
+      fetchTimeoutRef.current = setTimeout(() => {
+        fetchAllDeductions();
+      }, 500); // Increased delay to 500ms
     }
+    
+    return () => {
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
+      }
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
   }, [user, weekStart]);
 
   const totalWeeklyDeductions = Object.values(weeklyDeductions).reduce((total, amount) => {
