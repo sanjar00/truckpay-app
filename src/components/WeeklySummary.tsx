@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,6 +14,9 @@ interface WeeklySummaryProps {
   onAddExtraDeduction: () => void;
   onAddDeductionFromType: (type: string, amount: string) => void;
   onRemoveExtraDeduction: (id: string) => void;
+  onEditExtraDeduction?: (id: string, name: string, amount: string) => void;
+  editingDeduction?: string | null;
+  setEditingDeduction?: (id: string | null) => void;
   showAddExtraDeduction: boolean;
   setShowAddExtraDeduction: (show: boolean) => void;
   newExtraDeduction: { name: string, amount: string };
@@ -25,7 +27,7 @@ interface WeeklySummaryProps {
   totalExtraDeductions: number;
   totalFixedDeductions: number;
   netPay: number;
-  weeklyMileage?: { totalMiles: number }; // Add mileage prop
+  weeklyMileage?: { totalMiles: number };
 }
 
 const WeeklySummary = ({
@@ -50,11 +52,12 @@ const WeeklySummary = ({
   onEditExtraDeduction,
   editingDeduction,
   setEditingDeduction
-  // Remove the duplicate weeklyMileage parameter here
 }: WeeklySummaryProps) => {
+  // Restore the pendingDeductions state for input fields
   const [pendingDeductions, setPendingDeductions] = useState<Record<string, string>>({});
   const [editingData, setEditingData] = useState<{name: string, amount: string}>({name: '', amount: ''});
 
+  // Fix the handleAddDeduction function
   const handleAddDeduction = async (type: string) => {
     const amount = pendingDeductions[type];
     if (amount && parseFloat(amount) > 0) {
@@ -93,7 +96,45 @@ const WeeklySummary = ({
       {/* Weekly Deductions */}
       <div className="space-y-4 mb-6">
         <h3 className="brutal-text text-lg text-foreground">WEEKLY_DEDUCTIONS</h3>
-        
+        {/* Display existing weekly deductions */}
+        {Object.entries(weeklyDeductions).filter(([type, amount]) => amount && parseFloat(amount) > 0).length > 0 && (
+          <div className="space-y-4 mb-6">
+            <h4 className="brutal-text text-md text-foreground">CURRENT_WEEKLY_DEDUCTIONS</h4>
+            <div className="brutal-border bg-background p-4 brutal-shadow">
+              {Object.entries(weeklyDeductions)
+                .filter(([type, amount]) => amount && parseFloat(amount) > 0)
+                .map(([type, amount]) => (
+                  <div key={type} className="py-2 border-b border-border last:border-b-0">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <span className="brutal-mono text-sm text-foreground">{type.toUpperCase().replace(/ /g, '_')}</span>
+                        <span className="brutal-text text-foreground">${formatCurrency(parseFloat(amount))}</span>
+                      </div>
+                      <div className="flex gap-1">
+                        <Input
+                          type="number"
+                          placeholder="0.00"
+                          value={amount}
+                          onChange={(e) => onWeeklyDeductionChange(type, e.target.value)}
+                          className="w-24"
+                        />
+                        <Button
+                          onClick={() => onWeeklyDeductionChange(type, '0')}
+                          variant="destructive"
+                          size="sm"
+                          className="brutal-border-destructive"
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              }
+            </div>
+          </div>
+        )}
+        {/* Add new deduction inputs */}
         {availableDeductionTypes.map((type) => (
           <div key={type} className="brutal-border bg-background p-4 brutal-shadow">
             <Label className="brutal-mono text-sm text-foreground mb-2 block">
@@ -120,7 +161,6 @@ const WeeklySummary = ({
             </div>
           </div>
         ))}
-        
         {/* Add Extra Button */}
         <Button 
           onClick={() => setShowAddExtraDeduction(!showAddExtraDeduction)}
@@ -270,53 +310,50 @@ const WeeklySummary = ({
           <div className="brutal-border-accent bg-accent p-6 brutal-shadow">
             <div className="flex items-center gap-2 mb-2">
               <Navigation className="w-5 h-5 text-accent-foreground" />
-              <h3 className="brutal-text text-lg text-accent-foreground">MILES_DRIVEN</h3>
+              <h3 className="brutal-text text-lg text-accent-foreground">MILEAGE</h3>
             </div>
             <p className="brutal-text text-3xl text-accent-foreground">{weeklyMileage.totalMiles.toLocaleString()}</p>
-            <p className="brutal-mono text-xs text-accent-foreground opacity-80 mt-2">THIS_WEEK</p>
+            <p className="brutal-mono text-xs text-accent-foreground opacity-80 mt-2">TOTAL_MILES</p>
           </div>
         )}
       </div>
 
-      {/* Detailed Breakdown */}
-      {(totalDriverPay > 0 || totalWeeklyDeductions > 0 || totalFixedDeductions > 0 || totalExtraDeductions > 0) && (
-        <div className="brutal-border bg-background p-4 brutal-shadow mt-6">
-          <h4 className="brutal-text text-lg text-foreground mb-4">PAYMENT_BREAKDOWN</h4>
-          <div className="space-y-2 brutal-mono text-sm text-foreground">
+      {/* Payment Breakdown */}
+      <div className="brutal-border bg-background p-4 brutal-shadow mt-6">
+        <h4 className="brutal-text text-lg text-foreground mb-4">PAYMENT_BREAKDOWN</h4>
+        <div className="space-y-2 brutal-mono text-sm text-foreground">
+          <div className="flex justify-between">
+            <span>GROSS_PAY:</span>
+            <span>${formatCurrency(totalGrossPay)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>AFTER_COMPANY_CUT:</span>
+            <span>${formatCurrency(totalDriverPay)}</span>
+          </div>
+          {totalWeeklyDeductions > 0 && (
             <div className="flex justify-between">
-              <span>GROSS_PAY:</span>
-              <span>${formatCurrency(totalGrossPay)}</span>
+              <span>WEEKLY_DEDUCTIONS:</span>
+              <span>-${formatCurrency(totalWeeklyDeductions)}</span>
             </div>
+          )}
+          {totalExtraDeductions > 0 && (
             <div className="flex justify-between">
-              <span>AFTER_COMPANY_CUT:</span>
-              <span>${formatCurrency(totalDriverPay)}</span>
+              <span>ADDED_DEDUCTIONS:</span>
+              <span>-${formatCurrency(totalExtraDeductions)}</span>
             </div>
-            {totalWeeklyDeductions > 0 && (
-              <div className="flex justify-between">
-                <span>WEEKLY_DEDUCTIONS:</span>
-                <span>-${formatCurrency(totalWeeklyDeductions)}</span>
-              </div>
-            )}
-            {totalExtraDeductions > 0 && (
-              <div className="flex justify-between">
-                <span>ADDED_DEDUCTIONS:</span>
-                <span>-${formatCurrency(totalExtraDeductions)}</span>
-              </div>
-            )}
-            {totalFixedDeductions > 0 && (
-              <div className="flex justify-between">
-                <span>FIXED_DEDUCTIONS:</span>
-                <span>-${formatCurrency(totalFixedDeductions)}</span>
-              </div>
-            )}
-            <hr className="border-border" />
-            <div className="flex justify-between brutal-text text-lg">
-              <span>FINAL_NET_PAY:</span>
-              <span>${formatCurrency(netPay)}</span>
+          )}
+          {totalFixedDeductions > 0 && (
+            <div className="flex justify-between">
+              <span>FIXED_DEDUCTIONS:</span>
+              <span>-${formatCurrency(totalFixedDeductions)}</span>
             </div>
+          )}
+          <div className="flex justify-between border-t border-border pt-2 font-bold">
+            <span>NET_PAY:</span>
+            <span>${formatCurrency(netPay)}</span>
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 };

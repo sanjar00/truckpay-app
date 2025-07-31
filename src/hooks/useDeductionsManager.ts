@@ -2,277 +2,206 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { ExtraDeduction } from '@/types/LoadReports';
 
+/**
+ * Хук управляет:
+ *  • фикс/нефикс списаниями за неделю (weekly_deductions);
+ *  • кастомными списаниями (weekly_extra_deductions);
+ *  • суммами и CRUD-операциями.
+ *
+ * @param user      – объект текущего пользователя Supabase
+ * @param weekStart – дата начала недели (Sunday 00:00)
+ */
 export const useDeductionsManager = (user: any, weekStart: Date) => {
+  /** ---------- State ---------- */
   const [weeklyDeductions, setWeeklyDeductions] = useState<Record<string, string>>({});
   const [extraDeductionTypes, setExtraDeductionTypes] = useState<ExtraDeduction[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+
+  /** ---------- Helpers ---------- */
+  const weekStartStr = weekStart.toISOString().slice(0, 10);          // 2025-07-27
   const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
+  /** ---------- Fetchers ---------- */
   const fetchWeeklyDeductions = async () => {
     if (!user || isLoading) return;
-    
+
     try {
-      // Cancel previous request if still pending
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-      
+      abortControllerRef.current?.abort();                            // cancel prev req
       abortControllerRef.current = new AbortController();
-      
+      setIsLoading(true);
+
       const { data, error } = await supabase
         .from('weekly_deductions')
         .select('*')
         .eq('user_id', user.id)
-        .eq('week_start', weekStart.toISOString().split('T')[0])
+        .eq('week_start', weekStartStr)
         .abortSignal(abortControllerRef.current.signal);
-  
-      // Check for AbortError more thoroughly
-      if (error) {
-        if (error.code === '20' || error.name === 'AbortError' || error.message?.includes('AbortError')) {
-          // Silently ignore abort errors as they are expected during cleanup
-          return;
-        }
-        console.error('Error fetching weekly deductions:', error);
-        return;
-      }
-  
+
+      if (error) throw error;
+
       if (data) {
-        const deductionsMap: Record<string, string> = {};
-        data.forEach(deduction => {
-          deductionsMap[deduction.deduction_type] = deduction.amount.toString();
+        const map: Record<string, string> = {};
+        data.forEach(d => {
+          map[d.deduction_type] = d.amount.toString();
         });
-        setWeeklyDeductions(deductionsMap);
+        setWeeklyDeductions(map);
       }
-    } catch (error: any) {
-      // Check for AbortError more thoroughly
-      if (error.code === '20' || error.name === 'AbortError' || error.message?.includes('AbortError')) {
-        // Silently ignore abort errors as they are expected during cleanup
-        return;
-      }
-      console.error('Error fetching weekly deductions:', error);
-    }
-  };
-
-  const fetchExtraDeductions = async () => {
-    if (!user || isLoading) return;
-    
-    try {
-      // Use the same abort controller for consistency
-      const signal = abortControllerRef.current?.signal;
-      
-      const { data, error } = await supabase
-        .from('weekly_extra_deductions')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('week_start', weekStart.toISOString().split('T')[0])
-        .abortSignal(signal);
-  
-      // Check for AbortError more thoroughly
-      if (error) {
-        if (error.code === '20' || error.name === 'AbortError' || error.message?.includes('AbortError')) {
-          // Silently ignore abort errors as they are expected during cleanup
-          return;
-        }
-        console.error('Error fetching extra deductions:', error);
-        return;
-      }
-  
-      if (data) {
-        const extraDeductions = data.map(item => ({
-          id: item.id.toString(),
-          name: item.name,
-          amount: item.amount.toString(),
-          dateAdded: item.updated_at
-        }));
-        setExtraDeductionTypes(extraDeductions);
-      }
-    } catch (error: any) {
-      // Check for AbortError more thoroughly
-      if (error.code === '20' || error.name === 'AbortError' || error.message?.includes('AbortError')) {
-        // Silently ignore abort errors as they are expected during cleanup
-        return;
-      }
-      console.error('Error fetching extra deductions:', error);
-    }
-  };
-
-  const fetchAllDeductions = async () => {
-    if (!user || isLoading) return;
-    
-    setIsLoading(true);
-    try {
-      // Fetch both types of deductions sequentially to avoid overwhelming the API
-      await fetchWeeklyDeductions();
-      // Add a small delay between requests
-      await new Promise(resolve => setTimeout(resolve, 100));
-      await fetchExtraDeductions();
+    } catch (err: any) {
+      if (err.name !== 'AbortError') console.error('fetchWeeklyDeductions:', err);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const saveWeeklyDeduction = async (type: string, amount: string) => {
-    if (!user) return;
-    
-    try {
-      const weekStartDate = weekStart.toISOString().split('T')[0];
-      
-      if (!amount || parseFloat(amount) === 0) {
-        const { error } = await supabase
-          .from('weekly_deductions')
-          .delete()
-          .eq('user_id', user.id)
-          .eq('week_start', weekStartDate)
-          .eq('deduction_type', type);
-          
-        if (error) {
-          console.error('Error deleting weekly deduction:', error);
-        }
-      } else {
-        const { error } = await supabase
-          .from('weekly_deductions')
-          .upsert({
-            user_id: user.id,
-            week_start: weekStartDate,
-            deduction_type: type,
-            amount: parseFloat(amount),
-            updated_at: new Date().toISOString()
-          }, {
-            onConflict: 'user_id,week_start,deduction_type'
-          });
+  const fetchExtraDeductions = async () => {
+    if (!user || isLoading) return;
 
-        if (error) {
-          console.error('Error saving weekly deduction:', error);
-        }
+    try {
+      abortControllerRef.current?.abort();
+      abortControllerRef.current = new AbortController();
+      setIsLoading(true);
+
+      const { data, error } = await supabase
+        .from('weekly_extra_deductions')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('week_start', weekStartStr)
+        .abortSignal(abortControllerRef.current.signal);
+
+      if (error) throw error;
+
+      if (data) {
+        const extras = data.map(item => ({
+          id: item.id.toString(),                                     // bigint → string
+          name: item.name ?? item.deduction_type,
+          amount: item.amount.toString(),
+          dateAdded: item.date_added ?? item.created_at ?? item.updated_at,
+        }));
+        setExtraDeductionTypes(extras);
       }
-    } catch (error) {
-      console.error('Error saving weekly deduction:', error);
+    } catch (err: any) {
+      if (err.name !== 'AbortError') console.error('fetchExtraDeductions:', err);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleWeeklyDeductionChange = async (type: string, amount: string) => {
-    setWeeklyDeductions(prev => ({
-      ...prev,
-      [type]: amount
-    }));
-    
-    clearTimeout((window as any).deductionSaveTimeout);
-    (window as any).deductionSaveTimeout = setTimeout(() => {
-      saveWeeklyDeduction(type, amount);
-    }, 1000);
+  const fetchAllDeductions = () => {
+    fetchWeeklyDeductions();
+    fetchExtraDeductions();
   };
-  
+
+  /** ---------- Persistence ---------- */
+  const saveWeeklyDeduction = async (type: string, amount: string) => {
+    if (!user) return;
+
+    try {
+      if (!amount || parseFloat(amount) === 0) {
+        await supabase
+          .from('weekly_deductions')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('week_start', weekStartStr)
+          .eq('deduction_type', type);
+      } else {
+        await supabase
+          .from('weekly_deductions')
+          .upsert(
+            {
+              user_id: user.id,
+              week_start: weekStartStr,
+              deduction_type: type,
+              amount: parseFloat(amount),
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: 'user_id,week_start,deduction_type' },
+          );
+      }
+    } catch (err) {
+      console.error('saveWeeklyDeduction:', err);
+    }
+  };
+
   const saveExtraDeduction = async (deduction: ExtraDeduction) => {
     if (!user) return false;
-    
+
     try {
-      const weekStartDate = weekStart.toISOString().split('T')[0];
-      
       if (deduction.id.includes('_')) {
-        // Insert new deduction
+        /* ---------- INSERT ---------- */
         const { data, error } = await supabase
           .from('weekly_extra_deductions')
           .insert({
             user_id: user.id,
-            week_start: weekStartDate,
+            week_start: weekStartStr,
             name: deduction.name,
             amount: parseFloat(deduction.amount),
-            updated_at: new Date().toISOString()
+            date_added: new Date().toISOString(),
           })
           .select();
-      
-        if (error) {
-          console.error('Error saving extra deduction:', error);
-          setExtraDeductionTypes(prev => prev.filter(item => item.id !== deduction.id));
-          return false;
-        }
-        
+
+        if (error) throw error;
         if (data && data[0]) {
-          setExtraDeductionTypes(prev => 
-            prev.map(item => 
-              item.id === deduction.id 
-                ? { ...item, id: data[0].id.toString() }
-                : item
-            )
+          setExtraDeductionTypes(prev =>
+            prev.map(item => (item.id === deduction.id ? { ...deduction, id: data[0].id.toString() } : item)),
           );
         }
-        
-        return true;
       } else {
-        // Update existing deduction
-        const { error } = await supabase
+        /* ---------- UPDATE ---------- */
+        await supabase
           .from('weekly_extra_deductions')
           .update({
             name: deduction.name,
             amount: parseFloat(deduction.amount),
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
           })
           .eq('id', parseInt(deduction.id))
           .eq('user_id', user.id);
-  
-        if (error) {
-          console.error('Error updating extra deduction:', error);
-          return false;
-        }
-        
-        return true;
       }
-    } catch (error) {
-      console.error('Error saving extra deduction:', error);
-      setExtraDeductionTypes(prev => prev.filter(item => item.id !== deduction.id));
+
+      return true;
+    } catch (err) {
+      console.error('saveExtraDeduction:', err);
       return false;
     }
   };
-  
+
   const deleteExtraDeduction = async (id: string) => {
-    if (!user) return;
-    
+    if (!user || id.includes('_')) return; // temp-ID — запись ещё не создана
+
     try {
-      if (!id.includes('_')) {
-        const { error } = await supabase
-          .from('weekly_extra_deductions')
-          .delete()
-          .eq('id', parseInt(id))
-          .eq('user_id', user.id);
-  
-        if (error) {
-          console.error('Error deleting extra deduction:', error);
-        }
-      }
-    } catch (error) {
-      console.error('Error deleting extra deduction:', error);
+      await supabase
+        .from('weekly_extra_deductions')
+        .delete()
+        .eq('id', parseInt(id))
+        .eq('user_id', user.id);
+    } catch (err) {
+      console.error('deleteExtraDeduction:', err);
     }
   };
 
-  const handleAddExtraDeduction = async (newExtraDeduction: { name: string; amount: string }) => {
-    if (newExtraDeduction.name.trim() && newExtraDeduction.amount.trim()) {
-      const tempId = `temp_${Date.now()}`;
-      const newExtra: ExtraDeduction = {
-        id: tempId,
-        name: newExtraDeduction.name.trim(),
-        amount: newExtraDeduction.amount,
-        dateAdded: new Date().toISOString()
-      };
-      
-      setExtraDeductionTypes(prev => [...prev, newExtra]);
-      
-      try {
-        const success = await saveExtraDeduction(newExtra);
-        
-        if (!success) {
-          setExtraDeductionTypes(prev => prev.filter(item => item.id !== newExtra.id));
-          console.error('Failed to save custom deduction. Please try again.');
-        }
-        
-        return success;
-      } catch (error) {
-        setExtraDeductionTypes(prev => prev.filter(item => item.id !== tempId));
-        console.error('Error saving custom deduction:', error);
-        return false;
-      }
+  /** ---------- Handlers (для UI) ---------- */
+  const handleWeeklyDeductionChange = async (type: string, amount: string) => {
+    setWeeklyDeductions(prev => ({ ...prev, [type]: amount }));
+    await saveWeeklyDeduction(type, amount);
+  };
+
+  const handleAddExtraDeduction = async (name: string, amount: string) => {
+    const tempId = `temp_${Date.now()}`;
+    const newExtra: ExtraDeduction = {
+      id: tempId,
+      name,
+      amount,
+      dateAdded: new Date().toISOString(),
+    };
+
+    setExtraDeductionTypes(prev => [...prev, newExtra]);
+
+    const success = await saveExtraDeduction(newExtra);
+    if (!success) {
+      setExtraDeductionTypes(prev => prev.filter(item => item.id !== tempId));
     }
-    return false;
+    return success;
   };
 
   const handleRemoveExtraDeduction = async (id: string) => {
@@ -281,74 +210,56 @@ export const useDeductionsManager = (user: any, weekStart: Date) => {
   };
 
   const handleEditExtraDeduction = async (id: string, name: string, amount: string) => {
-    const updatedDeduction: ExtraDeduction = { id, name, amount };
-    const success = await saveExtraDeduction(updatedDeduction);
+    const updated: ExtraDeduction = { id, name, amount };
+    const success = await saveExtraDeduction(updated);
     if (success) {
-      setExtraDeductionTypes(prev => 
-        prev.map(item => item.id === id ? updatedDeduction : item)
-      );
+      setExtraDeductionTypes(prev => prev.map(item => (item.id === id ? updated : item)));
     }
     return success;
   };
 
+  /** Добавить кастомное списание из списка предопределённых типов 👇 */
   const handleAddDeductionFromType = async (type: string, amount: string) => {
-    if (amount && parseFloat(amount) > 0) {
-      const newExtra: ExtraDeduction = {
-        id: `${type}_${Date.now()}`,
-        name: type,
-        amount: amount,
-        dateAdded: new Date().toISOString()
-      };
-      setExtraDeductionTypes(prev => [...prev, newExtra]);
-      const success = await saveExtraDeduction(newExtra);
-      if (!success) {
-        console.error('Failed to save deduction:', newExtra);
-      }
-    }
+    if (!amount || parseFloat(amount) <= 0) return false;
+    return handleAddExtraDeduction(type, amount);
   };
 
+  /** ---------- Effects ---------- */
   useEffect(() => {
-    if (user) {
-      // Clear any existing timeout
-      if (fetchTimeoutRef.current) {
-        clearTimeout(fetchTimeoutRef.current);
-      }
-      
-      // Debounce the fetch requests with a longer delay
-      fetchTimeoutRef.current = setTimeout(() => {
-        fetchAllDeductions();
-      }, 500); // Increased delay to 500ms
-    }
-    
+    if (!user?.id) return;
+
+    /* debounce, чтобы не дёргать БД при каждом клике Prev/Next Week */
+    fetchTimeoutRef.current && clearTimeout(fetchTimeoutRef.current);
+    fetchTimeoutRef.current = setTimeout(fetchAllDeductions, 400);
+
     return () => {
-      if (fetchTimeoutRef.current) {
-        clearTimeout(fetchTimeoutRef.current);
-      }
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
+      fetchTimeoutRef.current && clearTimeout(fetchTimeoutRef.current);
+      abortControllerRef.current?.abort();
     };
-  }, [user, weekStart]);
+  }, [user?.id, weekStartStr]);                                       // <-- реагируем на смену недели
 
-  const totalWeeklyDeductions = Object.values(weeklyDeductions).reduce((total, amount) => {
-    return total + (parseFloat(amount) || 0);
-  }, 0);
-  
-  const totalExtraDeductions = extraDeductionTypes.reduce((total, extra) => {
-    return total + (parseFloat(extra.amount) || 0);
-  }, 0);
+  /** ---------- Totals ---------- */
+  const totalWeeklyDeductions = Object.values(weeklyDeductions).reduce(
+    (sum, a) => sum + (parseFloat(a) || 0),
+    0,
+  );
+  const totalExtraDeductions = extraDeductionTypes.reduce(
+    (sum, e) => sum + (parseFloat(e.amount) || 0),
+    0,
+  );
 
+  /** ---------- Public API ---------- */
   return {
     weeklyDeductions,
     extraDeductionTypes,
     totalWeeklyDeductions,
     totalExtraDeductions,
-    setWeeklyDeductions,
+    setWeeklyDeductions,          // на случай ручных манипуляций в UI
     setExtraDeductionTypes,
     handleWeeklyDeductionChange,
     handleAddExtraDeduction,
     handleRemoveExtraDeduction,
     handleEditExtraDeduction,
-    handleAddDeductionFromType
+    handleAddDeductionFromType,
   };
 };
