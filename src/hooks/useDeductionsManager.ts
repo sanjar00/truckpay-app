@@ -18,17 +18,19 @@ export const useDeductionsManager = (user: any, weekStart: Date) => {
   const [isLoading, setIsLoading] = useState(false);
 
   /** ---------- Helpers ---------- */
-  const weekStartStr = weekStart.toISOString().slice(0, 10);          // 2025-07-27
+  const weekStartStr = weekStart.toISOString().slice(0, 10);
   const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
+  // Separate abort controllers for each fetch operation
+  const weeklyAbortControllerRef = useRef<AbortController | null>(null);
+  const extraAbortControllerRef = useRef<AbortController | null>(null);
 
   /** ---------- Fetchers ---------- */
   const fetchWeeklyDeductions = async () => {
     if (!user || isLoading) return;
 
     try {
-      abortControllerRef.current?.abort();                            // cancel prev req
-      abortControllerRef.current = new AbortController();
+      weeklyAbortControllerRef.current?.abort();
+      weeklyAbortControllerRef.current = new AbortController();
       setIsLoading(true);
 
       const { data, error } = await supabase
@@ -36,7 +38,7 @@ export const useDeductionsManager = (user: any, weekStart: Date) => {
         .select('*')
         .eq('user_id', user.id)
         .eq('week_start', weekStartStr)
-        .abortSignal(abortControllerRef.current.signal);
+        .abortSignal(weeklyAbortControllerRef.current.signal);
 
       if (error) throw error;
 
@@ -58,8 +60,8 @@ export const useDeductionsManager = (user: any, weekStart: Date) => {
     if (!user || isLoading) return;
 
     try {
-      abortControllerRef.current?.abort();
-      abortControllerRef.current = new AbortController();
+      extraAbortControllerRef.current?.abort();
+      extraAbortControllerRef.current = new AbortController();
       setIsLoading(true);
 
       const { data, error } = await supabase
@@ -67,13 +69,13 @@ export const useDeductionsManager = (user: any, weekStart: Date) => {
         .select('*')
         .eq('user_id', user.id)
         .eq('week_start', weekStartStr)
-        .abortSignal(abortControllerRef.current.signal);
+        .abortSignal(extraAbortControllerRef.current.signal);
 
       if (error) throw error;
 
       if (data) {
         const extras = data.map(item => ({
-          id: item.id.toString(),                                     // bigint → string
+          id: item.id.toString(),
           name: item.name ?? item.deduction_type,
           amount: item.amount.toString(),
           dateAdded: item.date_added ?? item.created_at ?? item.updated_at,
@@ -234,7 +236,8 @@ export const useDeductionsManager = (user: any, weekStart: Date) => {
 
     return () => {
       fetchTimeoutRef.current && clearTimeout(fetchTimeoutRef.current);
-      abortControllerRef.current?.abort();
+      weeklyAbortControllerRef.current?.abort();
+      extraAbortControllerRef.current?.abort();
     };
   }, [user?.id, weekStartStr]);                                       // <-- реагируем на смену недели
 

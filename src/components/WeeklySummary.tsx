@@ -3,7 +3,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, X, Navigation, Edit, Save } from 'lucide-react';
+import { Plus, X, Navigation, Edit, Save, MoreHorizontal } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 
 interface WeeklySummaryProps {
@@ -56,6 +56,7 @@ const WeeklySummary = ({
   // Restore the pendingDeductions state for input fields
   const [pendingDeductions, setPendingDeductions] = useState<Record<string, string>>({});
   const [editingData, setEditingData] = useState<{name: string, amount: string}>({name: '', amount: ''});
+  const [showMobileMenu, setShowMobileMenu] = useState<string | null>(null);
 
   // Fix the handleAddDeduction function
   const handleAddDeduction = async (type: string) => {
@@ -172,6 +173,49 @@ const WeeklySummary = ({
         </Button>
       </div>
 
+      {/* Add Extra Deduction Form - Moved above the deductions list */}
+      {showAddExtraDeduction && (
+        <div className="brutal-border-accent bg-accent/10 p-6 brutal-shadow mb-6">
+          <h4 className="brutal-text text-lg text-foreground mb-4">ADD_CUSTOM_DEDUCTION</h4>
+          <div className="space-y-4">
+            <div>
+              <Label className="brutal-mono text-sm text-foreground mb-2 block">NAME</Label>
+              <Input
+                placeholder="DEDUCTION_NAME"
+                value={newExtraDeduction.name}
+                onChange={(e) => setNewExtraDeduction(prev => ({ ...prev, name: e.target.value }))}
+              />
+            </div>
+            <div>
+              <Label className="brutal-mono text-sm text-foreground mb-2 block">AMOUNT</Label>
+              <Input
+                type="number"
+                placeholder="0.00"
+                value={newExtraDeduction.amount}
+                onChange={(e) => setNewExtraDeduction(prev => ({ ...prev, amount: e.target.value }))}
+              />
+            </div>
+            <div className="flex gap-3">
+              <Button 
+                onClick={onAddExtraDeduction}
+                variant="success"
+                className="flex-1"
+                disabled={!newExtraDeduction.name.trim() || !newExtraDeduction.amount.trim() || isNaN(parseFloat(newExtraDeduction.amount)) || parseFloat(newExtraDeduction.amount) <= 0}
+              >
+                ADD
+              </Button>
+              <Button 
+                onClick={() => setShowAddExtraDeduction(false)}
+                variant="outline"
+                className="flex-1"
+              >
+                CANCEL
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Added Deductions Display with Edit Functionality */}
       {extraDeductionTypes.length > 0 && (
         <div className="space-y-4 mb-6">
@@ -213,13 +257,15 @@ const WeeklySummary = ({
                 ) : (
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                      <span className="brutal-mono text-sm text-foreground">{extra.name.toUpperCase()}</span>
+                      <span className="brutal-mono text-sm text-foreground">{String(extra.name || "").toUpperCase()}</span>
                       <span className="brutal-text text-foreground">${formatCurrency(parseFloat(extra.amount))}</span>
                       <span className="brutal-mono text-xs text-muted-foreground">
                         {extra.dateAdded ? new Date(extra.dateAdded).toLocaleDateString() : new Date().toLocaleDateString()}
                       </span>
                     </div>
-                    <div className="flex gap-1">
+                    
+                    {/* Desktop buttons - hidden on mobile */}
+                    <div className="hidden sm:flex gap-1">
                       {onEditExtraDeduction && setEditingDeduction && (
                         <Button
                           onClick={() => handleEditDeduction(extra)}
@@ -239,52 +285,50 @@ const WeeklySummary = ({
                         <X className="w-4 h-4" />
                       </Button>
                     </div>
+                    
+                    {/* Mobile 3-dot menu */}
+                    <div className="sm:hidden relative">
+                      <Button
+                        onClick={() => setShowMobileMenu(showMobileMenu === extra.id ? null : extra.id)}
+                        variant="ghost"
+                        size="sm"
+                        className="p-1"
+                      >
+                        <MoreHorizontal className="w-4 h-4" />
+                      </Button>
+                      
+                      {/* Mobile dropdown menu */}
+                      {showMobileMenu === extra.id && (
+                        <div className="absolute right-0 top-8 bg-white border border-gray-200 rounded-md shadow-lg z-10 min-w-[120px]">
+                          {onEditExtraDeduction && setEditingDeduction && (
+                            <button
+                              onClick={() => {
+                                handleEditDeduction(extra);
+                                setShowMobileMenu(null);
+                              }}
+                              className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+                            >
+                              <Edit className="w-4 h-4" />
+                              Edit
+                            </button>
+                          )}
+                          <button
+                            onClick={() => {
+                              onRemoveExtraDeduction(extra.id);
+                              setShowMobileMenu(null);
+                            }}
+                            className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 text-red-600 flex items-center gap-2"
+                          >
+                            <X className="w-4 h-4" />
+                            Delete
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
             ))}
-          </div>
-        </div>
-      )}
-
-      {/* Add Extra Deduction Form */}
-      {showAddExtraDeduction && (
-        <div className="brutal-border-accent bg-accent/10 p-6 brutal-shadow mb-6">
-          <h4 className="brutal-text text-lg text-foreground mb-4">ADD_CUSTOM_DEDUCTION</h4>
-          <div className="space-y-4">
-            <div>
-              <Label className="brutal-mono text-sm text-foreground mb-2 block">NAME</Label>
-              <Input
-                placeholder="DEDUCTION_NAME"
-                value={newExtraDeduction.name}
-                onChange={(e) => setNewExtraDeduction(prev => ({ ...prev, name: e.target.value }))}
-              />
-            </div>
-            <div>
-              <Label className="brutal-mono text-sm text-foreground mb-2 block">AMOUNT</Label>
-              <Input
-                type="number"
-                placeholder="0.00"
-                value={newExtraDeduction.amount}
-                onChange={(e) => setNewExtraDeduction(prev => ({ ...prev, amount: e.target.value }))}
-              />
-            </div>
-            <div className="flex gap-3">
-              <Button 
-                onClick={onAddExtraDeduction}
-                variant="success"
-                className="flex-1"
-              >
-                ADD
-              </Button>
-              <Button 
-                onClick={() => setShowAddExtraDeduction(false)}
-                variant="outline"
-                className="flex-1"
-              >
-                CANCEL
-              </Button>
-            </div>
           </div>
         </div>
       )}

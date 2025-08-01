@@ -87,8 +87,13 @@ const LoadReports = ({ onBack, user, userProfile, deductions }: LoadReportsProps
   };
 
   const handleAddExtraDeduction = async () => {
-    if (newExtraDeduction.name.trim() && newExtraDeduction.amount.trim()) {
-      const success = await addExtraDeduction(newExtraDeduction);
+    // Validate both name and amount more thoroughly
+    const name = newExtraDeduction.name.trim();
+    const amount = newExtraDeduction.amount.trim();
+    
+    // Check if name exists and amount is a valid positive number
+    if (name && amount && !isNaN(parseFloat(amount)) && parseFloat(amount) > 0) {
+      const success = await addExtraDeduction(name, amount);
       
       if (success) {
         setNewExtraDeduction({ name: '', amount: '' });

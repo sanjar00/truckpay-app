@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
-import { MapPin, Calendar, Trash2, Edit, Save, X } from 'lucide-react';
+import { MapPin, Calendar, Trash2, Edit, Save, X, MoreHorizontal } from 'lucide-react';
 import { format } from 'date-fns';
 import { formatCurrency } from '@/lib/utils';
 import LocationCombobox from './LocationCombobox';
@@ -43,6 +43,7 @@ const LoadCard = ({ load, onDelete, onEdit, isEditing, setIsEditing }: LoadCardP
   });
   const [pickupCalendarOpen, setPickupCalendarOpen] = useState(false);
   const [deliveryCalendarOpen, setDeliveryCalendarOpen] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'Not set';
@@ -262,24 +263,67 @@ const LoadCard = ({ load, onDelete, onEdit, isEditing, setIsEditing }: LoadCardP
             </div>
           </div>
           <div className="flex gap-2">
-            {onEdit && setIsEditing && (
+            {/* Desktop buttons - hidden on mobile */}
+            <div className="hidden sm:flex gap-2">
+              {onEdit && setIsEditing && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsEditing(true)}
+                  className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                >
+                  <Edit className="w-4 h-4" />
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setIsEditing(true)}
-                className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                onClick={() => onDelete(load.id)}
+                className="text-red-600 hover:text-red-700 hover:bg-red-50"
               >
-                <Edit className="w-4 h-4" />
+                <Trash2 className="w-4 h-4" />
               </Button>
-            )}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onDelete(load.id)}
-              className="text-red-600 hover:text-red-700 hover:bg-red-50"
-            >
-              <Trash2 className="w-4 h-4" />
-            </Button>
+            </div>
+            
+            {/* Mobile 3-dot menu */}
+            <div className="sm:hidden relative">
+              <Button
+                onClick={() => setShowMobileMenu(!showMobileMenu)}
+                variant="ghost"
+                size="sm"
+                className="p-1"
+              >
+                <MoreHorizontal className="w-4 h-4" />
+              </Button>
+              
+              {/* Mobile dropdown menu */}
+              {showMobileMenu && (
+                <div className="absolute right-0 top-8 bg-white border border-gray-200 rounded-md shadow-lg z-10 min-w-[120px]">
+                  {onEdit && setIsEditing && (
+                    <button
+                      onClick={() => {
+                        setIsEditing(true);
+                        setShowMobileMenu(false);
+                      }}
+                      className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+                    >
+                      <Edit className="w-4 h-4" />
+                      Edit
+                    </button>
+                  )}
+                  <button
+                    onClick={() => {
+                      onDelete(load.id);
+                      setShowMobileMenu(false);
+                    }}
+                    className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 text-red-600 flex items-center gap-2"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Delete
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </CardContent>
