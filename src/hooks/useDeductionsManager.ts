@@ -89,9 +89,11 @@ export const useDeductionsManager = (user: any, weekStart: Date) => {
     }
   };
 
-  const fetchAllDeductions = () => {
-    fetchWeeklyDeductions();
-    fetchExtraDeductions();
+  const fetchAllDeductions = async () => {
+    // Fetch weekly deductions first and wait for completion
+    await fetchWeeklyDeductions();
+    // Then fetch any extra deductions
+    await fetchExtraDeductions();
   };
 
   /** ---------- Persistence ---------- */
@@ -232,7 +234,10 @@ export const useDeductionsManager = (user: any, weekStart: Date) => {
 
     /* debounce, чтобы не дёргать БД при каждом клике Prev/Next Week */
     fetchTimeoutRef.current && clearTimeout(fetchTimeoutRef.current);
-    fetchTimeoutRef.current = setTimeout(fetchAllDeductions, 400);
+    // Delay fetching to avoid rapid consecutive database queries
+    fetchTimeoutRef.current = setTimeout(() => {
+      void fetchAllDeductions();
+    }, 400);
 
     return () => {
       fetchTimeoutRef.current && clearTimeout(fetchTimeoutRef.current);
