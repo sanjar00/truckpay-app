@@ -17,7 +17,7 @@ import { LoadReportsProps, DeleteConfirmation } from '@/types/LoadReports';
 const LoadReports = ({ onBack, user, userProfile, deductions }: LoadReportsProps) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<DeleteConfirmation | null>(null);
   const [showAddExtraDeduction, setShowAddExtraDeduction] = useState(false);
-  const [newExtraDeduction, setNewExtraDeduction] = useState({ name: '', amount: '' });
+  const [newExtraDeduction, setNewExtraDeduction] = useState({ name: '', amount: '', date: new Date().toISOString().split('T')[0] });
   const [editingDeduction, setEditingDeduction] = useState<string | null>(null);
 
   const {
@@ -90,13 +90,14 @@ const LoadReports = ({ onBack, user, userProfile, deductions }: LoadReportsProps
     // Validate both name and amount more thoroughly
     const name = newExtraDeduction.name.trim();
     const amount = newExtraDeduction.amount.trim();
+    const date = newExtraDeduction.date;
     
     // Check if name exists and amount is a valid positive number
     if (name && amount && !isNaN(parseFloat(amount)) && parseFloat(amount) > 0) {
-      const success = await addExtraDeduction(name, amount);
-      
+      const success = await addExtraDeduction(name, amount, date);
+
       if (success) {
-        setNewExtraDeduction({ name: '', amount: '' });
+        setNewExtraDeduction({ name: '', amount: '', date: new Date().toISOString().split('T')[0] });
         setShowAddExtraDeduction(false);
       }
     }

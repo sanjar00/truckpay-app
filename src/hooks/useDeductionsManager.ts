@@ -140,7 +140,7 @@ export const useDeductionsManager = (user: any, weekStart: Date) => {
             week_start: weekStartStr,
             name: deduction.name,
             amount: parseFloat(deduction.amount),
-            date_added: new Date().toISOString(),
+            date_added: deduction.dateAdded || new Date().toISOString(),
           })
           .select();
 
@@ -190,13 +190,13 @@ export const useDeductionsManager = (user: any, weekStart: Date) => {
     await saveWeeklyDeduction(type, amount);
   };
 
-  const handleAddExtraDeduction = async (name: string, amount: string) => {
+  const handleAddExtraDeduction = async (name: string, amount: string, date?: string) => {
     const tempId = `temp_${Date.now()}`;
     const newExtra: ExtraDeduction = {
       id: tempId,
       name,
       amount,
-      dateAdded: new Date().toISOString(),
+      dateAdded: date || new Date().toISOString(),
     };
 
     setExtraDeductionTypes(prev => [...prev, newExtra]);
@@ -214,7 +214,8 @@ export const useDeductionsManager = (user: any, weekStart: Date) => {
   };
 
   const handleEditExtraDeduction = async (id: string, name: string, amount: string) => {
-    const updated: ExtraDeduction = { id, name, amount };
+    const existing = extraDeductionTypes.find(item => item.id === id);
+    const updated: ExtraDeduction = { id, name, amount, dateAdded: existing?.dateAdded };
     const success = await saveExtraDeduction(updated);
     if (success) {
       setExtraDeductionTypes(prev => prev.map(item => (item.id === id ? updated : item)));
@@ -223,9 +224,9 @@ export const useDeductionsManager = (user: any, weekStart: Date) => {
   };
 
   /** Добавить кастомное списание из списка предопределённых типов 👇 */
-  const handleAddDeductionFromType = async (type: string, amount: string) => {
+  const handleAddDeductionFromType = async (type: string, amount: string, date?: string) => {
     if (!amount || parseFloat(amount) <= 0) return false;
-    return handleAddExtraDeduction(type, amount);
+    return handleAddExtraDeduction(type, amount, date);
   };
 
   /** ---------- Effects ---------- */
