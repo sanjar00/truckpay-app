@@ -12,15 +12,15 @@ interface WeeklySummaryProps {
   onWeeklyDeductionChange: (type: string, amount: string) => void;
   extraDeductionTypes: Array<{id: string, name: string, amount: string, dateAdded?: string}>;
   onAddExtraDeduction: () => void;
-  onAddDeductionFromType: (type: string, amount: string) => void;
+  onAddDeductionFromType: (type: string, amount: string, date: string) => void;
   onRemoveExtraDeduction: (id: string) => void;
   onEditExtraDeduction?: (id: string, name: string, amount: string) => void;
   editingDeduction?: string | null;
   setEditingDeduction?: (id: string | null) => void;
   showAddExtraDeduction: boolean;
   setShowAddExtraDeduction: (show: boolean) => void;
-  newExtraDeduction: { name: string, amount: string };
-  setNewExtraDeduction: (deduction: { name: string, amount: string }) => void;
+  newExtraDeduction: { name: string, amount: string, date: string };
+  setNewExtraDeduction: (deduction: { name: string, amount: string, date: string }) => void;
   totalGrossPay: number;
   totalDriverPay: number;
   totalWeeklyDeductions: number;
@@ -54,19 +54,25 @@ const WeeklySummary = ({
   setEditingDeduction
 }: WeeklySummaryProps) => {
   // Restore the pendingDeductions state for input fields
-  const [pendingDeductions, setPendingDeductions] = useState<Record<string, string>>({});
+  const [pendingDeductions, setPendingDeductions] = useState<Record<string, { amount: string, date: string }>>({});
   const [editingData, setEditingData] = useState<{name: string, amount: string}>({name: '', amount: ''});
   const [showMobileMenu, setShowMobileMenu] = useState<string | null>(null);
+  const todayStr = new Date().toISOString().split('T')[0];
 
   // Fix the handleAddDeduction function
   const handleAddDeduction = async (type: string) => {
-    const amount = pendingDeductions[type];
+    const entry = pendingDeductions[type];
+    const amount = entry?.amount;
+    const date = entry?.date || new Date().toISOString().split('T')[0];
     if (amount && parseFloat(amount) > 0) {
       // Call the parent function to add the deduction
-      await onAddDeductionFromType(type, amount);
-      
-      // Clear the pending amount
-      setPendingDeductions(prev => ({ ...prev, [type]: '' }));
+      await onAddDeductionFromType(type, amount, date);
+
+      // Clear the pending amount and reset date
+      setPendingDeductions(prev => ({
+        ...prev,
+        [type]: { amount: '', date: new Date().toISOString().split('T')[0] }
+      }));
     }
   };
 
@@ -145,16 +151,32 @@ const WeeklySummary = ({
               <Input
                 type="number"
                 placeholder="0.00"
-                value={pendingDeductions[type] || ''}
-                onChange={(e) => setPendingDeductions(prev => ({ ...prev, [type]: e.target.value }))}
+                value={pendingDeductions[type]?.amount || ''}
+                onChange={(e) =>
+                  setPendingDeductions(prev => ({
+                    ...prev,
+                    [type]: { ...(prev[type] || { date: todayStr }), amount: e.target.value }
+                  }))
+                }
                 className="brutal-border bg-input flex-1"
               />
-              <Button 
+              <Input
+                type="date"
+                value={pendingDeductions[type]?.date || todayStr}
+                onChange={(e) =>
+                  setPendingDeductions(prev => ({
+                    ...prev,
+                    [type]: { ...(prev[type] || { amount: '' }), date: e.target.value }
+                  }))
+                }
+                className="brutal-border bg-input w-36"
+              />
+              <Button
                 onClick={() => handleAddDeduction(type)}
                 variant="secondary"
                 size="sm"
                 className="brutal-border-accent bg-accent text-accent-foreground px-4"
-                disabled={!pendingDeductions[type] || parseFloat(pendingDeductions[type]) <= 0}
+                disabled={!pendingDeductions[type]?.amount || parseFloat(pendingDeductions[type].amount) <= 0}
               >
                 <Plus className="w-4 h-4 mr-1" />
                 ADD
@@ -195,12 +217,20 @@ const WeeklySummary = ({
                 onChange={(e) => setNewExtraDeduction(prev => ({ ...prev, amount: e.target.value }))}
               />
             </div>
+            <div>
+              <Label className="brutal-mono text-sm text-foreground mb-2 block">DATE</Label>
+              <Input
+                type="date"
+                value={newExtraDeduction.date}
+                onChange={(e) => setNewExtraDeduction(prev => ({ ...prev, date: e.target.value }))}
+              />
+            </div>
             <div className="flex gap-3">
-              <Button 
+              <Button
                 onClick={onAddExtraDeduction}
                 variant="success"
                 className="flex-1"
-                disabled={!newExtraDeduction.name.trim() || !newExtraDeduction.amount.trim() || isNaN(parseFloat(newExtraDeduction.amount)) || parseFloat(newExtraDeduction.amount) <= 0}
+                disabled={!newExtraDeduction.name.trim() || !newExtraDeduction.amount.trim() || !newExtraDeduction.date || isNaN(parseFloat(newExtraDeduction.amount)) || parseFloat(newExtraDeduction.amount) <= 0}
               >
                 ADD
               </Button>
