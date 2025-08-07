@@ -11,6 +11,20 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 
+// Helper function to format dates without timezone issues
+const formatDateForDB = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+// Add this new helper function to parse dates without timezone issues
+const parseDateFromDB = (dateString: string): Date => {
+  const [year, month, day] = dateString.split('-').map(Number);
+  return new Date(year, month - 1, day); // month is 0-indexed in Date constructor
+};
+
 interface Load {
   id: string;
   rate: number;
@@ -38,8 +52,8 @@ const LoadCard = ({ load, onDelete, onEdit, isEditing, setIsEditing }: LoadCardP
     companyDeduction: load.companyDeduction.toString(),
     locationFrom: load.locationFrom,
     locationTo: load.locationTo,
-    pickupDate: load.pickupDate ? new Date(load.pickupDate) : undefined,
-    deliveryDate: load.deliveryDate ? new Date(load.deliveryDate) : undefined
+    pickupDate: load.pickupDate ? parseDateFromDB(load.pickupDate) : undefined,
+    deliveryDate: load.deliveryDate ? parseDateFromDB(load.deliveryDate) : undefined
   });
   const [pickupCalendarOpen, setPickupCalendarOpen] = useState(false);
   const [deliveryCalendarOpen, setDeliveryCalendarOpen] = useState(false);
@@ -48,7 +62,10 @@ const LoadCard = ({ load, onDelete, onEdit, isEditing, setIsEditing }: LoadCardP
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'Not set';
     try {
-      return format(new Date(dateString), 'MMM dd, yyyy');
+      // Use the same timezone-safe parsing as in editing mode
+      const [year, month, day] = dateString.split('-').map(Number);
+      const date = new Date(year, month - 1, day); // month is 0-indexed
+      return format(date, 'MMM dd, yyyy');
     } catch {
       return 'Invalid date';
     }
@@ -63,8 +80,8 @@ const LoadCard = ({ load, onDelete, onEdit, isEditing, setIsEditing }: LoadCardP
         driverPay,
         locationFrom: editData.locationFrom,
         locationTo: editData.locationTo,
-        pickupDate: editData.pickupDate?.toISOString().split('T')[0],
-        deliveryDate: editData.deliveryDate?.toISOString().split('T')[0]
+        pickupDate: editData.pickupDate ? formatDateForDB(editData.pickupDate) : undefined,
+        deliveryDate: editData.deliveryDate ? formatDateForDB(editData.deliveryDate) : undefined
       });
     }
   };
@@ -75,8 +92,8 @@ const LoadCard = ({ load, onDelete, onEdit, isEditing, setIsEditing }: LoadCardP
       companyDeduction: load.companyDeduction.toString(),
       locationFrom: load.locationFrom,
       locationTo: load.locationTo,
-      pickupDate: load.pickupDate ? new Date(load.pickupDate) : undefined,
-      deliveryDate: load.deliveryDate ? new Date(load.deliveryDate) : undefined
+      pickupDate: load.pickupDate ? parseDateFromDB(load.pickupDate) : undefined,
+      deliveryDate: load.deliveryDate ? parseDateFromDB(load.deliveryDate) : undefined
     });
     if (setIsEditing) setIsEditing(false);
   };

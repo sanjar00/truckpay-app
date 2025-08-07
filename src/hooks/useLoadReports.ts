@@ -4,6 +4,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { getUserWeekStart, getUserWeekEnd } from '@/lib/weeklyPeriodUtils';
 import { Load, NewLoad, WeeklyMileage, ExtraDeduction } from '@/types/LoadReports';
 
+// Helper function to format dates without timezone issues
+const formatDateForDB = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 export const useLoadReports = (user: any, userProfile: any, deductions: any[]) => {
   const [currentWeek, setCurrentWeek] = useState(getUserWeekStart(new Date(), userProfile));
   const [allDeductionTypes, setAllDeductionTypes] = useState<string[]>([]);
@@ -103,8 +111,8 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
             driver_pay: driverPay,
             location_from: newLoad.locationFrom,
             location_to: newLoad.locationTo,
-            pickup_date: newLoad.pickupDate ? newLoad.pickupDate.toISOString().split('T')[0] : null,
-            delivery_date: newLoad.deliveryDate ? newLoad.deliveryDate.toISOString().split('T')[0] : null,
+            pickup_date: newLoad.pickupDate ? formatDateForDB(newLoad.pickupDate) : null,
+            delivery_date: newLoad.deliveryDate ? formatDateForDB(newLoad.deliveryDate) : null,
             date_added: loadDate,
             week_period: weekPeriod
           })
@@ -220,12 +228,23 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
     }
   }, [user, currentWeek]);
 
-  const currentWeekLoads = loads.filter(load => {
-    if (!load.dateAdded) return false;
-    const loadDate = typeof load.dateAdded === 'string' ? parseISO(load.dateAdded) : load.dateAdded;
-    const isInWeek = isWithinInterval(loadDate, { start: weekStart, end: weekEnd });
-    return isInWeek;
-  });
+  const currentWeekLoads = loads
+    .filter(load => {
+      if (!load.dateAdded) return false;
+      const loadDate = typeof load.dateAdded === 'string' ? parseISO(load.dateAdded) : load.dateAdded;
+      const isInWeek = isWithinInterval(loadDate, { start: weekStart, end: weekEnd });
+      return isInWeek;
+    })
+    .sort((a, b) => {
+      // Sort by pickup date with latest dates on top
+      if (!a.pickupDate && !b.pickupDate) return 0;
+      if (!a.pickupDate) return 1; // Loads without pickup date go to bottom
+      if (!b.pickupDate) return -1; // Loads without pickup date go to bottom
+      
+      const dateA = new Date(a.pickupDate);
+      const dateB = new Date(b.pickupDate);
+      return dateB.getTime() - dateA.getTime(); // Latest dates first
+    });
 
   const availableDeductionTypes = allDeductionTypes.filter(type => {
     const fixedDeduction = deductions?.find(d => d.type === type && d.isFixed);
