@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 interface OfflineAction {
   type: string;
@@ -11,28 +11,43 @@ const CACHE_PREFIX = 'cache_';
 export const useOfflineSync = (
   handlers: Record<string, (payload: any) => Promise<any>> = {}
 ) => {
-  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
+  const [isOnline, setIsOnline] = useState(
+    typeof navigator !== 'undefined' ? navigator.onLine : true
+  );
+  const processingRef = useRef(false);
 
   const processQueue = useCallback(async () => {
-    const raw = localStorage.getItem(QUEUE_KEY);
-    const queue: OfflineAction[] = raw ? JSON.parse(raw) : [];
-    if (!queue.length) return;
+    if (processingRef.current) return;
+    processingRef.current = true;
+    try {
+      const raw = localStorage.getItem(QUEUE_KEY);
+      const queue: OfflineAction[] = raw ? JSON.parse(raw) : [];
+      if (!queue.length) return;
 
-    const remaining: OfflineAction[] = [];
-    for (const action of queue) {
-      const handler = handlers[action.type];
-      if (handler) {
-        try {
-          await handler(action.payload);
-        } catch (err) {
-          console.error('Offline action failed', action, err);
+      // Clear queue immediately to avoid duplicate processing
+      localStorage.removeItem(QUEUE_KEY);
+
+      const remaining: OfflineAction[] = [];
+      for (const action of queue) {
+        const handler = handlers[action.type];
+        if (handler) {
+          try {
+            await handler(action.payload);
+          } catch (err) {
+            console.error('Offline action failed', action, err);
+            remaining.push(action);
+          }
+        } else {
           remaining.push(action);
         }
-      } else {
-        remaining.push(action);
       }
+
+      if (remaining.length) {
+        localStorage.setItem(QUEUE_KEY, JSON.stringify(remaining));
+      }
+    } finally {
+      processingRef.current = false;
     }
-    localStorage.setItem(QUEUE_KEY, JSON.stringify(remaining));
   }, [handlers]);
 
   const queueAction = useCallback(
