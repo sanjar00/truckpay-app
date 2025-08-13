@@ -12,18 +12,14 @@ const formatDateForDB = (date: Date): string => {
   return `${year}-${month}-${day}`;
 };
 
-export const useLoadReports = (user: any, userProfile: any, deductions: any[]) => {
+export const useLoadReports = (
+  user: { id: string } | null,
+  userProfile: { companyDeduction?: number } | null,
+  deductions: { type: string; isFixed?: boolean }[]
+) => {
   const [currentWeek, setCurrentWeek] = useState(getUserWeekStart(new Date(), userProfile));
   const [allDeductionTypes, setAllDeductionTypes] = useState<string[]>([]);
   const [weeklyDeductions, setWeeklyDeductions] = useState<Record<string, string>>({});
-  const [newLoad, setNewLoad] = useState<NewLoad>({
-    rate: '',
-    companyDeduction: userProfile?.companyDeduction || '',
-    locationFrom: '',
-    locationTo: '',
-    pickupDate: undefined,
-    deliveryDate: undefined
-  });
   const [showAddForm, setShowAddForm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loads, setLoads] = useState<Load[]>([]);
@@ -93,26 +89,26 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
     }
   };
 
-  const handleAddLoad = async () => {
+  const handleAddLoad = async (newLoad: NewLoad) => {
     if (newLoad.rate && newLoad.companyDeduction && newLoad.locationFrom && newLoad.locationTo && user) {
       setLoading(true);
-      
+
       try {
-        const driverPay = parseFloat(newLoad.rate) * (1 - parseFloat(newLoad.companyDeduction) / 100);
+        const driverPay = newLoad.rate * (1 - newLoad.companyDeduction / 100);
         const weekPeriod = `${format(weekStart, 'MMM dd')} - ${format(weekEnd, 'MMM dd, yyyy')}`;
         const loadDate = weekStart.toISOString().split('T')[0];
-        
+
         const { data, error } = await supabase
           .from('load_reports')
           .insert({
             user_id: user.id,
-            rate: parseFloat(newLoad.rate),
-            company_deduction: parseFloat(newLoad.companyDeduction),
+            rate: newLoad.rate,
+            company_deduction: newLoad.companyDeduction,
             driver_pay: driverPay,
             location_from: newLoad.locationFrom,
             location_to: newLoad.locationTo,
-            pickup_date: newLoad.pickupDate ? formatDateForDB(newLoad.pickupDate) : null,
-            delivery_date: newLoad.deliveryDate ? formatDateForDB(newLoad.deliveryDate) : null,
+            pickup_date: formatDateForDB(newLoad.pickupDate),
+            delivery_date: formatDateForDB(newLoad.deliveryDate),
             date_added: loadDate,
             week_period: weekPeriod
           })
@@ -137,16 +133,8 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
             dateAdded: data.date_added,
             weekPeriod: data.week_period
           };
-          
+
           setLoads(prev => [...prev, newLoadEntry]);
-          setNewLoad({ 
-            rate: '', 
-            companyDeduction: userProfile?.companyDeduction || '',
-            locationFrom: '',
-            locationTo: '',
-            pickupDate: undefined,
-            deliveryDate: undefined
-          });
           setShowAddForm(false);
         }
       } catch (error) {
@@ -258,7 +246,6 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
     weekEnd,
     loads,
     currentWeekLoads,
-    newLoad,
     showAddForm,
     loading,
     editingLoad,
@@ -271,7 +258,6 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
     weeklyDeductions,
     
     // Setters
-    setNewLoad,
     setShowAddForm,
     setEditingLoad,
     setWeeklyMileage,

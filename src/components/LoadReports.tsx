@@ -26,12 +26,10 @@ const LoadReports = ({ onBack, user, userProfile, deductions }: LoadReportsProps
     weekEnd,
     loads,
     currentWeekLoads,
-    newLoad,
     showAddForm,
     loading,
     editingLoad,
     availableDeductionTypes,
-    setNewLoad,
     setShowAddForm,
     setEditingLoad,
     handleAddLoad,
@@ -147,9 +145,7 @@ const LoadReports = ({ onBack, user, userProfile, deductions }: LoadReportsProps
         {showAddForm && (
           <div className="brutal-border-secondary bg-secondary p-6 brutal-shadow-lg">
             <h3 className="brutal-text text-xl text-secondary-foreground mb-4">NEW_LOAD_ENTRY</h3>
-            <AddLoadForm 
-              newLoad={newLoad}
-              setNewLoad={setNewLoad}
+            <AddLoadForm
               onAddLoad={handleAddLoad}
               onCancel={() => setShowAddForm(false)}
               loading={loading}

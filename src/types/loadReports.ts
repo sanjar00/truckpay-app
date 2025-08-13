@@ -13,9 +13,9 @@ export interface Load {
 
 export interface LoadReportsProps {
   onBack: () => void;
-  user: any;
-  userProfile: any;
-  deductions: any[];
+  user: { id: string } | null;
+  userProfile: { companyDeduction?: number } | null;
+  deductions: { type: string; isFixed?: boolean }[];
 }
 
 export interface WeeklyMileage {
@@ -32,12 +32,12 @@ export interface ExtraDeduction {
 }
 
 export interface NewLoad {
-  rate: string;
-  companyDeduction: string;
+  rate: number;
+  companyDeduction: number;
   locationFrom: string;
   locationTo: string;
-  pickupDate: Date | undefined;
-  deliveryDate: Date | undefined;
+  pickupDate: Date;
+  deliveryDate: Date;
 }
 
 export interface DeleteConfirmation {
