@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { WeeklyMileage } from '@/types/LoadReports';
+import { useToast } from '@/hooks/use-toast';
 
 export const useMileageManager = (user: any, weekStart: Date) => {
   const [weeklyMileage, setWeeklyMileage] = useState<WeeklyMileage>({
@@ -12,6 +13,7 @@ export const useMileageManager = (user: any, weekStart: Date) => {
   const isUserInputRef = useRef(false);
   const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const { toast } = useToast();
 
   const fetchWeeklyMileage = async () => {
     if (!user || isLoading) return;
@@ -28,7 +30,11 @@ export const useMileageManager = (user: any, weekStart: Date) => {
         .maybeSingle();
 
       if (error) {
-        console.error('Error fetching weekly mileage:', error);
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: 'Failed to fetch weekly mileage. Please try again.'
+        });
         return;
       }
 
@@ -46,7 +52,11 @@ export const useMileageManager = (user: any, weekStart: Date) => {
         });
       }
     } catch (error) {
-      console.error('Error fetching weekly mileage:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to fetch weekly mileage. Please try again.'
+      });
     } finally {
       setIsLoading(false);
     }
@@ -72,10 +82,18 @@ export const useMileageManager = (user: any, weekStart: Date) => {
         });
   
       if (error) {
-        console.error('Error saving weekly mileage:', error);
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: 'Failed to save weekly mileage. Please try again.'
+        });
       }
     } catch (error) {
-      console.error('Error saving weekly mileage:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to save weekly mileage. Please try again.'
+      });
     } finally {
       isUserInputRef.current = false;
     }

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { ExtraDeduction } from '@/types/LoadReports';
+import { useToast } from '@/hooks/use-toast';
 
 /**
  * Хук управляет:
@@ -16,6 +17,7 @@ export const useDeductionsManager = (user: any, weekStart: Date) => {
   const [weeklyDeductions, setWeeklyDeductions] = useState<Record<string, string>>({});
   const [extraDeductionTypes, setExtraDeductionTypes] = useState<ExtraDeduction[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const { toast } = useToast();
 
   /** ---------- Helpers ---------- */
   const weekStartStr = weekStart.toISOString().slice(0, 10);
@@ -50,7 +52,13 @@ export const useDeductionsManager = (user: any, weekStart: Date) => {
         setWeeklyDeductions(map);
       }
     } catch (err: any) {
-      if (err.name !== 'AbortError') console.error('fetchWeeklyDeductions:', err);
+      if (err.name !== 'AbortError') {
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: 'Failed to fetch weekly deductions. Please try again.'
+        });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -83,7 +91,13 @@ export const useDeductionsManager = (user: any, weekStart: Date) => {
         setExtraDeductionTypes(extras);
       }
     } catch (err: any) {
-      if (err.name !== 'AbortError') console.error('fetchExtraDeductions:', err);
+      if (err.name !== 'AbortError') {
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: 'Failed to fetch extra deductions. Please try again.'
+        });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -123,7 +137,11 @@ export const useDeductionsManager = (user: any, weekStart: Date) => {
           );
       }
     } catch (err) {
-      console.error('saveWeeklyDeduction:', err);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to save weekly deduction. Please try again.'
+      });
     }
   };
 
@@ -165,7 +183,11 @@ export const useDeductionsManager = (user: any, weekStart: Date) => {
 
       return true;
     } catch (err) {
-      console.error('saveExtraDeduction:', err);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to save extra deduction. Please try again.'
+      });
       return false;
     }
   };
@@ -180,7 +202,11 @@ export const useDeductionsManager = (user: any, weekStart: Date) => {
         .eq('id', parseInt(id))
         .eq('user_id', user.id);
     } catch (err) {
-      console.error('deleteExtraDeduction:', err);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to delete extra deduction. Please try again.'
+      });
     }
   };
 

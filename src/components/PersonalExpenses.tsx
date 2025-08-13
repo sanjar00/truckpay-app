@@ -127,19 +127,17 @@ const PersonalExpenses: React.FC<PersonalExpensesProps> = ({ onBack, userProfile
         .eq('user_id', user.id)
         .order('name');
 
-      if (error) {
-        console.error('Error fetching expense types:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load expense types",
-          variant: "destructive"
-        });
-        return;
-      }
+        if (error) {
+          toast({
+            title: "Error",
+            description: "Failed to load expense types",
+            variant: "destructive"
+          });
+          return;
+        }
 
       setExpenseTypes(data || []);
     } catch (error) {
-      console.error('Error fetching expense types:', error);
       toast({
         title: "Error",
         description: "Failed to load expense types",
@@ -162,7 +160,6 @@ const PersonalExpenses: React.FC<PersonalExpensesProps> = ({ onBack, userProfile
         .order('date', { ascending: false });
 
       if (error) {
-        console.error('Error fetching expenses:', error);
         toast({
           title: "Error",
           description: "Failed to load expenses",
@@ -173,7 +170,6 @@ const PersonalExpenses: React.FC<PersonalExpensesProps> = ({ onBack, userProfile
 
       setExpenses(data || []);
     } catch (error) {
-      console.error('Error fetching expenses:', error);
       toast({
         title: "Error",
         description: "Failed to load expenses",
@@ -218,7 +214,6 @@ const PersonalExpenses: React.FC<PersonalExpensesProps> = ({ onBack, userProfile
         .single();
 
       if (error) {
-        console.error('Error adding expense type:', error);
         toast({
           title: "Error",
           description: "Failed to add expense type",
@@ -234,7 +229,6 @@ const PersonalExpenses: React.FC<PersonalExpensesProps> = ({ onBack, userProfile
         description: "Expense type added successfully"
       });
     } catch (error) {
-      console.error('Error adding expense type:', error);
       toast({
         title: "Error",
         description: "Failed to add expense type",
@@ -255,7 +249,6 @@ const PersonalExpenses: React.FC<PersonalExpensesProps> = ({ onBack, userProfile
         .eq('user_id', user.id);
 
       if (error) {
-        console.error('Error updating expense type:', error);
         toast({
           title: "Error",
           description: "Failed to update expense type",
@@ -274,7 +267,6 @@ const PersonalExpenses: React.FC<PersonalExpensesProps> = ({ onBack, userProfile
         description: "Expense type updated successfully"
       });
     } catch (error) {
-      console.error('Error updating expense type:', error);
       toast({
         title: "Error",
         description: "Failed to update expense type",
@@ -295,7 +287,6 @@ const PersonalExpenses: React.FC<PersonalExpensesProps> = ({ onBack, userProfile
         .eq('user_id', user.id);
 
       if (error) {
-        console.error('Error deleting expense type:', error);
         toast({
           title: "Error",
           description: "Failed to delete expense type",
@@ -310,7 +301,6 @@ const PersonalExpenses: React.FC<PersonalExpensesProps> = ({ onBack, userProfile
         description: "Expense type deleted successfully"
       });
     } catch (error) {
-      console.error('Error deleting expense type:', error);
       toast({
         title: "Error",
         description: "Failed to delete expense type",
@@ -357,7 +347,6 @@ const PersonalExpenses: React.FC<PersonalExpensesProps> = ({ onBack, userProfile
         .single();
 
       if (error) {
-        console.error('Error adding expense:', error);
         toast({
           title: "Error",
           description: "Failed to add expense",
@@ -373,7 +362,6 @@ const PersonalExpenses: React.FC<PersonalExpensesProps> = ({ onBack, userProfile
         description: "Expense added successfully"
       });
     } catch (error) {
-      console.error('Error adding expense:', error);
       toast({
         title: "Error",
         description: "Failed to add expense",
@@ -394,7 +382,6 @@ const PersonalExpenses: React.FC<PersonalExpensesProps> = ({ onBack, userProfile
         .eq('user_id', user.id);
 
       if (error) {
-        console.error('Error deleting expense:', error);
         toast({
           title: "Error",
           description: "Failed to delete expense",
@@ -409,7 +396,6 @@ const PersonalExpenses: React.FC<PersonalExpensesProps> = ({ onBack, userProfile
         description: "Expense deleted successfully"
       });
     } catch (error) {
-      console.error('Error deleting expense:', error);
       toast({
         title: "Error",
         description: "Failed to delete expense",

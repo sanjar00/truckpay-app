@@ -4,6 +4,7 @@ import { Truck, Calculator, Settings, DollarSign, FileText, LogOut, Receipt } fr
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 import LoginPage from '@/components/LoginPage';
 import Registration from '@/components/Registration';
 import LoadReports from '@/components/LoadReports';
@@ -14,6 +15,7 @@ import PersonalExpenses from '@/components/PersonalExpenses';
 
 const Index = () => {
   const { user, loading, signOut } = useAuth();
+  const { toast } = useToast();
   const [currentView, setCurrentView] = useState('dashboard');
   const [showRegistration, setShowRegistration] = useState(false);
   const [userProfile, setUserProfile] = useState(null);
@@ -38,7 +40,11 @@ const Index = () => {
         .eq('is_fixed', true);
       
       if (error) {
-        console.error('Error fetching deductions:', error);
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: 'Failed to fetch deductions. Please try again.'
+        });
         return;
       }
       
@@ -54,7 +60,11 @@ const Index = () => {
         setDeductions(mappedDeductions);
       }
     } catch (error) {
-      console.error('Error fetching deductions:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to fetch deductions. Please try again.'
+      });
     }
   };
 

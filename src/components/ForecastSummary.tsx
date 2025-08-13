@@ -10,6 +10,7 @@ import { formatCurrency } from '@/lib/utils';
 import LoadCard from './LoadCard';
 import { useAuth } from '@/hooks/useAuth';
 import { getUserWeekStart, getUserWeekEnd, getWeekStartForPeriod, getWeekEndForPeriod } from '../lib/weeklyPeriodUtils';
+import { useToast } from '@/hooks/use-toast';
 
 interface Load {
   id: string;
@@ -41,6 +42,7 @@ interface ForecastSummaryProps {
 
 const ForecastSummary = ({ onBack, deductions, userProfile }: ForecastSummaryProps) => {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [periodFilter, setPeriodFilter] = useState('last2');
   const [customDateRange, setCustomDateRange] = useState<{from: Date, to: Date} | undefined>();
   const [loads, setLoads] = useState<Load[]>([]);
@@ -114,7 +116,11 @@ const ForecastSummary = ({ onBack, deductions, userProfile }: ForecastSummaryPro
         .order('date_added', { ascending: false });
 
       if (error) {
-        console.error('Error fetching loads:', error);
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: 'Failed to fetch loads. Please try again.'
+        });
         return;
       }
 
@@ -135,7 +141,11 @@ const ForecastSummary = ({ onBack, deductions, userProfile }: ForecastSummaryPro
         setLoads(formattedLoads);
       }
     } catch (error) {
-      console.error('Error fetching loads:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to fetch loads. Please try again.'
+      });
     } finally {
       setLoading(false);
     }
@@ -162,7 +172,11 @@ const ForecastSummary = ({ onBack, deductions, userProfile }: ForecastSummaryPro
         .in('week_start', weeks);
 
       if (error) {
-        console.error('Error fetching weekly deductions:', error);
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: 'Failed to fetch weekly deductions. Please try again.'
+        });
         return;
       }
 
@@ -177,7 +191,11 @@ const ForecastSummary = ({ onBack, deductions, userProfile }: ForecastSummaryPro
         setWeeklyDeductions(deductionsMap);
       }
     } catch (error) {
-      console.error('Error fetching weekly deductions:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to fetch weekly deductions. Please try again.'
+      });
     }
   };
 
@@ -202,7 +220,11 @@ const ForecastSummary = ({ onBack, deductions, userProfile }: ForecastSummaryPro
         .in('week_start', weeks);
 
       if (error) {
-        console.error('Error fetching extra deductions:', error);
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: 'Failed to fetch extra deductions. Please try again.'
+        });
         return;
       }
 
@@ -221,7 +243,11 @@ const ForecastSummary = ({ onBack, deductions, userProfile }: ForecastSummaryPro
         setExtraDeductions(extraMap);
       }
     } catch (error) {
-      console.error('Error fetching extra deductions:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to fetch extra deductions. Please try again.'
+      });
     }
   };
 
@@ -295,7 +321,11 @@ const ForecastSummary = ({ onBack, deductions, userProfile }: ForecastSummaryPro
         .in('week_start', weeks);
 
       if (error) {
-        console.error('Error fetching weekly mileage:', error);
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: 'Failed to fetch weekly mileage. Please try again.'
+        });
         return;
       }
 
@@ -311,7 +341,11 @@ const ForecastSummary = ({ onBack, deductions, userProfile }: ForecastSummaryPro
         setWeeklyMileageData(mileageMap);
       }
     } catch (error) {
-      console.error('Error fetching weekly mileage:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to fetch weekly mileage. Please try again.'
+      });
     }
   };
 
@@ -340,14 +374,22 @@ const ForecastSummary = ({ onBack, deductions, userProfile }: ForecastSummaryPro
         .eq('user_id', user.id);
 
       if (error) {
-        console.error('Error deleting load:', error);
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: 'Failed to delete load. Please try again.'
+        });
         return;
       }
 
       // Refresh loads
       fetchLoads();
     } catch (error) {
-      console.error('Error deleting load:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to delete load. Please try again.'
+      });
     }
   };
 
