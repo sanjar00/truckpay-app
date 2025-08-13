@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { format, addWeeks, subWeeks, isWithinInterval, parseISO } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { getUserWeekStart, getUserWeekEnd } from '@/lib/weeklyPeriodUtils';
-import { Load, NewLoad, WeeklyMileage, ExtraDeduction } from '@/types/LoadReports';
+import { Load, NewLoad } from '@/types/LoadReports';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 // Helper function to format dates without timezone issues
@@ -16,7 +16,6 @@ const formatDateForDB = (date: Date): string => {
 export const useLoadReports = (user: any, userProfile: any, deductions: any[]) => {
   const [currentWeek, setCurrentWeek] = useState(getUserWeekStart(new Date(), userProfile));
   const [allDeductionTypes, setAllDeductionTypes] = useState<string[]>([]);
-  const [weeklyDeductions, setWeeklyDeductions] = useState<Record<string, string>>({});
   const [newLoad, setNewLoad] = useState<NewLoad>({
     rate: '',
     companyDeduction: userProfile?.companyDeduction || '',
@@ -27,19 +26,15 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
   });
   const [showAddForm, setShowAddForm] = useState(false);
   const queryClient = useQueryClient();
-  const [extraDeductionTypes, setExtraDeductionTypes] = useState<ExtraDeduction[]>([]);
-  const [showAddExtraDeduction, setShowAddExtraDeduction] = useState(false);
-  const [newExtraDeduction, setNewExtraDeduction] = useState({ name: '', amount: '' });
   const [editingLoad, setEditingLoad] = useState<string | null>(null);
-  const [editingDeduction, setEditingDeduction] = useState<string | null>(null);
-  const [weeklyMileage, setWeeklyMileage] = useState<WeeklyMileage>({
-    startMileage: '',
-    endMileage: '',
-    totalMiles: 0
-  });
 
   const weekStart = getUserWeekStart(currentWeek, userProfile);
   const weekEnd = getUserWeekEnd(currentWeek, userProfile);
+
+  // Ensure the reference week aligns with the user's preferred weekly period
+  useEffect(() => {
+    setCurrentWeek(getUserWeekStart(new Date(), userProfile));
+  }, [userProfile]);
 
   const fetchAllDeductionTypes = async () => {
     try {
@@ -240,24 +235,11 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
     loading: addLoadMutation.isPending,
     editingLoad,
     availableDeductionTypes,
-    weeklyMileage,
-    extraDeductionTypes,
-    showAddExtraDeduction,
-    newExtraDeduction,
-    editingDeduction,
-    weeklyDeductions,
-    
     // Setters
     setNewLoad,
     setShowAddForm,
     setEditingLoad,
-    setWeeklyMileage,
-    setExtraDeductionTypes,
-    setShowAddExtraDeduction,
-    setNewExtraDeduction,
-    setEditingDeduction,
-    setWeeklyDeductions,
-    
+
     // Actions
     handleAddLoad,
     handleDeleteLoad,
