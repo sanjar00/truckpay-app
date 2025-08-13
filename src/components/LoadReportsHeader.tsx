@@ -1,5 +1,7 @@
 import { ArrowLeft, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import LocationCombobox from './LocationCombobox';
 import { format } from 'date-fns';
 import { getWeeklyPeriodDisplay } from '@/lib/loadReportsUtils';
 
@@ -9,14 +11,32 @@ interface LoadReportsHeaderProps {
   weekEnd: Date;
   userProfile: any;
   onNavigateWeek: (direction: 'prev' | 'next') => void;
+  filters: {
+    fromDate: string;
+    toDate: string;
+    locationFrom: string;
+    locationTo: string;
+  };
+  onFilterChange: (filters: {
+    fromDate: string;
+    toDate: string;
+    locationFrom: string;
+    locationTo: string;
+  }) => void;
+  onApplyFilters: () => void;
+  onResetFilters: () => void;
 }
 
 const LoadReportsHeader = ({ 
   onBack, 
   weekStart, 
   weekEnd, 
-  userProfile, 
-  onNavigateWeek 
+  userProfile,
+  onNavigateWeek,
+  filters,
+  onFilterChange,
+  onApplyFilters,
+  onResetFilters
 }: LoadReportsHeaderProps) => {
   return (
     <>
@@ -68,6 +88,48 @@ const LoadReportsHeader = ({
             className="brutal-border bg-background text-foreground w-full sm:w-auto"
           >
             NEXT_WEEK →
+          </Button>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="brutal-border bg-card p-4 brutal-shadow mt-4">
+        <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-4">
+          <Input
+            type="date"
+            value={filters.fromDate}
+            onChange={e => onFilterChange({ ...filters, fromDate: e.target.value })}
+            placeholder="FROM_DATE"
+            className="brutal-border"
+          />
+          <Input
+            type="date"
+            value={filters.toDate}
+            onChange={e => onFilterChange({ ...filters, toDate: e.target.value })}
+            placeholder="TO_DATE"
+            className="brutal-border"
+          />
+          <LocationCombobox
+            value={filters.locationFrom}
+            onValueChange={value => onFilterChange({ ...filters, locationFrom: value })}
+            placeholder="FROM_STATE"
+          />
+          <LocationCombobox
+            value={filters.locationTo}
+            onValueChange={value => onFilterChange({ ...filters, locationTo: value })}
+            placeholder="TO_STATE"
+          />
+        </div>
+        <div className="flex flex-col sm:flex-row gap-2 mt-4">
+          <Button onClick={onApplyFilters} className="brutal-border w-full sm:w-auto">
+            APPLY_FILTERS
+          </Button>
+          <Button
+            variant="outline"
+            onClick={onResetFilters}
+            className="brutal-border w-full sm:w-auto"
+          >
+            RESET
           </Button>
         </div>
       </div>
