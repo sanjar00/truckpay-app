@@ -185,11 +185,10 @@ const LoadReports = ({ onBack, user, userProfile, deductions }: LoadReportsProps
 
         {/* Weekly Summary - Only show when there are loads */}
         {currentWeekLoads.length > 0 && (
-          <WeeklySummary 
+          <WeeklySummary
             weeklyDeductions={weeklyDeductions}
             onWeeklyDeductionChange={handleWeeklyDeductionChange}
             availableDeductionTypes={availableDeductionTypes}
-            fixedDeductions={deductions?.filter(d => d.isFixed) || []}
             totalGrossPay={totalGrossPay}
             totalDriverPay={totalDriverPay}
             totalWeeklyDeductions={totalWeeklyDeductions}
@@ -208,6 +207,7 @@ const LoadReports = ({ onBack, user, userProfile, deductions }: LoadReportsProps
             newExtraDeduction={newExtraDeduction}
             setNewExtraDeduction={setNewExtraDeduction}
             weeklyMileage={weeklyMileage}
+            currentWeekLoads={currentWeekLoads}
           />
         )}
 

@@ -4,7 +4,9 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Plus, X, Navigation, Edit, Save, MoreHorizontal } from 'lucide-react';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, formatDate } from '@/lib/utils';
+import { toCSV } from '@/lib/exportUtils';
+import { Load } from '@/types/LoadReports';
 
 interface WeeklySummaryProps {
   availableDeductionTypes: string[];
@@ -28,6 +30,7 @@ interface WeeklySummaryProps {
   totalFixedDeductions: number;
   netPay: number;
   weeklyMileage?: { totalMiles: number };
+  currentWeekLoads: Load[];
 }
 
 const WeeklySummary = ({
@@ -49,6 +52,7 @@ const WeeklySummary = ({
   totalFixedDeductions,
   netPay,
   weeklyMileage,
+  currentWeekLoads,
   onEditExtraDeduction,
   editingDeduction,
   setEditingDeduction
@@ -58,6 +62,49 @@ const WeeklySummary = ({
   const [editingData, setEditingData] = useState<{name: string, amount: string}>({name: '', amount: ''});
   const [showMobileMenu, setShowMobileMenu] = useState<string | null>(null);
   const todayStr = new Date().toISOString().split('T')[0];
+
+  const handleExportCSV = () => {
+    const loadData = currentWeekLoads.map(load => ({
+      type: 'Load',
+      date: formatDate(load.dateAdded),
+      rate: load.rate,
+      company_deduction: load.companyDeduction,
+      driver_pay: load.driverPay,
+      location_from: load.locationFrom,
+      location_to: load.locationTo,
+      pickup_date: load.pickupDate ? formatDate(load.pickupDate) : '',
+      delivery_date: load.deliveryDate ? formatDate(load.deliveryDate) : ''
+    }));
+
+    const deductionData = [
+      ...Object.entries(weeklyDeductions)
+        .filter(([_, amount]) => amount && parseFloat(amount) > 0)
+        .map(([type, amount]) => ({
+          type: 'Deduction',
+          deduction_type: type,
+          amount: parseFloat(amount)
+        })),
+      ...extraDeductionTypes.map(d => ({
+        type: 'Extra Deduction',
+        deduction_type: d.name,
+        amount: parseFloat(d.amount),
+        date: d.dateAdded ? formatDate(d.dateAdded) : ''
+      }))
+    ];
+
+    const mileageData = weeklyMileage ? [{ type: 'Mileage', total_miles: weeklyMileage.totalMiles }] : [];
+
+    const csv = toCSV([...loadData, ...deductionData, ...mileageData]);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `weekly-summary-${formatDate(new Date())}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   // Fix the handleAddDeduction function
   const handleAddDeduction = async (type: string) => {
@@ -391,7 +438,7 @@ const WeeklySummary = ({
           </div>
         )}
       </div>
-
+      
       {/* Payment Breakdown */}
       <div className="brutal-border bg-background p-4 brutal-shadow mt-6">
         <h4 className="brutal-text text-lg text-foreground mb-4">PAYMENT_BREAKDOWN</h4>
@@ -427,6 +474,12 @@ const WeeklySummary = ({
             <span>${formatCurrency(netPay)}</span>
           </div>
         </div>
+      </div>
+
+      <div className="mt-4">
+        <Button onClick={handleExportCSV} className="brutal-border bg-primary text-primary-foreground">
+          EXPORT_CSV
+        </Button>
       </div>
     </div>
   );
