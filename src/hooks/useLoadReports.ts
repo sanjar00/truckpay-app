@@ -3,6 +3,7 @@ import { format, addWeeks, subWeeks, isWithinInterval, parseISO } from 'date-fns
 import { supabase } from '@/integrations/supabase/client';
 import { getUserWeekStart, getUserWeekEnd } from '@/lib/weeklyPeriodUtils';
 import { Load, NewLoad, WeeklyMileage, ExtraDeduction } from '@/types/LoadReports';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 // Helper function to format dates without timezone issues
 const formatDateForDB = (date: Date): string => {
@@ -25,8 +26,7 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
     deliveryDate: undefined
   });
   const [showAddForm, setShowAddForm] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [loads, setLoads] = useState<Load[]>([]);
+  const queryClient = useQueryClient();
   const [extraDeductionTypes, setExtraDeductionTypes] = useState<ExtraDeduction[]>([]);
   const [showAddExtraDeduction, setShowAddExtraDeduction] = useState(false);
   const [newExtraDeduction, setNewExtraDeduction] = useState({ name: '', amount: '' });
@@ -57,127 +57,103 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
     }
   };
 
-  const fetchLoads = async () => {
-    if (!user) return;
-    
-    try {
+  const loadsQuery = useQuery({
+    queryKey: ['load_reports', user?.id],
+    queryFn: async () => {
       const { data, error } = await supabase
         .from('load_reports')
         .select('*')
         .eq('user_id', user.id)
         .order('date_added', { ascending: false });
 
-      if (error) {
-        console.error('Error fetching loads:', error);
-        return;
-      }
+      if (error) throw error;
 
-      if (data) {
-        const formattedLoads = data.map(load => ({
-          id: load.id,
-          rate: load.rate,
-          companyDeduction: load.company_deduction,
-          driverPay: load.driver_pay,
-          locationFrom: load.location_from,
-          locationTo: load.location_to,
-          pickupDate: load.pickup_date,
-          deliveryDate: load.delivery_date,
-          dateAdded: load.date_added,
-          weekPeriod: load.week_period
-        }));
-        
-        setLoads(formattedLoads);
-      }
-    } catch (error) {
-      console.error('Error fetching loads:', error);
+      return data.map(load => ({
+        id: load.id,
+        rate: load.rate,
+        companyDeduction: load.company_deduction,
+        driverPay: load.driver_pay,
+        locationFrom: load.location_from,
+        locationTo: load.location_to,
+        pickupDate: load.pickup_date,
+        deliveryDate: load.delivery_date,
+        dateAdded: load.date_added,
+        weekPeriod: load.week_period
+      }));
+    },
+    enabled: !!user
+  });
+
+  const addLoadMutation = useMutation({
+    mutationFn: async (load: NewLoad) => {
+      const driverPay = parseFloat(load.rate) * (1 - parseFloat(load.companyDeduction) / 100);
+      const weekPeriod = `${format(weekStart, 'MMM dd')} - ${format(weekEnd, 'MMM dd, yyyy')}`;
+      const loadDate = weekStart.toISOString().split('T')[0];
+
+      const { data, error } = await supabase
+        .from('load_reports')
+        .insert({
+          user_id: user.id,
+          rate: parseFloat(load.rate),
+          company_deduction: parseFloat(load.companyDeduction),
+          driver_pay: driverPay,
+          location_from: load.locationFrom,
+          location_to: load.locationTo,
+          pickup_date: load.pickupDate ? formatDateForDB(load.pickupDate) : null,
+          delivery_date: load.deliveryDate ? formatDateForDB(load.deliveryDate) : null,
+          date_added: loadDate,
+          week_period: weekPeriod
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      return {
+        id: data.id,
+        rate: data.rate,
+        companyDeduction: data.company_deduction,
+        driverPay: data.driver_pay,
+        locationFrom: data.location_from,
+        locationTo: data.location_to,
+        pickupDate: data.pickup_date,
+        deliveryDate: data.delivery_date,
+        dateAdded: data.date_added,
+        weekPeriod: data.week_period
+      } as Load;
+    },
+    onSuccess: (newLoadEntry) => {
+      queryClient.setQueryData<Load[]>(['load_reports', user.id], (old = []) => [...old, newLoadEntry]);
+      setNewLoad({
+        rate: '',
+        companyDeduction: userProfile?.companyDeduction || '',
+        locationFrom: '',
+        locationTo: '',
+        pickupDate: undefined,
+        deliveryDate: undefined
+      });
+      setShowAddForm(false);
     }
-  };
+  });
 
-  const handleAddLoad = async () => {
-    if (newLoad.rate && newLoad.companyDeduction && newLoad.locationFrom && newLoad.locationTo && user) {
-      setLoading(true);
-      
-      try {
-        const driverPay = parseFloat(newLoad.rate) * (1 - parseFloat(newLoad.companyDeduction) / 100);
-        const weekPeriod = `${format(weekStart, 'MMM dd')} - ${format(weekEnd, 'MMM dd, yyyy')}`;
-        const loadDate = weekStart.toISOString().split('T')[0];
-        
-        const { data, error } = await supabase
-          .from('load_reports')
-          .insert({
-            user_id: user.id,
-            rate: parseFloat(newLoad.rate),
-            company_deduction: parseFloat(newLoad.companyDeduction),
-            driver_pay: driverPay,
-            location_from: newLoad.locationFrom,
-            location_to: newLoad.locationTo,
-            pickup_date: newLoad.pickupDate ? formatDateForDB(newLoad.pickupDate) : null,
-            delivery_date: newLoad.deliveryDate ? formatDateForDB(newLoad.deliveryDate) : null,
-            date_added: loadDate,
-            week_period: weekPeriod
-          })
-          .select()
-          .single();
-
-        if (error) {
-          console.error('Error adding load:', error);
-          return;
-        }
-
-        if (data) {
-          const newLoadEntry = {
-            id: data.id,
-            rate: data.rate,
-            companyDeduction: data.company_deduction,
-            driverPay: data.driver_pay,
-            locationFrom: data.location_from,
-            locationTo: data.location_to,
-            pickupDate: data.pickup_date,
-            deliveryDate: data.delivery_date,
-            dateAdded: data.date_added,
-            weekPeriod: data.week_period
-          };
-          
-          setLoads(prev => [...prev, newLoadEntry]);
-          setNewLoad({ 
-            rate: '', 
-            companyDeduction: userProfile?.companyDeduction || '',
-            locationFrom: '',
-            locationTo: '',
-            pickupDate: undefined,
-            deliveryDate: undefined
-          });
-          setShowAddForm(false);
-        }
-      } catch (error) {
-        console.error('Error adding load:', error);
-      } finally {
-        setLoading(false);
-      }
-    }
-  };
-
-  const handleDeleteLoad = async (id: string) => {
-    try {
+  const deleteLoadMutation = useMutation({
+    mutationFn: async (id: string) => {
       const { error } = await supabase
         .from('load_reports')
         .delete()
         .eq('id', id)
         .eq('user_id', user.id);
 
-      if (error) {
-        console.error('Error deleting load:', error);
-        return;
-      }
-
-      setLoads(prev => prev.filter(load => load.id !== id));
-    } catch (error) {
-      console.error('Error deleting load:', error);
+      if (error) throw error;
+      return id;
+    },
+    onSuccess: (id) => {
+      queryClient.setQueryData<Load[]>(['load_reports', user.id], (old = []) => old.filter(load => load.id !== id));
     }
-  };
+  });
 
-  const handleEditLoad = async (id: string, updatedLoad: Partial<Load>) => {
-    try {
+  const editLoadMutation = useMutation({
+    mutationFn: async ({ id, updatedLoad }: { id: string; updatedLoad: Partial<Load> }) => {
       const { error } = await supabase
         .from('load_reports')
         .update({
@@ -192,19 +168,27 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
         .eq('id', id)
         .eq('user_id', user.id);
 
-      if (error) {
-        console.error('Error updating load:', error);
-        return;
-      }
-
-      setLoads(prev => prev.map(load => 
-        load.id === id ? { ...load, ...updatedLoad } : load
-      ));
+      if (error) throw error;
+      return { id, updatedLoad };
+    },
+    onSuccess: ({ id, updatedLoad }) => {
+      queryClient.setQueryData<Load[]>(['load_reports', user.id], (old = []) =>
+        old.map(load => (load.id === id ? { ...load, ...updatedLoad } : load))
+      );
       setEditingLoad(null);
-    } catch (error) {
-      console.error('Error updating load:', error);
+    }
+  });
+
+  const handleAddLoad = () => {
+    if (newLoad.rate && newLoad.companyDeduction && newLoad.locationFrom && newLoad.locationTo && user) {
+      return addLoadMutation.mutateAsync(newLoad);
     }
   };
+
+  const handleDeleteLoad = (id: string) => deleteLoadMutation.mutateAsync(id);
+
+  const handleEditLoad = (id: string, updatedLoad: Partial<Load>) =>
+    editLoadMutation.mutateAsync({ id, updatedLoad });
 
   const navigateWeek = (direction: 'prev' | 'next') => {
     if (direction === 'prev') {
@@ -221,14 +205,7 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
     }
   }, [user]);
 
-  // Fetch loads and weekly deductions when week changes
-  useEffect(() => {
-    if (user) {
-      fetchLoads();
-    }
-  }, [user, currentWeek]);
-
-  const currentWeekLoads = loads
+  const currentWeekLoads = (loadsQuery.data || [])
     .filter(load => {
       if (!load.dateAdded) return false;
       const loadDate = typeof load.dateAdded === 'string' ? parseISO(load.dateAdded) : load.dateAdded;
@@ -256,11 +233,11 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
     currentWeek,
     weekStart,
     weekEnd,
-    loads,
+    loads: loadsQuery.data || [],
     currentWeekLoads,
     newLoad,
     showAddForm,
-    loading,
+    loading: addLoadMutation.isPending,
     editingLoad,
     availableDeductionTypes,
     weeklyMileage,
