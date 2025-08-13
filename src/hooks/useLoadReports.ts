@@ -27,6 +27,7 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
   const [showAddForm, setShowAddForm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loads, setLoads] = useState<Load[]>([]);
+  const [filteredLoads, setFilteredLoads] = useState<Load[]>([]);
   const [extraDeductionTypes, setExtraDeductionTypes] = useState<ExtraDeduction[]>([]);
   const [showAddExtraDeduction, setShowAddExtraDeduction] = useState(false);
   const [newExtraDeduction, setNewExtraDeduction] = useState({ name: '', amount: '' });
@@ -40,6 +41,66 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
 
   const weekStart = getUserWeekStart(currentWeek, userProfile);
   const weekEnd = getUserWeekEnd(currentWeek, userProfile);
+
+  useEffect(() => {
+    setFilteredLoads(loads);
+  }, [loads]);
+
+  const filterLoads = ({
+    fromDate,
+    toDate,
+    locationFrom,
+    locationTo
+  }: {
+    fromDate?: string;
+    toDate?: string;
+    locationFrom?: string;
+    locationTo?: string;
+  }) => {
+    let result = loads;
+
+    if (fromDate) {
+      const from = new Date(fromDate);
+      result = result.filter(load => {
+        const date = load.pickupDate
+          ? new Date(load.pickupDate)
+          : load.dateAdded
+            ? new Date(load.dateAdded)
+            : null;
+        return date ? date >= from : true;
+      });
+    }
+
+    if (toDate) {
+      const to = new Date(toDate);
+      result = result.filter(load => {
+        const date = load.pickupDate
+          ? new Date(load.pickupDate)
+          : load.dateAdded
+            ? new Date(load.dateAdded)
+            : null;
+        return date ? date <= to : true;
+      });
+    }
+
+    if (locationFrom) {
+      result = result.filter(load =>
+        load.locationFrom?.toLowerCase().includes(locationFrom.toLowerCase())
+      );
+    }
+
+    if (locationTo) {
+      result = result.filter(load =>
+        load.locationTo?.toLowerCase().includes(locationTo.toLowerCase())
+      );
+    }
+
+    setFilteredLoads(result);
+  };
+
+  const resetFilters = () => {
+    setFilteredLoads(loads);
+  };
 
   const fetchAllDeductionTypes = async () => {
     try {
@@ -258,6 +319,7 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
     weekEnd,
     loads,
     currentWeekLoads,
+    filteredLoads,
     newLoad,
     showAddForm,
     loading,
@@ -285,6 +347,8 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
     handleAddLoad,
     handleDeleteLoad,
     handleEditLoad,
-    navigateWeek
+    navigateWeek,
+    filterLoads,
+    resetFilters
   };
 };
