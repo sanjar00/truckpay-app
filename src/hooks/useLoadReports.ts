@@ -3,6 +3,7 @@ import { format, addWeeks, subWeeks, isWithinInterval, parseISO } from 'date-fns
 import { supabase } from '@/integrations/supabase/client';
 import { getUserWeekStart, getUserWeekEnd } from '@/lib/weeklyPeriodUtils';
 import { Load, NewLoad, WeeklyMileage, ExtraDeduction } from '@/types/LoadReports';
+import { useOfflineSync } from '@/hooks/useOfflineSync';
 
 // Helper function to format dates without timezone issues
 const formatDateForDB = (date: Date): string => {
@@ -38,6 +39,26 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
     totalMiles: 0
   });
 
+  const { isOnline, queueAction, setCachedData, getCachedData } = useOfflineSync({
+    addLoad: async (payload: any) => {
+      await supabase.from('load_reports').insert(payload);
+    },
+    deleteLoad: async (payload: any) => {
+      await supabase
+        .from('load_reports')
+        .delete()
+        .eq('id', payload.id)
+        .eq('user_id', payload.user_id);
+    },
+    editLoad: async (payload: any) => {
+      await supabase
+        .from('load_reports')
+        .update(payload.updates)
+        .eq('id', payload.id)
+        .eq('user_id', payload.user_id);
+    }
+  });
+
   const weekStart = getUserWeekStart(currentWeek, userProfile);
   const weekEnd = getUserWeekEnd(currentWeek, userProfile);
 
@@ -59,7 +80,7 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
 
   const fetchLoads = async () => {
     if (!user) return;
-    
+
     try {
       const { data, error } = await supabase
         .from('load_reports')
@@ -85,8 +106,9 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
           dateAdded: load.date_added,
           weekPeriod: load.week_period
         }));
-        
+
         setLoads(formattedLoads);
+        setCachedData('loadReports', formattedLoads);
       }
     } catch (error) {
       console.error('Error fetching loads:', error);
@@ -96,59 +118,68 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
   const handleAddLoad = async () => {
     if (newLoad.rate && newLoad.companyDeduction && newLoad.locationFrom && newLoad.locationTo && user) {
       setLoading(true);
-      
+
       try {
         const driverPay = parseFloat(newLoad.rate) * (1 - parseFloat(newLoad.companyDeduction) / 100);
         const weekPeriod = `${format(weekStart, 'MMM dd')} - ${format(weekEnd, 'MMM dd, yyyy')}`;
         const loadDate = weekStart.toISOString().split('T')[0];
-        
-        const { data, error } = await supabase
-          .from('load_reports')
-          .insert({
-            user_id: user.id,
-            rate: parseFloat(newLoad.rate),
-            company_deduction: parseFloat(newLoad.companyDeduction),
-            driver_pay: driverPay,
-            location_from: newLoad.locationFrom,
-            location_to: newLoad.locationTo,
-            pickup_date: newLoad.pickupDate ? formatDateForDB(newLoad.pickupDate) : null,
-            delivery_date: newLoad.deliveryDate ? formatDateForDB(newLoad.deliveryDate) : null,
-            date_added: loadDate,
-            week_period: weekPeriod
-          })
-          .select()
-          .single();
 
-        if (error) {
-          console.error('Error adding load:', error);
-          return;
-        }
+        const payload = {
+          user_id: user.id,
+          rate: parseFloat(newLoad.rate),
+          company_deduction: parseFloat(newLoad.companyDeduction),
+          driver_pay: driverPay,
+          location_from: newLoad.locationFrom,
+          location_to: newLoad.locationTo,
+          pickup_date: newLoad.pickupDate ? formatDateForDB(newLoad.pickupDate) : null,
+          delivery_date: newLoad.deliveryDate ? formatDateForDB(newLoad.deliveryDate) : null,
+          date_added: loadDate,
+          week_period: weekPeriod
+        };
 
-        if (data) {
-          const newLoadEntry = {
-            id: data.id,
-            rate: data.rate,
-            companyDeduction: data.company_deduction,
-            driverPay: data.driver_pay,
-            locationFrom: data.location_from,
-            locationTo: data.location_to,
-            pickupDate: data.pickup_date,
-            deliveryDate: data.delivery_date,
-            dateAdded: data.date_added,
-            weekPeriod: data.week_period
-          };
-          
-          setLoads(prev => [...prev, newLoadEntry]);
-          setNewLoad({ 
-            rate: '', 
-            companyDeduction: userProfile?.companyDeduction || '',
-            locationFrom: '',
-            locationTo: '',
-            pickupDate: undefined,
-            deliveryDate: undefined
-          });
-          setShowAddForm(false);
-        }
+        const result = await queueAction({ type: 'addLoad', payload });
+
+        const newLoadEntry = result
+          ? {
+              id: result[0]?.id || result.id,
+              rate: result[0]?.rate ?? payload.rate,
+              companyDeduction: result[0]?.company_deduction ?? payload.company_deduction,
+              driverPay: result[0]?.driver_pay ?? payload.driver_pay,
+              locationFrom: result[0]?.location_from ?? payload.location_from,
+              locationTo: result[0]?.location_to ?? payload.location_to,
+              pickupDate: result[0]?.pickup_date ?? payload.pickup_date,
+              deliveryDate: result[0]?.delivery_date ?? payload.delivery_date,
+              dateAdded: result[0]?.date_added ?? payload.date_added,
+              weekPeriod: result[0]?.week_period ?? payload.week_period
+            }
+          : {
+              id: `temp_${Date.now()}`,
+              rate: payload.rate,
+              companyDeduction: payload.company_deduction,
+              driverPay: payload.driver_pay,
+              locationFrom: payload.location_from,
+              locationTo: payload.location_to,
+              pickupDate: payload.pickup_date,
+              deliveryDate: payload.delivery_date,
+              dateAdded: payload.date_added,
+              weekPeriod: payload.week_period
+            };
+
+        setLoads(prev => {
+          const updated = [...prev, newLoadEntry];
+          setCachedData('loadReports', updated);
+          return updated;
+        });
+
+        setNewLoad({
+          rate: '',
+          companyDeduction: userProfile?.companyDeduction || '',
+          locationFrom: '',
+          locationTo: '',
+          pickupDate: undefined,
+          deliveryDate: undefined
+        });
+        setShowAddForm(false);
       } catch (error) {
         console.error('Error adding load:', error);
       } finally {
@@ -159,18 +190,12 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
 
   const handleDeleteLoad = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from('load_reports')
-        .delete()
-        .eq('id', id)
-        .eq('user_id', user.id);
-
-      if (error) {
-        console.error('Error deleting load:', error);
-        return;
-      }
-
-      setLoads(prev => prev.filter(load => load.id !== id));
+      await queueAction({ type: 'deleteLoad', payload: { id, user_id: user.id } });
+      setLoads(prev => {
+        const updated = prev.filter(load => load.id !== id);
+        setCachedData('loadReports', updated);
+        return updated;
+      });
     } catch (error) {
       console.error('Error deleting load:', error);
     }
@@ -178,28 +203,23 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
 
   const handleEditLoad = async (id: string, updatedLoad: Partial<Load>) => {
     try {
-      const { error } = await supabase
-        .from('load_reports')
-        .update({
-          rate: updatedLoad.rate,
-          company_deduction: updatedLoad.companyDeduction,
-          driver_pay: updatedLoad.driverPay,
-          location_from: updatedLoad.locationFrom,
-          location_to: updatedLoad.locationTo,
-          pickup_date: updatedLoad.pickupDate,
-          delivery_date: updatedLoad.deliveryDate
-        })
-        .eq('id', id)
-        .eq('user_id', user.id);
+      await queueAction({ type: 'editLoad', payload: { id, user_id: user.id, updates: {
+        rate: updatedLoad.rate,
+        company_deduction: updatedLoad.companyDeduction,
+        driver_pay: updatedLoad.driverPay,
+        location_from: updatedLoad.locationFrom,
+        location_to: updatedLoad.locationTo,
+        pickup_date: updatedLoad.pickupDate,
+        delivery_date: updatedLoad.deliveryDate
+      } } });
 
-      if (error) {
-        console.error('Error updating load:', error);
-        return;
-      }
-
-      setLoads(prev => prev.map(load => 
-        load.id === id ? { ...load, ...updatedLoad } : load
-      ));
+      setLoads(prev => {
+        const updated = prev.map(load =>
+          load.id === id ? { ...load, ...updatedLoad } : load
+        );
+        setCachedData('loadReports', updated);
+        return updated;
+      });
       setEditingLoad(null);
     } catch (error) {
       console.error('Error updating load:', error);
@@ -214,6 +234,16 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
     }
   };
 
+  useEffect(() => {
+    setWeeklyMileage(
+      getCachedData('weeklyMileage', { startMileage: '', endMileage: '', totalMiles: 0 })
+    );
+  }, [getCachedData]);
+
+  useEffect(() => {
+    setCachedData('weeklyMileage', weeklyMileage);
+  }, [weeklyMileage, setCachedData]);
+
   // Fetch all deduction types from database
   useEffect(() => {
     if (user) {
@@ -221,12 +251,16 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
     }
   }, [user]);
 
-  // Fetch loads and weekly deductions when week changes
+  // Fetch loads when week or connectivity changes
   useEffect(() => {
     if (user) {
-      fetchLoads();
+      if (isOnline) {
+        void fetchLoads();
+      } else {
+        setLoads(getCachedData('loadReports', []));
+      }
     }
-  }, [user, currentWeek]);
+  }, [user, currentWeek, isOnline, getCachedData]);
 
   const currentWeekLoads = loads
     .filter(load => {
