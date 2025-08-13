@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Plus, Truck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import AddLoadForm from './AddLoadForm';
@@ -103,10 +103,22 @@ const LoadReports = ({ onBack, user, userProfile, deductions }: LoadReportsProps
     }
   };
 
-  const totalGrossPay = currentWeekLoads.reduce((total, load) => total + (load.rate || 0), 0);
-  const totalDriverPay = currentWeekLoads.reduce((total, load) => total + (load.driverPay || 0), 0);
-  const totalFixedDeductions = calculateFixedDeductionsForWeek(deductions, weekStart);
-  const netPay = totalDriverPay - totalWeeklyDeductions - totalExtraDeductions - totalFixedDeductions;
+  const totalGrossPay = useMemo(
+    () => currentWeekLoads.reduce((total, load) => total + (load.rate || 0), 0),
+    [currentWeekLoads]
+  );
+  const totalDriverPay = useMemo(
+    () => currentWeekLoads.reduce((total, load) => total + (load.driverPay || 0), 0),
+    [currentWeekLoads]
+  );
+  const totalFixedDeductions = useMemo(
+    () => calculateFixedDeductionsForWeek(deductions, weekStart),
+    [deductions, weekStart]
+  );
+  const netPay = useMemo(
+    () => totalDriverPay - totalWeeklyDeductions - totalExtraDeductions - totalFixedDeductions,
+    [totalDriverPay, totalWeeklyDeductions, totalExtraDeductions, totalFixedDeductions]
+  );
 
   return (
     <div className="min-h-screen bg-background brutal-grid p-6">

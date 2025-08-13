@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { ArrowLeft, TrendingUp, DollarSign, Minus, Calculator, Calendar, Filter, Truck, FileText, Navigation } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -226,53 +226,79 @@ const ForecastSummary = ({ onBack, deductions, userProfile }: ForecastSummaryPro
   };
 
   // Filter loads for the selected period
-  const filteredLoads = loads.filter(load => {
-    if (!load.dateAdded) return false;
-    const loadDate = typeof load.dateAdded === 'string' ? parseISO(load.dateAdded) : load.dateAdded;
-    return isWithinInterval(loadDate, { start: dateStart, end: dateEnd });
-  });
+  const filteredLoads = useMemo(
+    () =>
+      loads.filter(load => {
+        if (!load.dateAdded) return false;
+        const loadDate = typeof load.dateAdded === 'string' ? parseISO(load.dateAdded) : load.dateAdded;
+        return isWithinInterval(loadDate, { start: dateStart, end: dateEnd });
+      }),
+    [loads, dateStart, dateEnd]
+  );
 
   // Calculate totals with safety checks
-  const totalGrossPay = filteredLoads.reduce((total, load) => {
-    const rate = load.rate || 0;
-    return total + (isNaN(rate) ? 0 : rate);
-  }, 0);
-  
-  const totalDriverPay = filteredLoads.reduce((total, load) => {
-    const driverPay = load.driverPay || 0;
-    return total + (isNaN(driverPay) ? 0 : driverPay);
-  }, 0);
-  
+  const totalGrossPay = useMemo(() => {
+    return filteredLoads.reduce((total, load) => {
+      const rate = load.rate || 0;
+      return total + (isNaN(rate) ? 0 : rate);
+    }, 0);
+  }, [filteredLoads]);
+
+  const totalDriverPay = useMemo(() => {
+    return filteredLoads.reduce((total, load) => {
+      const driverPay = load.driverPay || 0;
+      return total + (isNaN(driverPay) ? 0 : driverPay);
+    }, 0);
+  }, [filteredLoads]);
+
   // Calculate total weekly deductions across all weeks
-  const totalWeeklyDeductions = Object.values(weeklyDeductions).reduce((total, weekDeductions) => {
-    return total + Object.values(weekDeductions).reduce((weekTotal, amount) => {
-      return weekTotal + (isNaN(amount) ? 0 : amount);
+  const totalWeeklyDeductions = useMemo(() => {
+    return Object.values(weeklyDeductions).reduce((total, weekDeductions) => {
+      return total + Object.values(weekDeductions).reduce((weekTotal, amount) => {
+        return weekTotal + (isNaN(amount) ? 0 : amount);
+      }, 0);
     }, 0);
-  }, 0);
-  
+  }, [weeklyDeductions]);
+
   // Calculate total extra deductions across all weeks
-  const totalExtraDeductions = Object.values(extraDeductions).reduce((total, weekExtras) => {
-    return total + weekExtras.reduce((weekTotal, extra) => {
-      const amount = extra.amount || 0;
-      return weekTotal + (isNaN(amount) ? 0 : amount);
+  const totalExtraDeductions = useMemo(() => {
+    return Object.values(extraDeductions).reduce((total, weekExtras) => {
+      return total + weekExtras.reduce((weekTotal, extra) => {
+        const amount = extra.amount || 0;
+        return weekTotal + (isNaN(amount) ? 0 : amount);
+      }, 0);
     }, 0);
-  }, 0);
-  
+  }, [extraDeductions]);
+
   // Calculate total fixed deductions (multiply by number of weeks)
-  // Calculate total fixed deductions (multiply by number of weeks)
-  const numberOfWeeks = isValidDateStart && isValidDateEnd 
-    ? Math.floor((dateEnd.getTime() - dateStart.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1
-    : 1; // Default to 1 week if dates are invalid
-  const totalFixedDeductions = deductions
-    ?.filter(d => d.isFixed)
-    .reduce((total, deduction) => {
-      const amount = deduction.amount || 0;
-      return total + (isNaN(amount) ? 0 : amount);
-    }, 0) * numberOfWeeks || 0;
-  
-  const totalDeductions = (totalWeeklyDeductions || 0) + (totalExtraDeductions || 0) + (totalFixedDeductions || 0);
-  const netIncome = (totalDriverPay || 0) - (totalDeductions || 0);
-  const netIncomePercentage = totalDriverPay > 0 ? ((netIncome / totalDriverPay) * 100) : 0;
+  const numberOfWeeks = useMemo(() => {
+    return isValidDateStart && isValidDateEnd
+      ? Math.floor((dateEnd.getTime() - dateStart.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1
+      : 1; // Default to 1 week if dates are invalid
+  }, [isValidDateStart, isValidDateEnd, dateStart, dateEnd]);
+
+  const totalFixedDeductions = useMemo(() => {
+    return (
+      deductions
+        ?.filter(d => d.isFixed)
+        .reduce((total, deduction) => {
+          const amount = deduction.amount || 0;
+          return total + (isNaN(amount) ? 0 : amount);
+        }, 0) * numberOfWeeks || 0
+    );
+  }, [deductions, numberOfWeeks]);
+
+  const totalDeductions = useMemo(() => {
+    return (totalWeeklyDeductions || 0) + (totalExtraDeductions || 0) + (totalFixedDeductions || 0);
+  }, [totalWeeklyDeductions, totalExtraDeductions, totalFixedDeductions]);
+
+  const netIncome = useMemo(() => {
+    return (totalDriverPay || 0) - (totalDeductions || 0);
+  }, [totalDriverPay, totalDeductions]);
+
+  const netIncomePercentage = useMemo(() => {
+    return totalDriverPay > 0 ? ((netIncome / totalDriverPay) * 100) : 0;
+  }, [netIncome, totalDriverPay]);
 
   // Add mileage fetch function
   const fetchWeeklyMileage = async () => {
