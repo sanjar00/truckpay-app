@@ -1,17 +1,22 @@
+import { Deduction } from '@/types/LoadReports';
+
 export const getWeeklyPeriodDisplay = (weeklyPeriod: string) => {
   const periodMap = {
-    'sunday': 'SUNDAY_TO_SATURDAY',
-    'monday': 'MONDAY_TO_SUNDAY',
-    'tuesday': 'TUESDAY_TO_MONDAY',
-    'wednesday': 'WEDNESDAY_TO_TUESDAY',
-    'thursday': 'THURSDAY_TO_WEDNESDAY',
-    'friday': 'FRIDAY_TO_THURSDAY',
-    'saturday': 'SATURDAY_TO_FRIDAY'
-  };
-  return periodMap[weeklyPeriod] || 'SUNDAY_TO_SATURDAY';
+    sunday: 'SUNDAY_TO_SATURDAY',
+    monday: 'MONDAY_TO_SUNDAY',
+    tuesday: 'TUESDAY_TO_MONDAY',
+    wednesday: 'WEDNESDAY_TO_TUESDAY',
+    thursday: 'THURSDAY_TO_WEDNESDAY',
+    friday: 'FRIDAY_TO_THURSDAY',
+    saturday: 'SATURDAY_TO_FRIDAY',
+  } as const;
+  return periodMap[weeklyPeriod as keyof typeof periodMap] || 'SUNDAY_TO_SATURDAY';
 };
 
-export const calculateFixedDeductionsForWeek = (deductions: any[], weekStartDate: Date) => {
+export const calculateFixedDeductionsForWeek = (
+  deductions: Deduction[],
+  weekStartDate: Date,
+) => {
   if (!deductions) return 0;
   
   const weekStartString = weekStartDate.toISOString().split('T')[0];

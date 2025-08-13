@@ -2,12 +2,13 @@ import { ArrowLeft, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import { getWeeklyPeriodDisplay } from '@/lib/loadReportsUtils';
+import { UserProfile } from '@/types/LoadReports';
 
 interface LoadReportsHeaderProps {
   onBack: () => void;
   weekStart: Date;
   weekEnd: Date;
-  userProfile: any;
+  userProfile: UserProfile;
   onNavigateWeek: (direction: 'prev' | 'next') => void;
 }
 

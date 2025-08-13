@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { ExtraDeduction } from '@/types/LoadReports';
 
@@ -11,7 +12,7 @@ import { ExtraDeduction } from '@/types/LoadReports';
  * @param user      – объект текущего пользователя Supabase
  * @param weekStart – дата начала недели (Sunday 00:00)
  */
-export const useDeductionsManager = (user: any, weekStart: Date) => {
+export const useDeductionsManager = (user: User | null, weekStart: Date) => {
   /** ---------- State ---------- */
   const [weeklyDeductions, setWeeklyDeductions] = useState<Record<string, string>>({});
   const [extraDeductionTypes, setExtraDeductionTypes] = useState<ExtraDeduction[]>([]);
@@ -49,8 +50,8 @@ export const useDeductionsManager = (user: any, weekStart: Date) => {
         });
         setWeeklyDeductions(map);
       }
-    } catch (err: any) {
-      if (err.name !== 'AbortError') console.error('fetchWeeklyDeductions:', err);
+    } catch (err: unknown) {
+      if ((err as Error).name !== 'AbortError') console.error('fetchWeeklyDeductions:', err);
     } finally {
       setIsLoading(false);
     }
@@ -82,8 +83,8 @@ export const useDeductionsManager = (user: any, weekStart: Date) => {
         }));
         setExtraDeductionTypes(extras);
       }
-    } catch (err: any) {
-      if (err.name !== 'AbortError') console.error('fetchExtraDeductions:', err);
+    } catch (err: unknown) {
+      if ((err as Error).name !== 'AbortError') console.error('fetchExtraDeductions:', err);
     } finally {
       setIsLoading(false);
     }
