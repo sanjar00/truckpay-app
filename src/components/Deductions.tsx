@@ -238,8 +238,7 @@ const Deductions = ({ onBack, deductions, setDeductions }: DeductionsProps) => {
       } finally {
         setLoading(false);
       }
-    }
-  };
+    };
 
   const handleAddCustomType = async () => {
     if (!validateNewType() || allDeductionTypes.includes(newDeductionType.trim()) || !user) {
