@@ -32,6 +32,7 @@ interface Expense {
 
 interface PersonalExpensesProps {
   onBack: () => void;
+  userProfile?: any;
 }
 
 const PersonalExpenses: React.FC<PersonalExpensesProps> = ({ onBack, userProfile }) => {
@@ -54,34 +55,35 @@ const PersonalExpenses: React.FC<PersonalExpensesProps> = ({ onBack, userProfile
   // Calculate date range based on period filter
   const getDateRange = () => {
     const today = new Date();
+    const profile = userProfile || {};
     let startDate: Date;
     let endDate: Date;
 
     switch (periodFilter) {
       case 'last2':
-        startDate = getUserWeekStart(subWeeks(today, 1), userProfile);
-        endDate = getUserWeekEnd(today, userProfile);
+        startDate = getUserWeekStart(subWeeks(today, 1), profile);
+        endDate = getUserWeekEnd(today, profile);
         break;
       case 'last3':
-        startDate = getUserWeekStart(subWeeks(today, 2), userProfile);
-        endDate = getUserWeekEnd(today, userProfile);
+        startDate = getUserWeekStart(subWeeks(today, 2), profile);
+        endDate = getUserWeekEnd(today, profile);
         break;
       case 'last4':
-        startDate = getUserWeekStart(subWeeks(today, 3), userProfile);
-        endDate = getUserWeekEnd(today, userProfile);
+        startDate = getUserWeekStart(subWeeks(today, 3), profile);
+        endDate = getUserWeekEnd(today, profile);
         break;
       case 'custom':
         if (customDateRange?.from && customDateRange?.to) {
           startDate = customDateRange.from;
           endDate = customDateRange.to;
         } else {
-          startDate = getUserWeekStart(today, userProfile);
-          endDate = getUserWeekEnd(today, userProfile);
+          startDate = getUserWeekStart(today, profile);
+          endDate = getUserWeekEnd(today, profile);
         }
         break;
       default:
-        startDate = getUserWeekStart(subWeeks(today, 1), userProfile);
-        endDate = getUserWeekEnd(today, userProfile);
+        startDate = getUserWeekStart(subWeeks(today, 1), profile);
+        endDate = getUserWeekEnd(today, profile);
     }
 
     return { startDate, endDate };

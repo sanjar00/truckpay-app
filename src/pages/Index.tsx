@@ -147,8 +147,9 @@ const Index = () => {
         );
       case 'expenses':
         return (
-          <PersonalExpenses 
+          <PersonalExpenses
             onBack={() => setCurrentView('dashboard')}
+            userProfile={userProfile}
           />
         );
       case 'settings':
