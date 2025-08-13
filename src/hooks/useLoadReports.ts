@@ -3,6 +3,7 @@ import { format, addWeeks, subWeeks, isWithinInterval, parseISO } from 'date-fns
 import { supabase } from '@/integrations/supabase/client';
 import { getUserWeekStart, getUserWeekEnd } from '@/lib/weeklyPeriodUtils';
 import { Load, NewLoad, WeeklyMileage, ExtraDeduction } from '@/types/LoadReports';
+import { useToast } from '@/hooks/use-toast';
 
 // Helper function to format dates without timezone issues
 const formatDateForDB = (date: Date): string => {
@@ -37,6 +38,7 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
     endMileage: '',
     totalMiles: 0
   });
+  const { toast } = useToast();
 
   const weekStart = getUserWeekStart(currentWeek, userProfile);
   const weekEnd = getUserWeekEnd(currentWeek, userProfile);
@@ -53,7 +55,11 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
       const uniqueTypes = [...new Set(data.map(d => d.type))];
       setAllDeductionTypes(uniqueTypes);
     } catch (error) {
-      console.error('Error fetching deduction types:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to fetch deduction types. Please try again.'
+      });
     }
   };
 
@@ -68,7 +74,11 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
         .order('date_added', { ascending: false });
 
       if (error) {
-        console.error('Error fetching loads:', error);
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: 'Failed to fetch loads. Please try again.'
+        });
         return;
       }
 
@@ -89,7 +99,11 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
         setLoads(formattedLoads);
       }
     } catch (error) {
-      console.error('Error fetching loads:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to fetch loads. Please try again.'
+      });
     }
   };
 
@@ -120,7 +134,11 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
           .single();
 
         if (error) {
-          console.error('Error adding load:', error);
+          toast({
+            variant: 'destructive',
+            title: 'Error',
+            description: 'Failed to add load. Please try again.'
+          });
           return;
         }
 
@@ -150,7 +168,11 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
           setShowAddForm(false);
         }
       } catch (error) {
-        console.error('Error adding load:', error);
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: 'Failed to add load. Please try again.'
+        });
       } finally {
         setLoading(false);
       }
@@ -166,13 +188,21 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
         .eq('user_id', user.id);
 
       if (error) {
-        console.error('Error deleting load:', error);
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: 'Failed to delete load. Please try again.'
+        });
         return;
       }
 
       setLoads(prev => prev.filter(load => load.id !== id));
     } catch (error) {
-      console.error('Error deleting load:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to delete load. Please try again.'
+      });
     }
   };
 
@@ -193,7 +223,11 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
         .eq('user_id', user.id);
 
       if (error) {
-        console.error('Error updating load:', error);
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: 'Failed to update load. Please try again.'
+        });
         return;
       }
 
@@ -202,7 +236,11 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
       ));
       setEditingLoad(null);
     } catch (error) {
-      console.error('Error updating load:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to update load. Please try again.'
+      });
     }
   };
 

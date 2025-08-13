@@ -84,7 +84,6 @@ const SettingsPanel = ({ userProfile, setUserProfile, onBack }) => {
         duration: 3000,
       });
     } catch (error) {
-      console.error('Error saving profile:', error);
       toast({
         title: "Error saving settings",
         description: error.message || "Failed to update profile. Please try again.",
@@ -139,7 +138,6 @@ const SettingsPanel = ({ userProfile, setUserProfile, onBack }) => {
         duration: 3000,
       });
     } catch (error) {
-      console.error('Error exporting data:', error);
       toast({
         title: "Export failed",
         description: "Failed to export data. Please try again.",
@@ -209,7 +207,6 @@ const SettingsPanel = ({ userProfile, setUserProfile, onBack }) => {
           duration: 5000,
         });
       } catch (error) {
-        console.error('Error importing data:', error);
         toast({
           title: "Import failed",
           description: error.message || "Failed to import data. Please check the file format.",
@@ -279,7 +276,6 @@ const SettingsPanel = ({ userProfile, setUserProfile, onBack }) => {
       
       setShowFinalConfirm(false);
     } catch (error) {
-      console.error('Error deleting data:', error);
       toast({
         title: "Delete failed",
         description: error.message || "Failed to delete data. Please try again.",

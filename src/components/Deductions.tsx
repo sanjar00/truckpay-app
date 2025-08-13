@@ -21,9 +21,11 @@ import { supabase } from '@/integrations/supabase/client';
 import DeductionsSummary from './DeductionsSummary';
 import { formatCurrency } from '@/lib/utils';
 import { startOfWeek } from 'date-fns';
+import { useToast } from '@/hooks/use-toast';
 
 const Deductions = ({ onBack, deductions, setDeductions }: DeductionsProps) => {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [fixedDeductions, setFixedDeductions] = useState({});
   const [newDeductionType, setNewDeductionType] = useState('');
   const [customDeductionTypes, setCustomDeductionTypes] = useState([]);
@@ -49,7 +51,11 @@ const Deductions = ({ onBack, deductions, setDeductions }: DeductionsProps) => {
         .order('created_at', { ascending: false });
   
       if (error) {
-        console.error('Error fetching deductions:', error);
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: 'Failed to fetch deductions. Please try again.'
+        });
         return;
       }
   
@@ -65,7 +71,11 @@ const Deductions = ({ onBack, deductions, setDeductions }: DeductionsProps) => {
         setDeductions(mappedDeductions);
       }
     } catch (error) {
-      console.error('Error fetching deductions:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to fetch deductions. Please try again.'
+      });
     }
   };
 
@@ -94,7 +104,11 @@ const Deductions = ({ onBack, deductions, setDeductions }: DeductionsProps) => {
             }));
           }
         } catch (error) {
-          console.error('Error updating fixed deduction:', error);
+          toast({
+            variant: 'destructive',
+            title: 'Error',
+            description: 'Failed to update fixed deduction. Please try again.'
+          });
         }
       } else {
         // Just update local state if no database record
@@ -172,7 +186,11 @@ const Deductions = ({ onBack, deductions, setDeductions }: DeductionsProps) => {
             });
     
           if (error) {
-            console.error('Error creating new deduction version:', error);
+            toast({
+              variant: 'destructive',
+              title: 'Error',
+              description: 'Failed to create new deduction version. Please try again.'
+            });
             return;
           }
         } else {
@@ -189,7 +207,11 @@ const Deductions = ({ onBack, deductions, setDeductions }: DeductionsProps) => {
             });
     
           if (error) {
-            console.error('Error saving deduction:', error);
+            toast({
+              variant: 'destructive',
+              title: 'Error',
+              description: 'Failed to save deduction. Please try again.'
+            });
             return;
           }
         }
@@ -204,7 +226,11 @@ const Deductions = ({ onBack, deductions, setDeductions }: DeductionsProps) => {
         }));
         
       } catch (error) {
-        console.error('Error saving deduction:', error);
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: 'Failed to save deduction. Please try again.'
+        });
       } finally {
         setLoading(false);
       }
@@ -230,7 +256,11 @@ const Deductions = ({ onBack, deductions, setDeductions }: DeductionsProps) => {
           .single();
 
         if (error) {
-          console.error('Error adding custom deduction type:', error);
+          toast({
+            variant: 'destructive',
+            title: 'Error',
+            description: 'Failed to add custom deduction type. Please try again.'
+          });
           return;
         }
 
@@ -250,7 +280,11 @@ const Deductions = ({ onBack, deductions, setDeductions }: DeductionsProps) => {
         setNewDeductionType('');
         
       } catch (error) {
-        console.error('Error adding custom deduction type:', error);
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: 'Failed to add custom deduction type. Please try again.'
+        });
       } finally {
         setLoading(false);
       }
@@ -268,14 +302,22 @@ const Deductions = ({ onBack, deductions, setDeductions }: DeductionsProps) => {
         .eq('user_id', user.id);
 
       if (error) {
-        console.error('Error deleting deduction:', error);
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: 'Failed to delete deduction. Please try again.'
+        });
         return;
       }
 
       // Update local state
       setDeductions(prev => prev.filter(deduction => deduction.id !== id));
     } catch (error) {
-      console.error('Error deleting deduction:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to delete deduction. Please try again.'
+      });
     }
   };
 
@@ -291,7 +333,11 @@ const Deductions = ({ onBack, deductions, setDeductions }: DeductionsProps) => {
         .single();
 
       if (error && error.code !== 'PGRST116') { // PGRST116 is "not found" error
-        console.error('Error fetching removed predefined types:', error);
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: 'Failed to fetch removed predefined types. Please try again.'
+        });
         return;
       }
 
@@ -299,7 +345,11 @@ const Deductions = ({ onBack, deductions, setDeductions }: DeductionsProps) => {
         setRemovedPredefinedTypes(data.removed_predefined_types);
       }
     } catch (error) {
-      console.error('Error fetching removed predefined types:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to fetch removed predefined types. Please try again.'
+      });
     }
   };
 
@@ -319,7 +369,11 @@ const Deductions = ({ onBack, deductions, setDeductions }: DeductionsProps) => {
         .single();
 
       if (fetchError && fetchError.code !== 'PGRST116') {
-        console.error('Error checking user preferences:', fetchError);
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: 'Failed to check user preferences. Please try again.'
+        });
         return;
       }
 
@@ -331,7 +385,11 @@ const Deductions = ({ onBack, deductions, setDeductions }: DeductionsProps) => {
           .eq('user_id', user.id);
 
         if (error) {
-          console.error('Error updating removed predefined types:', error);
+          toast({
+            variant: 'destructive',
+            title: 'Error',
+            description: 'Failed to update removed predefined types. Please try again.'
+          });
         }
       } else {
         // Create new record
@@ -343,11 +401,19 @@ const Deductions = ({ onBack, deductions, setDeductions }: DeductionsProps) => {
           });
 
         if (error) {
-          console.error('Error saving removed predefined types:', error);
+          toast({
+            variant: 'destructive',
+            title: 'Error',
+            description: 'Failed to save removed predefined types. Please try again.'
+          });
         }
       }
     } catch (error) {
-      console.error('Error persisting removed predefined types:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to persist removed predefined types. Please try again.'
+      });
     }
   };
 
