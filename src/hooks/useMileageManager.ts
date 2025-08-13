@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
+import { User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { WeeklyMileage } from '@/types/LoadReports';
 
-export const useMileageManager = (user: any, weekStart: Date) => {
+export const useMileageManager = (user: User | null, weekStart: Date) => {
   const [weeklyMileage, setWeeklyMileage] = useState<WeeklyMileage>({
     startMileage: '',
     endMileage: '',

@@ -1,4 +1,5 @@
 import { startOfWeek, endOfWeek, isAfter, isBefore, startOfDay } from 'date-fns';
+import { UserProfile } from '@/types/LoadReports';
 
 // Map weekly period strings to weekStartsOn values
 const WEEKLY_PERIOD_MAP = {
@@ -16,7 +17,7 @@ export const getWeekStartsOn = (weeklyPeriod: string): number => {
 };
 
 // Determine which weekly period to use for a specific date
-export const getWeeklyPeriodForDate = (date: Date, userProfile: any): string => {
+export const getWeeklyPeriodForDate = (date: Date, userProfile: UserProfile | null): string => {
   const { weeklyPeriod, weeklyPeriodUpdatedAt } = userProfile || {};
   
   // If no update timestamp, use current weekly period
@@ -41,13 +42,13 @@ export const getWeeklyPeriodForDate = (date: Date, userProfile: any): string => 
   return weeklyPeriod || 'sunday';
 };
 
-export const getUserWeekStart = (date: Date, userProfile: any): Date => {
+export const getUserWeekStart = (date: Date, userProfile: UserProfile | null): Date => {
   const weeklyPeriod = getWeeklyPeriodForDate(date, userProfile);
   const weekStartsOn = getWeekStartsOn(weeklyPeriod);
   return startOfWeek(date, { weekStartsOn });
 };
 
-export const getUserWeekEnd = (date: Date, userProfile: any): Date => {
+export const getUserWeekEnd = (date: Date, userProfile: UserProfile | null): Date => {
   const weeklyPeriod = getWeeklyPeriodForDate(date, userProfile);
   const weekStartsOn = getWeekStartsOn(weeklyPeriod);
   return endOfWeek(date, { weekStartsOn });

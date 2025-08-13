@@ -1,5 +1,16 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, TrendingUp, DollarSign, Minus, Calculator, Calendar, Filter, Truck, FileText, Navigation } from 'lucide-react';
+import {
+  ArrowLeft,
+  TrendingUp,
+  DollarSign,
+  Minus,
+  Calculator,
+  Calendar,
+  Filter,
+  Truck,
+  FileText,
+  Navigation,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -10,33 +21,12 @@ import { formatCurrency } from '@/lib/utils';
 import LoadCard from './LoadCard';
 import { useAuth } from '@/hooks/useAuth';
 import { getUserWeekStart, getUserWeekEnd, getWeekStartForPeriod, getWeekEndForPeriod } from '../lib/weeklyPeriodUtils';
-
-interface Load {
-  id: string;
-  rate: number;
-  companyDeduction: number;
-  driverPay: number;
-  locationFrom: string;
-  locationTo: string;
-  pickupDate?: string;
-  deliveryDate?: string;
-  dateAdded: string;
-  weekPeriod: string;
-}
-
-interface Deduction {
-  id: string;
-  type: string;
-  amount: number;
-  isFixed: boolean;
-  isCustomType?: boolean;
-  dateAdded?: string;
-}
+import { Load, Deduction, UserProfile } from '@/types/LoadReports';
 
 interface ForecastSummaryProps {
   onBack: () => void;
   deductions: Deduction[];
-  userProfile: any; // Add this line
+  userProfile: UserProfile | null;
 }
 
 const ForecastSummary = ({ onBack, deductions, userProfile }: ForecastSummaryProps) => {

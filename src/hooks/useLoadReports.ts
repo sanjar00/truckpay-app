@@ -1,8 +1,16 @@
 import { useState, useEffect } from 'react';
 import { format, addWeeks, subWeeks, isWithinInterval, parseISO } from 'date-fns';
+import { User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { getUserWeekStart, getUserWeekEnd } from '@/lib/weeklyPeriodUtils';
-import { Load, NewLoad, WeeklyMileage, ExtraDeduction } from '@/types/LoadReports';
+import {
+  Load,
+  NewLoad,
+  WeeklyMileage,
+  ExtraDeduction,
+  Deduction,
+  UserProfile,
+} from '@/types/LoadReports';
 
 // Helper function to format dates without timezone issues
 const formatDateForDB = (date: Date): string => {
@@ -12,7 +20,11 @@ const formatDateForDB = (date: Date): string => {
   return `${year}-${month}-${day}`;
 };
 
-export const useLoadReports = (user: any, userProfile: any, deductions: any[]) => {
+export const useLoadReports = (
+  user: User | null,
+  userProfile: UserProfile | null,
+  deductions: Deduction[],
+) => {
   const [currentWeek, setCurrentWeek] = useState(getUserWeekStart(new Date(), userProfile));
   const [allDeductionTypes, setAllDeductionTypes] = useState<string[]>([]);
   const [weeklyDeductions, setWeeklyDeductions] = useState<Record<string, string>>({});

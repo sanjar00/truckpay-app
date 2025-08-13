@@ -18,6 +18,8 @@ export type Database = {
           id: string
           phone: string | null
           updated_at: string
+          weekly_period: string | null
+          weekly_period_updated_at: string | null
         }
         Insert: {
           company_deduction: number
@@ -27,6 +29,8 @@ export type Database = {
           id: string
           phone?: string | null
           updated_at?: string
+          weekly_period?: string | null
+          weekly_period_updated_at?: string | null
         }
         Update: {
           company_deduction?: number
@@ -36,6 +40,197 @@ export type Database = {
           id?: string
           phone?: string | null
           updated_at?: string
+          weekly_period?: string | null
+          weekly_period_updated_at?: string | null
+        }
+        Relationships: []
+      }
+      load_reports: {
+        Row: {
+          id: string
+          user_id: string
+          rate: number
+          company_deduction: number
+          driver_pay: number
+          location_from: string
+          location_to: string
+          pickup_date: string | null
+          delivery_date: string | null
+          date_added: string
+          week_period: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          rate: number
+          company_deduction: number
+          driver_pay: number
+          location_from: string
+          location_to: string
+          pickup_date?: string | null
+          delivery_date?: string | null
+          date_added: string
+          week_period: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          rate?: number
+          company_deduction?: number
+          driver_pay?: number
+          location_from?: string
+          location_to?: string
+          pickup_date?: string | null
+          delivery_date?: string | null
+          date_added?: string
+          week_period?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      deductions: {
+        Row: {
+          id: string
+          user_id: string
+          type: string
+          amount: number
+          is_fixed: boolean
+          is_custom_type: boolean
+          date_added: string
+          week_period: string | null
+          load_report_id: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          type: string
+          amount: number
+          is_fixed?: boolean
+          is_custom_type?: boolean
+          date_added?: string
+          week_period?: string | null
+          load_report_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          type?: string
+          amount?: number
+          is_fixed?: boolean
+          is_custom_type?: boolean
+          date_added?: string
+          week_period?: string | null
+          load_report_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      weekly_deductions: {
+        Row: {
+          id: number
+          user_id: string
+          week_start: string
+          deduction_type: string
+          amount: number
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: number
+          user_id: string
+          week_start: string
+          deduction_type: string
+          amount: number
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: number
+          user_id?: string
+          week_start?: string
+          deduction_type?: string
+          amount?: number
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      weekly_extra_deductions: {
+        Row: {
+          id: number
+          user_id: string
+          week_start: string
+          name: string | null
+          deduction_type: string | null
+          amount: number
+          date_added: string | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: number
+          user_id: string
+          week_start: string
+          name?: string | null
+          deduction_type?: string | null
+          amount: number
+          date_added?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: number
+          user_id?: string
+          week_start?: string
+          name?: string | null
+          deduction_type?: string | null
+          amount?: number
+          date_added?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      weekly_mileage: {
+        Row: {
+          id: number
+          user_id: string
+          week_start: string
+          start_mileage: number | null
+          end_mileage: number | null
+          total_miles: number | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: number
+          user_id: string
+          week_start: string
+          start_mileage?: number | null
+          end_mileage?: number | null
+          total_miles?: number | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: number
+          user_id?: string
+          week_start?: string
+          start_mileage?: number | null
+          end_mileage?: number | null
+          total_miles?: number | null
+          created_at?: string | null
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -165,3 +360,4 @@ export const Constants = {
     Enums: {},
   },
 } as const
+

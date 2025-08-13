@@ -11,14 +11,15 @@ import Deductions from '@/components/Deductions';
 import ForecastSummary from '@/components/ForecastSummary';
 import SettingsPanel from '@/components/SettingsPanel';
 import PersonalExpenses from '@/components/PersonalExpenses';
+import { Deduction, UserProfile } from '@/types/LoadReports';
 
 const Index = () => {
   const { user, loading, signOut } = useAuth();
   const [currentView, setCurrentView] = useState('dashboard');
   const [showRegistration, setShowRegistration] = useState(false);
-  const [userProfile, setUserProfile] = useState(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loads, setLoads] = useState([]);
-  const [deductions, setDeductions] = useState([]);
+  const [deductions, setDeductions] = useState<Deduction[]>([]);
 
   useEffect(() => {
     if (user) {

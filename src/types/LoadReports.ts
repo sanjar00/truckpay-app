@@ -1,3 +1,6 @@
+import { User } from '@supabase/supabase-js';
+import { Tables } from '@/integrations/supabase/types';
+
 export interface Load {
   id: string;
   rate: number;
@@ -11,11 +14,30 @@ export interface Load {
   weekPeriod: string;
 }
 
+export interface UserProfile {
+  name: string;
+  phone: string | null;
+  email: string | null;
+  driverType: string;
+  companyDeduction: number;
+  weeklyPeriod: string;
+  weeklyPeriodUpdatedAt?: string | null;
+}
+
+export type Deduction = {
+  id: Tables<'deductions'>['Row']['id'];
+  type: Tables<'deductions'>['Row']['type'];
+  amount: Tables<'deductions'>['Row']['amount'];
+  isFixed: Tables<'deductions'>['Row']['is_fixed'];
+  isCustomType: Tables<'deductions'>['Row']['is_custom_type'];
+  dateAdded: Tables<'deductions'>['Row']['date_added'];
+};
+
 export interface LoadReportsProps {
   onBack: () => void;
-  user: any;
-  userProfile: any;
-  deductions: any[];
+  user: User;
+  userProfile: UserProfile | null;
+  deductions: Deduction[];
 }
 
 export interface WeeklyMileage {
