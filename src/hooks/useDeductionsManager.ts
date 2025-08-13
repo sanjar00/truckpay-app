@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { ExtraDeduction } from '@/types/LoadReports';
+import { useOfflineSync } from '@/hooks/useOfflineSync';
 
 /**
  * Хук управляет:
@@ -16,6 +17,63 @@ export const useDeductionsManager = (user: any, weekStart: Date) => {
   const [weeklyDeductions, setWeeklyDeductions] = useState<Record<string, string>>({});
   const [extraDeductionTypes, setExtraDeductionTypes] = useState<ExtraDeduction[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+
+  const { isOnline, queueAction, setCachedData, getCachedData } = useOfflineSync({
+    saveWeeklyDeduction: async (payload: any) => {
+      if (payload.delete) {
+        await supabase
+          .from('weekly_deductions')
+          .delete()
+          .eq('user_id', payload.user_id)
+          .eq('week_start', payload.week_start)
+          .eq('deduction_type', payload.deduction_type);
+      } else {
+        await supabase
+          .from('weekly_deductions')
+          .upsert(
+            {
+              user_id: payload.user_id,
+              week_start: payload.week_start,
+              deduction_type: payload.deduction_type,
+              amount: payload.amount,
+              updated_at: payload.updated_at,
+            },
+            { onConflict: 'user_id,week_start,deduction_type' },
+          );
+      }
+    },
+    saveExtraDeduction: async (payload: any) => {
+      const d = payload.deduction as ExtraDeduction;
+      if (d.id && !d.id.includes('_')) {
+        await supabase
+          .from('weekly_extra_deductions')
+          .update({
+            name: d.name,
+            amount: parseFloat(d.amount),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', parseInt(d.id))
+          .eq('user_id', payload.user_id);
+      } else {
+        await supabase
+          .from('weekly_extra_deductions')
+          .insert({
+            user_id: payload.user_id,
+            week_start: payload.week_start,
+            name: d.name,
+            amount: parseFloat(d.amount),
+            date_added: d.dateAdded || new Date().toISOString(),
+          });
+      }
+    },
+    deleteExtraDeduction: async (payload: any) => {
+      await supabase
+        .from('weekly_extra_deductions')
+        .delete()
+        .eq('id', parseInt(payload.id))
+        .eq('user_id', payload.user_id);
+    }
+  });
 
   /** ---------- Helpers ---------- */
   const weekStartStr = weekStart.toISOString().slice(0, 10);
@@ -90,15 +148,35 @@ export const useDeductionsManager = (user: any, weekStart: Date) => {
   };
 
   const fetchAllDeductions = async () => {
-    // Fetch weekly deductions first and wait for completion
+    if (!user) return;
+    if (!isOnline) {
+      const cached = getCachedData('deductions', { weekly: {}, extra: [] });
+      setWeeklyDeductions(cached.weekly);
+      setExtraDeductionTypes(cached.extra);
+      return;
+    }
     await fetchWeeklyDeductions();
-    // Then fetch any extra deductions
     await fetchExtraDeductions();
   };
 
   /** ---------- Persistence ---------- */
   const saveWeeklyDeduction = async (type: string, amount: string) => {
     if (!user) return;
+
+    if (!isOnline) {
+      await queueAction({
+        type: 'saveWeeklyDeduction',
+        payload: {
+          user_id: user.id,
+          week_start: weekStartStr,
+          deduction_type: type,
+          amount: parseFloat(amount),
+          updated_at: new Date().toISOString(),
+          delete: !amount || parseFloat(amount) === 0
+        }
+      });
+      return;
+    }
 
     try {
       if (!amount || parseFloat(amount) === 0) {
@@ -129,6 +207,14 @@ export const useDeductionsManager = (user: any, weekStart: Date) => {
 
   const saveExtraDeduction = async (deduction: ExtraDeduction) => {
     if (!user) return false;
+
+    if (!isOnline) {
+      await queueAction({
+        type: 'saveExtraDeduction',
+        payload: { deduction, user_id: user.id, week_start: weekStartStr }
+      });
+      return true;
+    }
 
     try {
       if (deduction.id.includes('_')) {
@@ -172,6 +258,11 @@ export const useDeductionsManager = (user: any, weekStart: Date) => {
 
   const deleteExtraDeduction = async (id: string) => {
     if (!user || id.includes('_')) return; // temp-ID — запись ещё не создана
+
+    if (!isOnline) {
+      await queueAction({ type: 'deleteExtraDeduction', payload: { id, user_id: user.id } });
+      return;
+    }
 
     try {
       await supabase
@@ -246,6 +337,10 @@ export const useDeductionsManager = (user: any, weekStart: Date) => {
       extraAbortControllerRef.current?.abort();
     };
   }, [user?.id, weekStartStr]);                                       // <-- реагируем на смену недели
+
+  useEffect(() => {
+    setCachedData('deductions', { weekly: weeklyDeductions, extra: extraDeductionTypes });
+  }, [weeklyDeductions, extraDeductionTypes, setCachedData]);
 
   /** ---------- Totals ---------- */
   const totalWeeklyDeductions = Object.values(weeklyDeductions).reduce(
