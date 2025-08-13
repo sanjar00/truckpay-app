@@ -19,7 +19,10 @@ export const useDeductionsManager = (user: any, weekStart: Date) => {
   const queryClient = useQueryClient();
 
   /** ---------- Helpers ---------- */
-  const weekStartStr = weekStart.toISOString().slice(0, 10);
+  // Use local date components to avoid timezone shifting issues
+  const weekStartStr = `${weekStart.getFullYear()}-${String(weekStart.getMonth() + 1).padStart(2, '0')}-${String(
+    weekStart.getDate(),
+  ).padStart(2, '0')}`;
 
   /** ---------- Fetchers ---------- */
   useQuery({
