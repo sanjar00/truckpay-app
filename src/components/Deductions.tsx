@@ -21,6 +21,8 @@ import { supabase } from '@/integrations/supabase/client';
 import DeductionsSummary from './DeductionsSummary';
 import { formatCurrency } from '@/lib/utils';
 import { startOfWeek } from 'date-fns';
+import { toast } from '@/components/ui/use-toast';
+import { deductionSchema } from '@/lib/validation';
 
 const Deductions = ({ onBack, deductions, setDeductions }: DeductionsProps) => {
   const { user } = useAuth();
@@ -29,6 +31,7 @@ const Deductions = ({ onBack, deductions, setDeductions }: DeductionsProps) => {
   const [customDeductionTypes, setCustomDeductionTypes] = useState([]);
   const [loading, setLoading] = useState(false);
   const [pendingFixAction, setPendingFixAction] = useState<{type: string, checked: boolean} | null>(null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Fetch deductions from Supabase on component mount
   useEffect(() => {
@@ -112,6 +115,30 @@ const Deductions = ({ onBack, deductions, setDeductions }: DeductionsProps) => {
     }
   };
 
+  const validateAmount = (type: string, amount: string) => {
+    const result = deductionSchema.pick({ amount: true }).safeParse({ amount });
+    if (!result.success) {
+      const message = result.error.flatten().fieldErrors.amount?.[0] || '';
+      setErrors((prev) => ({ ...prev, [type]: message }));
+      toast({ title: 'Validation Error', description: message });
+      return false;
+    }
+    setErrors((prev) => ({ ...prev, [type]: '' }));
+    return true;
+  };
+
+  const validateNewType = () => {
+    const result = deductionSchema.pick({ type: true }).safeParse({ type: newDeductionType.trim() });
+    if (!result.success) {
+      const message = result.error.flatten().fieldErrors.type?.[0] || '';
+      setErrors((prev) => ({ ...prev, type: message }));
+      toast({ title: 'Validation Error', description: message });
+      return false;
+    }
+    setErrors((prev) => ({ ...prev, type: '' }));
+    return true;
+  };
+
   const handleFixedToggleWithConfirmation = (type: string, checked: boolean) => {
     if (checked) {
       // Show confirmation dialog when marking as fixed
@@ -139,12 +166,15 @@ const Deductions = ({ onBack, deductions, setDeductions }: DeductionsProps) => {
   const handleSaveFixedDeduction = async (type) => {
     const deductionData = fixedDeductions[type];
     const existingDeduction = deductions.find(d => d.type === type && d.isFixed);
-    
+
     // Use existing amount if no new amount is provided
     const amountToSave = deductionData?.amount || (existingDeduction ? existingDeduction.amount.toString() : '');
-    
-    if (amountToSave && user) {
-      setLoading(true);
+
+    if (!amountToSave || !validateAmount(type, amountToSave) || !user) {
+      return;
+    }
+
+    setLoading(true);
       
       try {
         const currentWeekStart = startOfWeek(new Date(), { weekStartsOn: 0 }).toISOString().split('T')[0];
@@ -212,48 +242,50 @@ const Deductions = ({ onBack, deductions, setDeductions }: DeductionsProps) => {
   };
 
   const handleAddCustomType = async () => {
-    if (newDeductionType.trim() && !allDeductionTypes.includes(newDeductionType.trim()) && user) {
-      setLoading(true);
-      
-      try {
-        // Add directly to deductions table as non-fixed
-        const { data, error } = await supabase
-          .from('deductions')
-          .insert({
-            user_id: user.id,
-            type: newDeductionType.trim(),
-            amount: 0, // Default amount
-            is_fixed: false, // Not fixed by default
-            is_custom_type: true
-          })
-          .select()
-          .single();
+    if (!validateNewType() || allDeductionTypes.includes(newDeductionType.trim()) || !user) {
+      return;
+    }
 
-        if (error) {
-          console.error('Error adding custom deduction type:', error);
-          return;
-        }
+    setLoading(true);
 
-        if (data) {
-          // Add to local state
-          const newDeduction = {
-            id: data.id,
-            type: data.type,
-            amount: data.amount,
-            isFixed: data.is_fixed,
-            isCustomType: data.is_custom_type,
-            dateAdded: data.date_added
-          };
-          setDeductions(prev => [...prev, newDeduction]);
-        }
+    try {
+      // Add directly to deductions table as non-fixed
+      const { data, error } = await supabase
+        .from('deductions')
+        .insert({
+          user_id: user.id,
+          type: newDeductionType.trim(),
+          amount: 0, // Default amount
+          is_fixed: false, // Not fixed by default
+          is_custom_type: true
+        })
+        .select()
+        .single();
 
-        setNewDeductionType('');
-        
-      } catch (error) {
+      if (error) {
         console.error('Error adding custom deduction type:', error);
-      } finally {
-        setLoading(false);
+        return;
       }
+
+      if (data) {
+        // Add to local state
+        const newDeduction = {
+          id: data.id,
+          type: data.type,
+          amount: data.amount,
+          isFixed: data.is_fixed,
+          isCustomType: data.is_custom_type,
+          dateAdded: data.date_added
+        };
+        setDeductions(prev => [...prev, newDeduction]);
+      }
+
+      setNewDeductionType('');
+
+    } catch (error) {
+      console.error('Error adding custom deduction type:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -481,16 +513,25 @@ const Deductions = ({ onBack, deductions, setDeductions }: DeductionsProps) => {
                             min="0"
                             value={fixedDeductions[type]?.amount || (existingDeduction ? existingDeduction.amount : '')}
                             onChange={(e) => handleAmountChange(type, e.target.value)}
+                            onBlur={() =>
+                              validateAmount(
+                                type,
+                                fixedDeductions[type]?.amount || (existingDeduction ? existingDeduction.amount.toString() : '')
+                              )
+                            }
                             className="brutal-border bg-background text-lg font-bold flex-1"
                           />
                           <Button
                             onClick={() => handleSaveFixedDeduction(type)}
-                            disabled={!fixedDeductions[type]?.amount && !existingDeduction}
+                            disabled={(!fixedDeductions[type]?.amount && !existingDeduction) || !!errors[type]}
                             className="brutal-border-success bg-success text-success-foreground brutal-shadow"
                           >
                             <span className="brutal-text">{existingDeduction ? 'UPDATE' : 'SAVE'}</span>
                           </Button>
                         </div>
+                        {errors[type] && (
+                          <p className="text-red-500 text-sm">{errors[type]}</p>
+                        )}
                         {existingDeduction && (
                           <div className="brutal-border-success bg-success/10 p-3 brutal-shadow">
                             <p className="brutal-mono text-sm text-success font-bold">
@@ -525,17 +566,21 @@ const Deductions = ({ onBack, deductions, setDeductions }: DeductionsProps) => {
               placeholder="ENTER_NAME"
               value={newDeductionType}
               onChange={(e) => setNewDeductionType(e.target.value)}
+              onBlur={validateNewType}
               className="brutal-border bg-background text-lg font-bold flex-1"
             />
             <Button
               onClick={handleAddCustomType}
-              disabled={!newDeductionType.trim()}
+              disabled={!newDeductionType.trim() || !!errors.type}
               className="brutal-border-primary bg-primary text-primary-foreground brutal-shadow-lg brutal-hover"
             >
               <Plus className="w-6 h-6 mr-2" />
               <span className="brutal-text">ADD_TYPE</span>
             </Button>
           </div>
+          {errors.type && (
+            <p className="text-red-500 text-sm mt-2">{errors.type}</p>
+          )}
         </div>
 
         {/* Current Fixed Deductions List */}
