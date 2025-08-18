@@ -10,6 +10,8 @@ import { Calendar } from '@/components/ui/calendar';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import LocationCombobox from './LocationCombobox';
+import { loadSchema } from '@/lib/validation';
+import { toast } from '@/components/ui/use-toast';
 
 interface NewLoad {
   rate: string;
@@ -41,6 +43,44 @@ const AddLoadForm = ({
 }: AddLoadFormProps) => {
   const [pickupCalendarOpen, setPickupCalendarOpen] = useState(false);
   const [deliveryCalendarOpen, setDeliveryCalendarOpen] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const validateField = (field: keyof NewLoad) => {
+    const result = loadSchema.safeParse(newLoad);
+    if (!result.success) {
+      const fieldErrors = result.error.flatten().fieldErrors;
+      const message = fieldErrors[field]?.[0] || '';
+      setErrors((prev) => ({ ...prev, [field]: message }));
+      if (message) {
+        toast({ title: 'Validation Error', description: message });
+      }
+    } else {
+      setErrors((prev) => ({ ...prev, [field]: '' }));
+    }
+  };
+
+  const handleSubmit = () => {
+    const result = loadSchema.safeParse(newLoad);
+    if (!result.success) {
+      const fieldErrors = result.error.flatten().fieldErrors;
+      setErrors({
+        rate: fieldErrors.rate?.[0] || '',
+        companyDeduction: fieldErrors.companyDeduction?.[0] || '',
+        locationFrom: fieldErrors.locationFrom?.[0] || '',
+        locationTo: fieldErrors.locationTo?.[0] || '',
+        pickupDate: fieldErrors.pickupDate?.[0] || '',
+        deliveryDate: fieldErrors.deliveryDate?.[0] || '',
+      });
+      toast({
+        title: 'Validation Error',
+        description: 'Please fix the errors before submitting.',
+      });
+      return;
+    }
+    onAddLoad();
+  };
+
+  const isValid = loadSchema.safeParse(newLoad).success;
 
   return (
     <Card>
@@ -58,9 +98,15 @@ const AddLoadForm = ({
           </Label>
           <LocationCombobox
             value={newLoad.locationFrom}
-            onValueChange={(value) => setNewLoad({ ...newLoad, locationFrom: value })}
+            onValueChange={(value) => {
+              setNewLoad({ ...newLoad, locationFrom: value });
+              validateField('locationFrom');
+            }}
             placeholder="Select origin state..."
           />
+          {errors.locationFrom && (
+            <p className="text-red-500 text-sm">{errors.locationFrom}</p>
+          )}
         </div>
 
         {/* Location To */}
@@ -70,9 +116,15 @@ const AddLoadForm = ({
           </Label>
           <LocationCombobox
             value={newLoad.locationTo}
-            onValueChange={(value) => setNewLoad({ ...newLoad, locationTo: value })}
+            onValueChange={(value) => {
+              setNewLoad({ ...newLoad, locationTo: value });
+              validateField('locationTo');
+            }}
             placeholder="Select destination state..."
           />
+          {errors.locationTo && (
+            <p className="text-red-500 text-sm">{errors.locationTo}</p>
+          )}
         </div>
 
         {/* Pickup Date */}
@@ -101,14 +153,18 @@ const AddLoadForm = ({
                 onSelect={(date) => {
                   setNewLoad({ ...newLoad, pickupDate: date });
                   setPickupCalendarOpen(false);
+                  validateField('pickupDate');
                 }}
-                disabled={(date) => 
+                disabled={(date) =>
                   date < weekStart || date > weekEnd
                 }
                 initialFocus
               />
             </PopoverContent>
           </Popover>
+          {errors.pickupDate && (
+            <p className="text-red-500 text-sm">{errors.pickupDate}</p>
+          )}
         </div>
 
         {/* Delivery Date - Remove future date restriction */}
@@ -137,6 +193,7 @@ const AddLoadForm = ({
                 onSelect={(date) => {
                   setNewLoad({ ...newLoad, deliveryDate: date });
                   setDeliveryCalendarOpen(false);
+                  validateField('deliveryDate');
                 }}
                 initialFocus
                 disabled={(date) => {
@@ -150,6 +207,9 @@ const AddLoadForm = ({
               />
             </PopoverContent>
           </Popover>
+          {errors.deliveryDate && (
+            <p className="text-red-500 text-sm">{errors.deliveryDate}</p>
+          )}
         </div>
 
         {/* Load Rate */}
@@ -165,8 +225,12 @@ const AddLoadForm = ({
             step="0.01"
             value={newLoad.rate}
             onChange={(e) => setNewLoad({ ...newLoad, rate: e.target.value })}
+            onBlur={() => validateField('rate')}
             className="h-12"
           />
+          {errors.rate && (
+            <p className="text-red-500 text-sm">{errors.rate}</p>
+          )}
         </div>
 
         {/* Company Deduction */}
@@ -184,16 +248,20 @@ const AddLoadForm = ({
             max="100"
             value={newLoad.companyDeduction}
             onChange={(e) => setNewLoad({ ...newLoad, companyDeduction: e.target.value })}
+            onBlur={() => validateField('companyDeduction')}
             className="h-12"
           />
+          {errors.companyDeduction && (
+            <p className="text-red-500 text-sm">{errors.companyDeduction}</p>
+          )}
         </div>
 
         {/* Action Buttons */}
         <div className="flex gap-3 pt-4">
-          <Button 
-            onClick={onAddLoad}
+          <Button
+            onClick={handleSubmit}
             className="flex-1 bg-green-600 hover:bg-green-700"
-            disabled={loading || !newLoad.rate || !newLoad.companyDeduction || !newLoad.locationFrom || !newLoad.locationTo}
+            disabled={loading || !isValid}
           >
             {loading ? 'Adding...' : 'Add Load'}
           </Button>
