@@ -1,15 +1,16 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, TrendingUp, DollarSign, Minus, Calculator, Calendar, Filter, Truck, FileText, Navigation } from 'lucide-react';
+import { ArrowLeft, TrendingUp, DollarSign, Minus, Calculator, Calendar, Filter, Truck, FileText, Navigation, BarChart2, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DatePickerWithRange } from '@/components/ui/date-picker';
-import { format, startOfWeek, endOfWeek, subWeeks, isWithinInterval, parseISO, addWeeks } from 'date-fns';
+import { format, startOfWeek, endOfWeek, subWeeks, isWithinInterval, parseISO, addWeeks, startOfYear, getMonth } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { formatCurrency } from '@/lib/utils';
 import LoadCard from './LoadCard';
 import { useAuth } from '@/hooks/useAuth';
 import { getUserWeekStart, getUserWeekEnd, getWeekStartForPeriod, getWeekEndForPeriod } from '../lib/weeklyPeriodUtils';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 interface Load {
   id: string;
@@ -54,7 +55,7 @@ const ForecastSummary = ({ onBack, deductions, userProfile }: ForecastSummaryPro
   const getDateRange = () => {
     const today = new Date();
     const currentWeekStart = getUserWeekStart(today, userProfile);
-    
+
     switch (periodFilter) {
       case 'last2':
         return {
@@ -71,11 +72,16 @@ const ForecastSummary = ({ onBack, deductions, userProfile }: ForecastSummaryPro
           start: getUserWeekStart(subWeeks(currentWeekStart, 3), userProfile),
           end: getUserWeekEnd(currentWeekStart, userProfile)
         };
+      case 'ytd':
+        return {
+          start: startOfYear(today),
+          end: today
+        };
       case 'custom':
         if (customDateRange && customDateRange.from && customDateRange.to) {
           const fromDate = new Date(customDateRange.from);
           const toDate = new Date(customDateRange.to);
-          
+
           if (!isNaN(fromDate.getTime()) && !isNaN(toDate.getTime())) {
             return {
               start: getUserWeekStart(fromDate, userProfile),
@@ -329,6 +335,46 @@ const ForecastSummary = ({ onBack, deductions, userProfile }: ForecastSummaryPro
     }
   }, [user, periodFilter, customDateRange]);
 
+  // Monthly chart data (for YTD view)
+  const MONTH_NAMES = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  const monthlyData = (() => {
+    const map: Record<number, { gross: number; net: number; count: number }> = {};
+    filteredLoads.forEach((load) => {
+      if (!load.dateAdded) return;
+      const m = getMonth(parseISO(load.dateAdded));
+      if (!map[m]) map[m] = { gross: 0, net: 0, count: 0 };
+      map[m].gross += load.rate || 0;
+      map[m].net += load.driverPay || 0;
+      map[m].count += 1;
+    });
+    const avgNet = Object.values(map).reduce((s, v) => s + v.net, 0) / Math.max(1, Object.keys(map).length);
+    return Object.entries(map).map(([month, val]) => ({
+      month: MONTH_NAMES[Number(month)],
+      net: Math.round(val.net),
+      gross: Math.round(val.gross),
+      loads: val.count,
+      aboveAvg: val.net >= avgNet,
+    }));
+  })();
+
+  // Lane analytics
+  const laneStats = (() => {
+    const map: Record<string, { totalDriverPay: number; count: number }> = {};
+    filteredLoads.forEach((load) => {
+      const key = `${load.locationFrom} → ${load.locationTo}`;
+      if (!map[key]) map[key] = { totalDriverPay: 0, count: 0 };
+      map[key].totalDriverPay += load.driverPay || 0;
+      map[key].count += 1;
+    });
+    return Object.entries(map)
+      .map(([lane, stats]) => ({
+        lane,
+        avgDriverPay: stats.totalDriverPay / stats.count,
+        count: stats.count,
+      }))
+      .sort((a, b) => b.avgDriverPay - a.avgDriverPay);
+  })();
+
   const handleDeleteLoad = async (loadId: string) => {
     if (!user) return;
     
@@ -394,6 +440,7 @@ const ForecastSummary = ({ onBack, deductions, userProfile }: ForecastSummaryPro
                     <SelectItem value="last2">LAST 2 WEEKS</SelectItem>
                     <SelectItem value="last3">LAST 3 WEEKS</SelectItem>
                     <SelectItem value="last4">LAST 4 WEEKS</SelectItem>
+                    <SelectItem value="ytd">YEAR TO DATE</SelectItem>
                     <SelectItem value="custom">CUSTOM RANGE</SelectItem>
                   </SelectContent>
                 </Select>
@@ -573,6 +620,78 @@ const ForecastSummary = ({ onBack, deductions, userProfile }: ForecastSummaryPro
           </CardContent>
         </Card>
 
+        {/* Monthly Bar Chart (YTD only) */}
+        {periodFilter === 'ytd' && monthlyData.length > 0 && (
+          <Card className="brutal-border brutal-shadow bg-background">
+            <CardHeader className="pb-4">
+              <CardTitle className="mobile-text-xl brutal-text font-bold flex items-center gap-2">
+                <BarChart2 className="mobile-icon" />
+                MONTHLY NET INCOME
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={monthlyData} margin={{ top: 4, right: 4, left: 0, bottom: 4 }}>
+                  <XAxis dataKey="month" tick={{ fontSize: 11, fontFamily: 'monospace' }} />
+                  <YAxis tick={{ fontSize: 10, fontFamily: 'monospace' }} tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`} />
+                  <Tooltip
+                    formatter={(val: number) => [`$${formatCurrency(val)}`, 'Net Pay']}
+                    contentStyle={{ fontFamily: 'monospace', fontSize: 12 }}
+                  />
+                  <Bar dataKey="net" radius={0}>
+                    {monthlyData.map((entry, i) => (
+                      <Cell key={i} fill={entry.aboveAvg ? 'hsl(120 100% 25%)' : 'hsl(39 94% 52%)'} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+              <p className="brutal-mono text-xs text-muted-foreground mt-2">
+                🟢 Above average &nbsp; 🟡 Below average
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Lane Performance Analytics */}
+        {laneStats.length > 0 && (
+          <Card className="brutal-border brutal-shadow bg-background">
+            <CardHeader className="pb-4">
+              <CardTitle className="mobile-text-xl brutal-text font-bold flex items-center gap-2">
+                <MapPin className="mobile-icon" />
+                LANE PERFORMANCE
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {laneStats.slice(0, 8).map((lane, i) => (
+                <div key={lane.lane} className={`brutal-border p-3 flex justify-between items-center gap-2 ${i === 0 ? 'bg-success/10' : i === laneStats.length - 1 ? 'bg-destructive/5' : 'bg-background'}`}>
+                  <div className="flex-1 min-w-0">
+                    <p className="brutal-text text-sm font-bold truncate">{lane.lane}</p>
+                    <p className="brutal-mono text-xs text-muted-foreground">{lane.count} load{lane.count !== 1 ? 's' : ''}</p>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <p className="brutal-text text-sm font-bold text-primary">${formatCurrency(lane.avgDriverPay)}</p>
+                    <p className="brutal-mono text-xs text-muted-foreground">AVG DRIVER PAY</p>
+                  </div>
+                </div>
+              ))}
+              {laneStats.length > 1 && (
+                <div className="pt-2 grid grid-cols-2 gap-3">
+                  <div className="brutal-border p-3 bg-success/10">
+                    <p className="brutal-mono text-xs text-muted-foreground">BEST LANE</p>
+                    <p className="brutal-text text-sm font-bold text-green-700 truncate">{laneStats[0].lane}</p>
+                    <p className="brutal-text text-lg font-bold">${formatCurrency(laneStats[0].avgDriverPay)}</p>
+                  </div>
+                  <div className="brutal-border p-3 bg-destructive/5">
+                    <p className="brutal-mono text-xs text-muted-foreground">WORST LANE</p>
+                    <p className="brutal-text text-sm font-bold text-red-700 truncate">{laneStats[laneStats.length - 1].lane}</p>
+                    <p className="brutal-text text-lg font-bold">${formatCurrency(laneStats[laneStats.length - 1].avgDriverPay)}</p>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         {/* Loads List */}
         {filteredLoads.length > 0 && (
           <Card className="brutal-border brutal-shadow bg-background">
@@ -585,8 +704,8 @@ const ForecastSummary = ({ onBack, deductions, userProfile }: ForecastSummaryPro
             <CardContent className="space-y-4">
               {filteredLoads.map((load) => (
                 <div key={load.id} className="brutal-border bg-card p-4 brutal-shadow">
-                  <LoadCard 
-                    load={load} 
+                  <LoadCard
+                    load={load}
                     onDelete={handleDeleteLoad}
                   />
                 </div>

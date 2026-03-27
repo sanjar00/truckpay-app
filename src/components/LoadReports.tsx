@@ -13,6 +13,7 @@ import { useDeductionsManager } from '@/hooks/useDeductionsManager';
 import { useMileageManager } from '@/hooks/useMileageManager';
 import { calculateFixedDeductionsForWeek } from '@/lib/loadReportsUtils';
 import { LoadReportsProps, DeleteConfirmation } from '@/types/LoadReports';
+import WeeklyForecastCard from './WeeklyForecastCard';
 
 const LoadReports = ({ onBack, user, userProfile, deductions }: LoadReportsProps) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<DeleteConfirmation | null>(null);
@@ -130,6 +131,15 @@ const LoadReports = ({ onBack, user, userProfile, deductions }: LoadReportsProps
           calculateRPM={() => calculateRPM(totalGrossPay)}
         />
 
+        <WeeklyForecastCard
+          user={user}
+          userProfile={userProfile}
+          weekStart={weekStart}
+          weekEnd={weekEnd}
+          currentGross={totalGrossPay}
+          fixedDeductionsWeeklyTotal={totalFixedDeductions}
+        />
+
         {/* Add New Load Button */}
         <Button 
           onClick={() => setShowAddForm(true)}
@@ -165,12 +175,17 @@ const LoadReports = ({ onBack, user, userProfile, deductions }: LoadReportsProps
             <h3 className="brutal-text text-xl text-foreground">WEEK_LOADS ({currentWeekLoads.length})</h3>
             {currentWeekLoads.map((load) => (
               <div key={load.id} className="brutal-border bg-card p-6 brutal-shadow">
-                <LoadCard 
-                  load={load} 
+                <LoadCard
+                  load={load}
                   onDelete={handleDeleteLoad}
                   onEdit={handleEditLoad}
                   isEditing={editingLoad === load.id}
                   setIsEditing={(editing) => setEditingLoad(editing ? load.id : null)}
+                  estimatedMiles={
+                    weeklyMileage.totalMiles > 0 && currentWeekLoads.length > 0
+                      ? weeklyMileage.totalMiles / currentWeekLoads.length
+                      : undefined
+                  }
                 />
               </div>
             ))}

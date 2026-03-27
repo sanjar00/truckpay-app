@@ -1,8 +1,9 @@
 
 import { useState, useEffect } from 'react';
-import { Truck, Calculator, Settings, DollarSign, FileText, LogOut, Receipt } from 'lucide-react';
+import { Truck, Calculator, Settings, DollarSign, FileText, LogOut, Receipt, Calendar, Map } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
+import { useSubscription } from '@/hooks/useSubscription';
 import { supabase } from '@/integrations/supabase/client';
 import LoginPage from '@/components/LoginPage';
 import Registration from '@/components/Registration';
@@ -11,11 +12,16 @@ import Deductions from '@/components/Deductions';
 import ForecastSummary from '@/components/ForecastSummary';
 import SettingsPanel from '@/components/SettingsPanel';
 import PersonalExpenses from '@/components/PersonalExpenses';
+import PerDiemCalculator from '@/components/PerDiemCalculator';
+import IFTAReport from '@/components/IFTAReport';
+import UpgradeModal from '@/components/UpgradeModal';
 
 const Index = () => {
   const { user, loading, signOut } = useAuth();
+  const { isFeatureAllowed } = useSubscription();
   const [currentView, setCurrentView] = useState('dashboard');
   const [showRegistration, setShowRegistration] = useState(false);
+  const [upgradeModal, setUpgradeModal] = useState<{ feature: string; tier: 'pro' | 'owner' } | null>(null);
   const [userProfile, setUserProfile] = useState(null);
   const [loads, setLoads] = useState([]);
   const [deductions, setDeductions] = useState([]);
@@ -84,6 +90,14 @@ const Index = () => {
     setShowRegistration(false);
   };
 
+  const navigateTo = (view: string, feature: 'perdiem' | 'ifta' | 'forecast' | null = null) => {
+    if (feature && !isFeatureAllowed(feature)) {
+      setUpgradeModal({ feature, tier: 'pro' });
+      return;
+    }
+    setCurrentView(view);
+  };
+
   const handleLogout = async () => {
     await signOut();
     setCurrentView('dashboard');
@@ -147,7 +161,20 @@ const Index = () => {
         );
       case 'expenses':
         return (
-          <PersonalExpenses 
+          <PersonalExpenses
+            onBack={() => setCurrentView('dashboard')}
+          />
+        );
+      case 'perdiem':
+        return (
+          <PerDiemCalculator
+            onBack={() => setCurrentView('dashboard')}
+            userProfile={userProfile}
+          />
+        );
+      case 'ifta':
+        return (
+          <IFTAReport
             onBack={() => setCurrentView('dashboard')}
           />
         );
@@ -246,8 +273,8 @@ const Index = () => {
                   </div>
                 </Button>
 
-                <Button 
-                  onClick={() => setCurrentView('forecast')}
+                <Button
+                  onClick={() => navigateTo('forecast', 'forecast')}
                   className="h-24 sm:h-32 brutal-border bg-info hover:bg-accent text-info-foreground hover:text-accent-foreground brutal-shadow-lg brutal-hover brutal-active p-4 sm:p-6 flex flex-col items-start justify-center"
                 >
                   <DollarSign className="w-6 h-6 sm:w-10 sm:h-10 mb-2 sm:mb-3" />
@@ -257,7 +284,7 @@ const Index = () => {
                   </div>
                 </Button>
 
-                <Button 
+                <Button
                   onClick={() => setCurrentView('expenses')}
                   className="h-24 sm:h-32 brutal-border bg-info hover:bg-accent text-info-foreground hover:text-accent-foreground brutal-shadow-lg brutal-hover brutal-active p-4 sm:p-6 flex flex-col items-start justify-center"
                 >
@@ -267,12 +294,34 @@ const Index = () => {
                     <p className="brutal-mono text-xs sm:text-sm opacity-80 mobile-text-wrap">TRACK EXPENSES</p>
                   </div>
                 </Button>
+
+                <Button
+                  onClick={() => navigateTo('perdiem', 'perdiem')}
+                  className="h-24 sm:h-32 brutal-border bg-info hover:bg-accent text-info-foreground hover:text-accent-foreground brutal-shadow-lg brutal-hover brutal-active p-4 sm:p-6 flex flex-col items-start justify-center"
+                >
+                  <Calendar className="w-6 h-6 sm:w-10 sm:h-10 mb-2 sm:mb-3" />
+                  <div className="text-left">
+                    <p className="brutal-text text-sm sm:text-xl mb-1">PER DIEM</p>
+                    <p className="brutal-mono text-xs sm:text-sm opacity-80 mobile-text-wrap">IRS MEAL DEDUCTION</p>
+                  </div>
+                </Button>
+
+                <Button
+                  onClick={() => navigateTo('ifta', 'ifta')}
+                  className="h-24 sm:h-32 brutal-border bg-info hover:bg-accent text-info-foreground hover:text-accent-foreground brutal-shadow-lg brutal-hover brutal-active p-4 sm:p-6 flex flex-col items-start justify-center"
+                >
+                  <Map className="w-6 h-6 sm:w-10 sm:h-10 mb-2 sm:mb-3" />
+                  <div className="text-left">
+                    <p className="brutal-text text-sm sm:text-xl mb-1">IFTA REPORT</p>
+                    <p className="brutal-mono text-xs sm:text-sm opacity-80 mobile-text-wrap">FUEL TAX FILING</p>
+                  </div>
+                </Button>
               </div>
 
               {/* Footer */}
               <div className="brutal-border bg-muted p-3 sm:p-6 brutal-shadow text-center">
                 <p className="brutal-mono text-xs sm:text-sm text-muted-foreground mobile-text-wrap">
-                  TRUCKPAY V1.2
+                  TRUCKPAY V2.0
                 </p>
               </div>
             </div>
@@ -284,6 +333,13 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-background">
       {renderCurrentView()}
+      {upgradeModal && (
+        <UpgradeModal
+          featureName={upgradeModal.feature}
+          requiredTier={upgradeModal.tier}
+          onClose={() => setUpgradeModal(null)}
+        />
+      )}
     </div>
   );
 };

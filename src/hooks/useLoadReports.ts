@@ -114,7 +114,15 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
             pickup_date: newLoad.pickupDate ? formatDateForDB(newLoad.pickupDate) : null,
             delivery_date: newLoad.deliveryDate ? formatDateForDB(newLoad.deliveryDate) : null,
             date_added: loadDate,
-            week_period: weekPeriod
+            week_period: weekPeriod,
+            deadhead_miles: newLoad.deadheadMiles ? parseInt(newLoad.deadheadMiles) : null,
+            dispatcher_name: newLoad.dispatcherName || null,
+            dispatcher_company: newLoad.dispatcherCompany || null,
+            dispatcher_phone: newLoad.dispatcherPhone || null,
+            broker_name: newLoad.brokerName || null,
+            broker_company: newLoad.brokerCompany || null,
+            bol_number: newLoad.bolNumber || null,
+            notes: newLoad.notes || null,
           })
           .select()
           .single();
@@ -139,13 +147,21 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
           };
           
           setLoads(prev => [...prev, newLoadEntry]);
-          setNewLoad({ 
-            rate: '', 
+          setNewLoad({
+            rate: '',
             companyDeduction: userProfile?.companyDeduction || '',
             locationFrom: '',
             locationTo: '',
             pickupDate: undefined,
-            deliveryDate: undefined
+            deliveryDate: undefined,
+            deadheadMiles: '',
+            dispatcherName: '',
+            dispatcherCompany: '',
+            dispatcherPhone: '',
+            brokerName: '',
+            brokerCompany: '',
+            bolNumber: '',
+            notes: '',
           });
           setShowAddForm(false);
         }

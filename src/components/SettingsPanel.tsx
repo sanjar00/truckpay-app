@@ -249,16 +249,11 @@ const SettingsPanel = ({ userProfile, setUserProfile, onBack }) => {
         // Delete profile first
         await supabase.from('profiles').delete().eq('id', user.id);
         
-        // Delete the actual user account from Supabase Auth
-        const { error: deleteError } = await supabase.auth.admin.deleteUser(user.id);
-        
-        if (deleteError) {
-          // If admin delete fails, try user delete (requires RLS policies)
-          const { error: userDeleteError } = await supabase.rpc('delete_user');
-          
-          if (userDeleteError) {
-            throw new Error('Failed to delete account. Please contact support.');
-          }
+        // Delete the actual user account via RPC (requires a delete_user function in Supabase)
+        const { error: userDeleteError } = await supabase.rpc('delete_user');
+
+        if (userDeleteError) {
+          throw new Error('Failed to delete account. Please contact support at dev@saaz.site.');
         }
         
         // Sign out after successful deletion
@@ -508,11 +503,11 @@ const SettingsPanel = ({ userProfile, setUserProfile, onBack }) => {
           <div className="space-y-4 text-sm text-muted-foreground">
             <div className="flex justify-between items-center">
               <span className="font-medium">Version:</span>
-              <span>1.0.0</span>
+              <span>2.1.0</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="font-medium">Last Updated:</span>
-              <span>June 2025</span>
+              <span>March 2026</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="font-medium">Support:</span>

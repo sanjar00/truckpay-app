@@ -11,6 +11,15 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 
+function getProfitabilityGrade(driverPay: number, estimatedMiles: number) {
+  if (!estimatedMiles || estimatedMiles <= 0) return null;
+  const rpm = driverPay / estimatedMiles;
+  if (rpm >= 2.50) return { score: 'A', label: 'EXCELLENT', color: 'bg-green-600 text-white', rpm };
+  if (rpm >= 2.00) return { score: 'B', label: 'GOOD', color: 'bg-blue-600 text-white', rpm };
+  if (rpm >= 1.50) return { score: 'C', label: 'AVERAGE', color: 'bg-yellow-500 text-black', rpm };
+  return { score: 'D', label: 'POOR', color: 'bg-red-600 text-white', rpm };
+}
+
 // Helper function to format dates without timezone issues
 const formatDateForDB = (date: Date): string => {
   const year = date.getFullYear();
@@ -44,9 +53,11 @@ interface LoadCardProps {
   onEdit?: (id: string, updatedLoad: Partial<Load>) => void;
   isEditing?: boolean;
   setIsEditing?: (editing: boolean) => void;
+  estimatedMiles?: number;
 }
 
-const LoadCard = ({ load, onDelete, onEdit, isEditing, setIsEditing }: LoadCardProps) => {
+const LoadCard = ({ load, onDelete, onEdit, isEditing, setIsEditing, estimatedMiles }: LoadCardProps) => {
+  const grade = estimatedMiles ? getProfitabilityGrade(load.driverPay, estimatedMiles) : null;
   const [editData, setEditData] = useState({
     rate: load.rate.toString(),
     companyDeduction: load.companyDeduction.toString(),
@@ -250,6 +261,11 @@ const LoadCard = ({ load, onDelete, onEdit, isEditing, setIsEditing }: LoadCardP
             <div className="flex items-center gap-2 mb-2">
               <MapPin className="w-4 h-4 text-gray-500" />
               <span className="font-medium">{load.locationFrom} → {load.locationTo}</span>
+              {grade && (
+                <span className={`ml-auto text-xs font-bold px-2 py-0.5 rounded ${grade.color}`}>
+                  {grade.score} · ${grade.rpm.toFixed(2)}/mi
+                </span>
+              )}
             </div>
             
             {/* Date Information */}

@@ -22,6 +22,21 @@ import DeductionsSummary from './DeductionsSummary';
 import { formatCurrency } from '@/lib/utils';
 import { startOfWeek } from 'date-fns';
 
+interface Deduction {
+  id: string;
+  type: string;
+  amount: number;
+  isFixed: boolean;
+  isCustomType: boolean;
+  dateAdded: string | null;
+}
+
+interface DeductionsProps {
+  onBack: () => void;
+  deductions: Deduction[];
+  setDeductions: React.Dispatch<React.SetStateAction<Deduction[]>>;
+}
+
 const Deductions = ({ onBack, deductions, setDeductions }: DeductionsProps) => {
   const { user } = useAuth();
   const [fixedDeductions, setFixedDeductions] = useState({});
@@ -279,75 +294,17 @@ const Deductions = ({ onBack, deductions, setDeductions }: DeductionsProps) => {
     }
   };
 
-  // Add this new function to fetch removed predefined types
-  const fetchRemovedPredefinedTypes = async () => {
+  const handleDeleteDeductionsByType = async (type: string) => {
     if (!user) return;
-    
-    try {
-      const { data, error } = await supabase
-        .from('user_preferences')
-        .select('removed_predefined_types')
-        .eq('user_id', user.id)
-        .single();
-
-      if (error && error.code !== 'PGRST116') { // PGRST116 is "not found" error
-        console.error('Error fetching removed predefined types:', error);
-        return;
-      }
-
-      if (data && data.removed_predefined_types) {
-        setRemovedPredefinedTypes(data.removed_predefined_types);
-      }
-    } catch (error) {
-      console.error('Error fetching removed predefined types:', error);
-    }
-  };
-
-  // Update the handleRemovePredefinedType function to persist to database
-  const handleRemovePredefinedType = async (type: string) => {
-    const newRemovedTypes = [...removedPredefinedTypes, type];
-    setRemovedPredefinedTypes(newRemovedTypes);
-    
-    if (!user) return;
-    
-    try {
-      // First, try to update existing record
-      const { data: existingData, error: fetchError } = await supabase
-        .from('user_preferences')
-        .select('id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (fetchError && fetchError.code !== 'PGRST116') {
-        console.error('Error checking user preferences:', fetchError);
-        return;
-      }
-
-      if (existingData) {
-        // Update existing record
-        const { error } = await supabase
-          .from('user_preferences')
-          .update({ removed_predefined_types: newRemovedTypes })
-          .eq('user_id', user.id);
-
-        if (error) {
-          console.error('Error updating removed predefined types:', error);
-        }
-      } else {
-        // Create new record
-        const { error } = await supabase
-          .from('user_preferences')
-          .insert({
-            user_id: user.id,
-            removed_predefined_types: newRemovedTypes
-          });
-
-        if (error) {
-          console.error('Error saving removed predefined types:', error);
-        }
-      }
-    } catch (error) {
-      console.error('Error persisting removed predefined types:', error);
+    const ids = deductions.filter(d => d.type === type).map(d => d.id);
+    if (ids.length === 0) return;
+    const { error } = await supabase
+      .from('deductions')
+      .delete()
+      .in('id', ids)
+      .eq('user_id', user.id);
+    if (!error) {
+      setDeductions(prev => prev.filter(d => !ids.includes(d.id)));
     }
   };
 
@@ -451,11 +408,7 @@ const Deductions = ({ onBack, deductions, setDeductions }: DeductionsProps) => {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => {
-                            // All types are custom now, so just delete all instances
-                            const customDeductions = deductions.filter(d => d.type === type);
-                            customDeductions.forEach(d => handleDeleteDeduction(d.id));
-                          }}
+                          onClick={() => handleDeleteDeductionsByType(type)}
                           className="brutal-border-destructive bg-destructive hover:bg-destructive text-destructive-foreground brutal-shadow"
                           title="Delete custom type"
                         >
