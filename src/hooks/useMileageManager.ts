@@ -33,10 +33,15 @@ export const useMileageManager = (user: any, weekStart: Date) => {
       }
 
       if (data && !isUserInputRef.current) {
+        // Compute safe totalMiles: only if both values are positive and difference is valid
+        const start = data.start_mileage || 0;
+        const end = data.end_mileage || 0;
+        const rawTotal = (start > 0 && end > 0) ? Math.max(0, end - start) : 0;
+        const safeTotalMiles = rawTotal > 15000 ? 0 : rawTotal;
         setWeeklyMileage({
           startMileage: data.start_mileage?.toString() || '',
           endMileage: data.end_mileage?.toString() || '',
-          totalMiles: data.total_miles || 0
+          totalMiles: safeTotalMiles
         });
       } else if (!data) {
         setWeeklyMileage({
@@ -88,7 +93,8 @@ export const useMileageManager = (user: any, weekStart: Date) => {
     // Calculate total miles
     const start = parseInt(newMileage.startMileage) || 0;
     const end = parseInt(newMileage.endMileage) || 0;
-    newMileage.totalMiles = Math.max(0, end - start);
+    const rawTotal = Math.max(0, end - start);
+    newMileage.totalMiles = rawTotal > 15000 ? 0 : rawTotal;
     
     setWeeklyMileage(newMileage);
     

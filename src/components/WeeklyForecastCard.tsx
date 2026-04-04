@@ -12,6 +12,8 @@ interface WeeklyForecastCardProps {
   weekStart: Date;
   weekEnd: Date;
   currentGross: number;
+  currentDriverPay: number;
+  loadCount: number;
   fixedDeductionsWeeklyTotal: number;
 }
 
@@ -21,6 +23,8 @@ const WeeklyForecastCard = ({
   weekStart,
   weekEnd,
   currentGross,
+  currentDriverPay,
+  loadCount,
   fixedDeductionsWeeklyTotal,
 }: WeeklyForecastCardProps) => {
   const [collapsed, setCollapsed] = useState(false);
@@ -49,9 +53,12 @@ const WeeklyForecastCard = ({
       : null;
 
   const goal = parseFloat(weeklyGoal);
+  const isOnTrack = goal > 0 && projectedNet >= goal;
+  const avgDriverPayPerLoad = loadCount > 0 ? currentDriverPay / loadCount : 0;
+  const remainingNetNeeded = goal - projectedNet;
   const loadsNeeded =
-    goal > 0 && currentGross < goal && daysRemaining > 0
-      ? Math.ceil((goal - currentGross) / (dailyRate || 1))
+    goal > 0 && !isOnTrack && avgDriverPayPerLoad > 0
+      ? Math.ceil(remainingNetNeeded / avgDriverPayPerLoad)
       : null;
 
   useEffect(() => {
@@ -146,13 +153,22 @@ const WeeklyForecastCard = ({
                 <div className="h-2 brutal-border bg-muted">
                   <div
                     className="h-full bg-primary transition-all"
-                    style={{ width: `${Math.min(100, (currentGross / goal) * 100).toFixed(1)}%` }}
+                    style={{ width: `${Math.min(100, (projectedNet / goal) * 100).toFixed(1)}%` }}
                   />
                 </div>
                 <p className="brutal-mono text-xs text-muted-foreground">
-                  ${formatCurrency(currentGross)} of ${formatCurrency(goal)} goal
-                  {loadsNeeded !== null && ` · ~${loadsNeeded} more load(s) needed`}
+                  ${formatCurrency(projectedNet)} projected net of ${formatCurrency(goal)} goal
                 </p>
+                {isOnTrack && (
+                  <p className="brutal-mono text-xs font-bold text-green-600">
+                    ✓ ON TRACK — projected net exceeds your goal
+                  </p>
+                )}
+                {!isOnTrack && loadsNeeded !== null && loadsNeeded > 0 && (
+                  <p className="brutal-mono text-xs text-muted-foreground">
+                    You need ~{loadsNeeded} more load{loadsNeeded !== 1 ? 's' : ''} at your current average to hit your goal
+                  </p>
+                )}
               </div>
             )}
           </div>

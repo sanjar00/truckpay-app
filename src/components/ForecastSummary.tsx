@@ -50,6 +50,7 @@ const ForecastSummary = ({ onBack, deductions, userProfile }: ForecastSummaryPro
   const [loading, setLoading] = useState(false);
   // Add mileage state
   const [weeklyMileageData, setWeeklyMileageData] = useState<Record<string, {startMileage: number, endMileage: number, totalMiles: number}>>({});
+  const [editingLoad, setEditingLoad] = useState<string | null>(null);
 
   // Calculate date range based on filter
   const getDateRange = () => {
@@ -280,6 +281,22 @@ const ForecastSummary = ({ onBack, deductions, userProfile }: ForecastSummaryPro
   const netIncome = (totalDriverPay || 0) - (totalDeductions || 0);
   const netIncomePercentage = totalDriverPay > 0 ? ((netIncome / totalDriverPay) * 100) : 0;
 
+  // Annual goal progress (YTD only)
+  const annualGoal = parseFloat(localStorage.getItem('truckpay_annual_goal') || '0');
+  const annualGoalProgress = (() => {
+    if (!annualGoal || annualGoal <= 0 || periodFilter !== 'ytd') return null;
+    const today = new Date();
+    const startOfYearDate = new Date(today.getFullYear(), 0, 1);
+    const dayOfYear = Math.ceil((today.getTime() - startOfYearDate.getTime()) / (1000 * 60 * 60 * 24));
+    const weeksElapsed = Math.max(1, dayOfYear / 7);
+    const weeklyAvg = netIncome / weeksElapsed;
+    const projectedAnnual = weeklyAvg * 52;
+    const pct = Math.min(100, (netIncome / annualGoal) * 100);
+    const isOnPace = projectedAnnual >= annualGoal;
+    const isBehindSlightly = !isOnPace && projectedAnnual >= annualGoal * 0.9;
+    return { pct, projectedAnnual, isOnPace, isBehindSlightly };
+  })();
+
   // Add mileage fetch function
   const fetchWeeklyMileage = async () => {
     if (!user) return;
@@ -308,10 +325,14 @@ const ForecastSummary = ({ onBack, deductions, userProfile }: ForecastSummaryPro
       if (data) {
         const mileageMap: Record<string, {startMileage: number, endMileage: number, totalMiles: number}> = {};
         data.forEach(mileage => {
+          const start = mileage.start_mileage || 0;
+          const end = mileage.end_mileage || 0;
+          const rawTotal = (start > 0 && end > 0) ? Math.max(0, end - start) : 0;
+          const safeTotalMiles = rawTotal > 15000 ? 0 : rawTotal;
           mileageMap[mileage.week_start] = {
-            startMileage: mileage.start_mileage || 0,
-            endMileage: mileage.end_mileage || 0,
-            totalMiles: mileage.total_miles || 0
+            startMileage: start,
+            endMileage: end,
+            totalMiles: safeTotalMiles
           };
         });
         setWeeklyMileageData(mileageMap);
@@ -359,25 +380,38 @@ const ForecastSummary = ({ onBack, deductions, userProfile }: ForecastSummaryPro
 
   // Lane analytics
   const laneStats = (() => {
-    const map: Record<string, { totalDriverPay: number; count: number }> = {};
+    const map: Record<string, { totalDriverPay: number; totalMiles: number; count: number }> = {};
     filteredLoads.forEach((load) => {
       const key = `${load.locationFrom} → ${load.locationTo}`;
-      if (!map[key]) map[key] = { totalDriverPay: 0, count: 0 };
+      if (!map[key]) map[key] = { totalDriverPay: 0, totalMiles: 0, count: 0 };
       map[key].totalDriverPay += load.driverPay || 0;
       map[key].count += 1;
+      // Estimated miles for this load based on its week's mileage
+      const wMileage = weeklyMileageData[load.dateAdded];
+      const loadsInWeek = filteredLoads.filter(l => l.dateAdded === load.dateAdded).length;
+      const estMiles = (wMileage && wMileage.totalMiles > 0 && loadsInWeek > 0)
+        ? wMileage.totalMiles / loadsInWeek
+        : 0;
+      map[key].totalMiles += estMiles;
     });
     return Object.entries(map)
       .map(([lane, stats]) => ({
         lane,
         avgDriverPay: stats.totalDriverPay / stats.count,
+        avgRPM: stats.totalMiles > 0 ? stats.totalDriverPay / stats.totalMiles : null,
         count: stats.count,
       }))
-      .sort((a, b) => b.avgDriverPay - a.avgDriverPay);
+      .sort((a, b) => {
+        if (a.avgRPM !== null && b.avgRPM !== null) return b.avgRPM - a.avgRPM;
+        if (a.avgRPM !== null) return -1;
+        if (b.avgRPM !== null) return 1;
+        return b.avgDriverPay - a.avgDriverPay;
+      });
   })();
 
   const handleDeleteLoad = async (loadId: string) => {
     if (!user) return;
-    
+
     try {
       const { error } = await supabase
         .from('load_reports')
@@ -394,6 +428,33 @@ const ForecastSummary = ({ onBack, deductions, userProfile }: ForecastSummaryPro
       fetchLoads();
     } catch (error) {
       console.error('Error deleting load:', error);
+    }
+  };
+
+  const handleEditLoad = async (loadId: string, updatedLoad: Partial<Load>) => {
+    if (!user) return;
+    try {
+      const { error } = await supabase
+        .from('load_reports')
+        .update({
+          rate: updatedLoad.rate,
+          company_deduction: updatedLoad.companyDeduction,
+          driver_pay: updatedLoad.driverPay,
+          location_from: updatedLoad.locationFrom,
+          location_to: updatedLoad.locationTo,
+          pickup_date: updatedLoad.pickupDate ?? null,
+          delivery_date: updatedLoad.deliveryDate ?? null,
+        })
+        .eq('id', loadId)
+        .eq('user_id', user.id);
+      if (error) {
+        console.error('Error editing load:', error);
+        return;
+      }
+      setEditingLoad(null);
+      fetchLoads();
+    } catch (error) {
+      console.error('Error editing load:', error);
     }
   };
 
@@ -497,6 +558,35 @@ const ForecastSummary = ({ onBack, deductions, userProfile }: ForecastSummaryPro
             </div>
           </CardContent>
         </Card>
+
+        {/* Annual Goal Progress (YTD only) */}
+        {annualGoalProgress && (
+          <Card className="brutal-border brutal-shadow bg-background">
+            <CardHeader className="pb-2">
+              <CardTitle className="mobile-text-xl brutal-text font-bold">ANNUAL GOAL PROGRESS</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="h-3 brutal-border bg-muted">
+                <div
+                  className={`h-full transition-all ${annualGoalProgress.isOnPace ? 'bg-green-600' : annualGoalProgress.isBehindSlightly ? 'bg-yellow-500' : 'bg-destructive'}`}
+                  style={{ width: `${annualGoalProgress.pct.toFixed(1)}%` }}
+                />
+              </div>
+              <p className="brutal-mono text-sm">
+                You've earned ${formatCurrency(netIncome)} of your ${formatCurrency(annualGoal)} annual goal ({annualGoalProgress.pct.toFixed(1)}%)
+              </p>
+              <p className={`brutal-mono text-xs font-bold ${annualGoalProgress.isOnPace ? 'text-green-600' : annualGoalProgress.isBehindSlightly ? 'text-yellow-600' : 'text-destructive'}`}>
+                On pace to earn ${formatCurrency(annualGoalProgress.projectedAnnual)} this year
+                {annualGoalProgress.isOnPace ? ' ✓' : ''}
+              </p>
+            </CardContent>
+          </Card>
+        )}
+        {periodFilter === 'ytd' && !annualGoal && (
+          <p className="brutal-mono text-xs text-muted-foreground text-center">
+            <button onClick={() => {}} className="underline">Set Annual Goal →</button>
+          </p>
+        )}
 
         {/* Total Mileage Card */}
         <Card className="brutal-border brutal-shadow bg-accent/10 mb-8">
@@ -670,7 +760,9 @@ const ForecastSummary = ({ onBack, deductions, userProfile }: ForecastSummaryPro
                   </div>
                   <div className="text-right flex-shrink-0">
                     <p className="brutal-text text-sm font-bold text-primary">${formatCurrency(lane.avgDriverPay)}</p>
-                    <p className="brutal-mono text-xs text-muted-foreground">AVG DRIVER PAY</p>
+                    <p className="brutal-mono text-xs text-muted-foreground">
+                      {lane.avgRPM !== null ? `$${lane.avgRPM.toFixed(2)}/mi` : '--'} · AVG DRIVER PAY
+                    </p>
                   </div>
                 </div>
               ))}
@@ -680,11 +772,17 @@ const ForecastSummary = ({ onBack, deductions, userProfile }: ForecastSummaryPro
                     <p className="brutal-mono text-xs text-muted-foreground">BEST LANE</p>
                     <p className="brutal-text text-sm font-bold text-green-700 truncate">{laneStats[0].lane}</p>
                     <p className="brutal-text text-lg font-bold">${formatCurrency(laneStats[0].avgDriverPay)}</p>
+                    {laneStats[0].avgRPM !== null && (
+                      <p className="brutal-mono text-xs text-green-700">${laneStats[0].avgRPM.toFixed(2)}/mi</p>
+                    )}
                   </div>
                   <div className="brutal-border p-3 bg-destructive/5">
                     <p className="brutal-mono text-xs text-muted-foreground">WORST LANE</p>
                     <p className="brutal-text text-sm font-bold text-red-700 truncate">{laneStats[laneStats.length - 1].lane}</p>
                     <p className="brutal-text text-lg font-bold">${formatCurrency(laneStats[laneStats.length - 1].avgDriverPay)}</p>
+                    {laneStats[laneStats.length - 1].avgRPM !== null && (
+                      <p className="brutal-mono text-xs text-red-700">${laneStats[laneStats.length - 1].avgRPM!.toFixed(2)}/mi</p>
+                    )}
                   </div>
                 </div>
               )}
@@ -702,14 +800,25 @@ const ForecastSummary = ({ onBack, deductions, userProfile }: ForecastSummaryPro
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {filteredLoads.map((load) => (
-                <div key={load.id} className="brutal-border bg-card p-4 brutal-shadow">
-                  <LoadCard
-                    load={load}
-                    onDelete={handleDeleteLoad}
-                  />
-                </div>
-              ))}
+              {filteredLoads.map((load) => {
+                const wMileage = weeklyMileageData[load.dateAdded];
+                const loadsInWeek = filteredLoads.filter(l => l.dateAdded === load.dateAdded).length;
+                const estMiles = (wMileage && wMileage.totalMiles > 0 && loadsInWeek > 0)
+                  ? wMileage.totalMiles / loadsInWeek
+                  : 500; // fallback per spec
+                return (
+                  <div key={load.id} className="brutal-border bg-card p-4 brutal-shadow">
+                    <LoadCard
+                      load={load}
+                      onDelete={handleDeleteLoad}
+                      onEdit={handleEditLoad}
+                      isEditing={editingLoad === load.id}
+                      setIsEditing={(editing) => setEditingLoad(editing ? load.id : null)}
+                      estimatedMiles={estMiles}
+                    />
+                  </div>
+                );
+              })}
             </CardContent>
           </Card>
         )}

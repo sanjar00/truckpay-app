@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { Plus, Truck } from 'lucide-react';
+import { useSubscription } from '@/hooks/useSubscription';
+import { isBefore, startOfDay } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import AddLoadForm from './AddLoadForm';
 import LoadCard from './LoadCard';
@@ -12,10 +14,12 @@ import { useLoadReports } from '@/hooks/useLoadReports';
 import { useDeductionsManager } from '@/hooks/useDeductionsManager';
 import { useMileageManager } from '@/hooks/useMileageManager';
 import { calculateFixedDeductionsForWeek } from '@/lib/loadReportsUtils';
+import { getUserWeekStart } from '@/lib/weeklyPeriodUtils';
 import { LoadReportsProps, DeleteConfirmation } from '@/types/LoadReports';
 import WeeklyForecastCard from './WeeklyForecastCard';
 
-const LoadReports = ({ onBack, user, userProfile, deductions }: LoadReportsProps) => {
+const LoadReports = ({ onBack, user, userProfile, deductions, onUpgrade }: LoadReportsProps) => {
+  const { isFeatureAllowed } = useSubscription();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<DeleteConfirmation | null>(null);
   const [showAddExtraDeduction, setShowAddExtraDeduction] = useState(false);
   const [newExtraDeduction, setNewExtraDeduction] = useState({ name: '', amount: '', date: new Date().toISOString().split('T')[0] });
@@ -104,6 +108,28 @@ const LoadReports = ({ onBack, user, userProfile, deductions }: LoadReportsProps
     }
   };
 
+  // Paywall: gate prev-week navigation for free users
+  const handleNavigateWeek = (direction: 'prev' | 'next') => {
+    if (direction === 'prev') {
+      const currentWeekStartDay = startOfDay(weekStart);
+      const todayWeekStart = startOfDay(getUserWeekStart(new Date(), userProfile));
+      if (isBefore(currentWeekStartDay, todayWeekStart) && !isFeatureAllowed('fullHistory')) {
+        onUpgrade?.();
+        return;
+      }
+    }
+    navigateWeek(direction);
+  };
+
+  // Paywall: gate 6th load for free users
+  const handleShowAddForm = () => {
+    if (!isFeatureAllowed('fullHistory') && currentWeekLoads.length >= 5) {
+      onUpgrade?.();
+      return;
+    }
+    setShowAddForm(true);
+  };
+
   const totalGrossPay = currentWeekLoads.reduce((total, load) => total + (load.rate || 0), 0);
   const totalDriverPay = currentWeekLoads.reduce((total, load) => total + (load.driverPay || 0), 0);
   const totalFixedDeductions = calculateFixedDeductionsForWeek(deductions, weekStart);
@@ -112,12 +138,12 @@ const LoadReports = ({ onBack, user, userProfile, deductions }: LoadReportsProps
   return (
     <div className="min-h-screen bg-background brutal-grid p-6">
       <div className="max-w-4xl mx-auto space-y-6">
-        <LoadReportsHeader 
+        <LoadReportsHeader
           onBack={onBack}
           weekStart={weekStart}
           weekEnd={weekEnd}
           userProfile={userProfile}
-          onNavigateWeek={navigateWeek}
+          onNavigateWeek={handleNavigateWeek}
         />
 
         <LoadSummaryCards 
@@ -137,12 +163,14 @@ const LoadReports = ({ onBack, user, userProfile, deductions }: LoadReportsProps
           weekStart={weekStart}
           weekEnd={weekEnd}
           currentGross={totalGrossPay}
+          currentDriverPay={totalDriverPay}
+          loadCount={currentWeekLoads.length}
           fixedDeductionsWeeklyTotal={totalFixedDeductions}
         />
 
         {/* Add New Load Button */}
-        <Button 
-          onClick={() => setShowAddForm(true)}
+        <Button
+          onClick={handleShowAddForm}
           className="w-full h-16 brutal-border-accent hover:brutal-border-info bg-accent hover:bg-accent text-accent-foreground brutal-hover brutal-active"
           size="lg"
         >

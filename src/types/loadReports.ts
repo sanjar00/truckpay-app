@@ -24,6 +24,7 @@ export interface LoadReportsProps {
   user: any;
   userProfile: any;
   deductions: any[];
+  onUpgrade?: () => void;
 }
 
 export interface WeeklyMileage {

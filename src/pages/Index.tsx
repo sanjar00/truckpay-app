@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { Truck, Calculator, Settings, DollarSign, FileText, LogOut, Receipt, Calendar, Map } from 'lucide-react';
+import { Truck, Calculator, Settings, DollarSign, FileText, LogOut, Receipt, Calendar, Map, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useSubscription } from '@/hooks/useSubscription';
@@ -18,13 +18,16 @@ import UpgradeModal from '@/components/UpgradeModal';
 
 const Index = () => {
   const { user, loading, signOut } = useAuth();
-  const { isFeatureAllowed } = useSubscription();
+  const { isFeatureAllowed, subscription, upgradeTo } = useSubscription();
   const [currentView, setCurrentView] = useState('dashboard');
   const [showRegistration, setShowRegistration] = useState(false);
   const [upgradeModal, setUpgradeModal] = useState<{ feature: string; tier: 'pro' | 'owner' } | null>(null);
   const [userProfile, setUserProfile] = useState(null);
   const [loads, setLoads] = useState([]);
   const [deductions, setDeductions] = useState([]);
+  const [earlyAdopterBannerDismissed, setEarlyAdopterBannerDismissed] = useState(
+    () => localStorage.getItem('truckpay_ea_banner_dismissed') === 'true'
+  );
 
   useEffect(() => {
     if (user) {
@@ -66,13 +69,13 @@ const Index = () => {
 
   const fetchUserProfile = async () => {
     if (!user) return;
-    
+
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', user.id)
       .single();
-      
+
     if (data) {
       setUserProfile({
         name: data.full_name,
@@ -83,6 +86,28 @@ const Index = () => {
         weeklyPeriod: data.weekly_period || 'sunday',
         weeklyPeriodUpdatedAt: data.weekly_period_updated_at
       });
+    }
+
+    // Early adopter check: if user has existing loads and is still on free tier
+    if (!subscription.earlyAdopter && subscription.tier === 'free') {
+      const today = new Date().toISOString().split('T')[0];
+      const { data: existingLoads } = await supabase
+        .from('load_reports')
+        .select('id')
+        .eq('user_id', user.id)
+        .lt('date_added', today)
+        .limit(1);
+      if (existingLoads && existingLoads.length > 0) {
+        localStorage.setItem('truckpay_early_adopter', 'true');
+        const endDate = new Date();
+        endDate.setDate(endDate.getDate() + 90);
+        upgradeTo('pro');
+        // Mark early adopter in subscription (upgradeTo sets endDate to 1 month — override)
+        const sub = JSON.parse(localStorage.getItem('truckpay_subscription') || '{}');
+        sub.earlyAdopter = true;
+        sub.endDate = endDate.toISOString();
+        localStorage.setItem('truckpay_subscription', JSON.stringify(sub));
+      }
     }
   };
 
@@ -136,19 +161,21 @@ const Index = () => {
     switch (currentView) {
       case 'loads':
         return (
-          <LoadReports 
+          <LoadReports
             user={user}
             userProfile={userProfile}
             onBack={() => setCurrentView('dashboard')}
             deductions={deductions}
+            onUpgrade={() => setUpgradeModal({ feature: 'fullHistory', tier: 'pro' })}
           />
         );
       case 'deductions':
         return (
-          <Deductions 
+          <Deductions
             deductions={deductions}
             setDeductions={setDeductions}
             onBack={() => setCurrentView('dashboard')}
+            onUpgrade={() => setUpgradeModal({ feature: 'AI Receipt Scanner', tier: 'pro' })}
           />
         );
       case 'forecast':
@@ -249,6 +276,24 @@ const Index = () => {
                 </div>
               </div>
 
+              {/* Early Adopter Banner */}
+              {subscription.earlyAdopter && !earlyAdopterBannerDismissed && subscription.endDate && (
+                <div className="brutal-border bg-primary/10 p-4 brutal-shadow flex items-center justify-between gap-3">
+                  <p className="brutal-mono text-sm text-foreground flex-1">
+                    🎉 Early Adopter Bonus: Pro free until {new Date(subscription.endDate).toLocaleDateString()}. Thank you for using TruckPay!
+                  </p>
+                  <button
+                    onClick={() => {
+                      setEarlyAdopterBannerDismissed(true);
+                      localStorage.setItem('truckpay_ea_banner_dismissed', 'true');
+                    }}
+                    className="text-muted-foreground hover:text-foreground flex-shrink-0"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+
               {/* Main Actions Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                 <Button 
@@ -297,8 +342,11 @@ const Index = () => {
 
                 <Button
                   onClick={() => navigateTo('perdiem', 'perdiem')}
-                  className="h-24 sm:h-32 brutal-border bg-info hover:bg-accent text-info-foreground hover:text-accent-foreground brutal-shadow-lg brutal-hover brutal-active p-4 sm:p-6 flex flex-col items-start justify-center"
+                  className="h-24 sm:h-32 brutal-border bg-info hover:bg-accent text-info-foreground hover:text-accent-foreground brutal-shadow-lg brutal-hover brutal-active p-4 sm:p-6 flex flex-col items-start justify-center relative"
                 >
+                  {!isFeatureAllowed('perdiem') && (
+                    <Lock className="w-4 h-4 absolute top-2 right-2 opacity-60" />
+                  )}
                   <Calendar className="w-6 h-6 sm:w-10 sm:h-10 mb-2 sm:mb-3" />
                   <div className="text-left">
                     <p className="brutal-text text-sm sm:text-xl mb-1">PER DIEM</p>
@@ -308,8 +356,11 @@ const Index = () => {
 
                 <Button
                   onClick={() => navigateTo('ifta', 'ifta')}
-                  className="h-24 sm:h-32 brutal-border bg-info hover:bg-accent text-info-foreground hover:text-accent-foreground brutal-shadow-lg brutal-hover brutal-active p-4 sm:p-6 flex flex-col items-start justify-center"
+                  className="h-24 sm:h-32 brutal-border bg-info hover:bg-accent text-info-foreground hover:text-accent-foreground brutal-shadow-lg brutal-hover brutal-active p-4 sm:p-6 flex flex-col items-start justify-center relative"
                 >
+                  {!isFeatureAllowed('ifta') && (
+                    <Lock className="w-4 h-4 absolute top-2 right-2 opacity-60" />
+                  )}
                   <Map className="w-6 h-6 sm:w-10 sm:h-10 mb-2 sm:mb-3" />
                   <div className="text-left">
                     <p className="brutal-text text-sm sm:text-xl mb-1">IFTA REPORT</p>
@@ -321,7 +372,7 @@ const Index = () => {
               {/* Footer */}
               <div className="brutal-border bg-muted p-3 sm:p-6 brutal-shadow text-center">
                 <p className="brutal-mono text-xs sm:text-sm text-muted-foreground mobile-text-wrap">
-                  TRUCKPAY V2.0
+                  TRUCKPAY V2.1
                 </p>
               </div>
             </div>

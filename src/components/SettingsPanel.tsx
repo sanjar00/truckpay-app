@@ -20,6 +20,26 @@ const SettingsPanel = ({ userProfile, setUserProfile, onBack }) => {
   const { toast } = useToast();
   const { user, signOut } = useAuth();
 
+  const [annualGoal, setAnnualGoal] = useState(() => localStorage.getItem('truckpay_annual_goal') || '');
+  const [weeklyGoalSetting, setWeeklyGoalSetting] = useState(() => localStorage.getItem('truckpay_weekly_goal') || '');
+  const [openAIKey, setOpenAIKey] = useState(() => localStorage.getItem('truckpay_openai_key') || '');
+  const [openAIKeySaved, setOpenAIKeySaved] = useState(false);
+
+  const storageUsedMB = (() => {
+    try {
+      let total = 0;
+      for (const key in localStorage) {
+        if (localStorage.hasOwnProperty(key)) {
+          total += (localStorage.getItem(key) || '').length * 2;
+        }
+      }
+      return (total / 1024 / 1024).toFixed(2);
+    } catch {
+      return '0.00';
+    }
+  })();
+  const storagePercent = Math.min(100, Math.round((parseFloat(storageUsedMB) / 5) * 100));
+
   const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     setHasChanges(true);
@@ -434,6 +454,103 @@ const SettingsPanel = ({ userProfile, setUserProfile, onBack }) => {
                 Changes to weekly period will be effective from today and won't affect historical data.
               </p>
             </div>
+          </div>
+        </div>
+
+        {/* Income Goals */}
+        <div className="brutal-border brutal-shadow-lg p-6 bg-success/5 mb-8">
+          <div className="flex items-center gap-3 mb-6">
+            <h2 className="text-xl brutal-text font-bold">INCOME GOALS</h2>
+          </div>
+          <div className="space-y-4">
+            <div>
+              <Label className="brutal-mono text-sm mb-2 block">ANNUAL INCOME GOAL ($)</Label>
+              <Input
+                type="number"
+                placeholder="e.g. 120000"
+                value={annualGoal}
+                onChange={e => {
+                  setAnnualGoal(e.target.value);
+                  localStorage.setItem('truckpay_annual_goal', e.target.value);
+                  // Auto-calculate weekly
+                  const weekly = e.target.value ? String(Math.round(parseFloat(e.target.value) / 52)) : '';
+                  setWeeklyGoalSetting(weekly);
+                  localStorage.setItem('truckpay_weekly_goal', weekly);
+                }}
+                className="brutal-border h-11"
+              />
+            </div>
+            <div>
+              <Label className="brutal-mono text-sm mb-2 block">WEEKLY INCOME GOAL ($)</Label>
+              <Input
+                type="number"
+                placeholder="Auto-calculated from annual"
+                value={weeklyGoalSetting}
+                onChange={e => {
+                  setWeeklyGoalSetting(e.target.value);
+                  localStorage.setItem('truckpay_weekly_goal', e.target.value);
+                }}
+                className="brutal-border h-11"
+              />
+              {annualGoal && (
+                <p className="brutal-mono text-xs text-muted-foreground mt-1">
+                  Auto-calculated: ${Math.round(parseFloat(annualGoal) / 52).toLocaleString()}/week
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* AI Receipt Scanner API Key */}
+        <div className="brutal-border brutal-shadow-lg p-6 bg-accent/5 mb-8">
+          <div className="flex items-center gap-3 mb-6">
+            <h2 className="text-xl brutal-text font-bold">AI RECEIPT SCANNER</h2>
+          </div>
+          <div className="space-y-3">
+            <Label className="brutal-mono text-sm mb-2 block">OPENAI API KEY</Label>
+            <Input
+              type="password"
+              placeholder="sk-proj-..."
+              value={openAIKey}
+              onChange={e => setOpenAIKey(e.target.value)}
+              className="brutal-border h-11 font-mono text-sm"
+            />
+            <Button
+              onClick={() => {
+                localStorage.setItem('truckpay_openai_key', openAIKey);
+                setOpenAIKeySaved(true);
+                setTimeout(() => setOpenAIKeySaved(false), 2000);
+              }}
+              className="brutal-border bg-primary text-primary-foreground brutal-hover"
+              size="sm"
+            >
+              {openAIKeySaved ? '✓ SAVED' : 'SAVE KEY'}
+            </Button>
+            <p className="brutal-mono text-xs text-muted-foreground">
+              Set <code>VITE_OPENAI_API_KEY</code> in .env (recommended), or enter it here as a fallback. Never shared with anyone.
+            </p>
+          </div>
+        </div>
+
+        {/* Storage Usage */}
+        <div className="brutal-border brutal-shadow-lg p-6 bg-muted/20 mb-8">
+          <h2 className="text-xl brutal-text font-bold mb-4">DATA MANAGEMENT</h2>
+          <div className="space-y-2">
+            <div className="flex justify-between brutal-mono text-sm">
+              <span>STORAGE USED</span>
+              <span>{storageUsedMB} MB / ~5 MB</span>
+            </div>
+            <div className="h-3 brutal-border bg-muted">
+              <div
+                className={`h-full transition-all ${storagePercent >= 80 ? 'bg-destructive' : 'bg-primary'}`}
+                style={{ width: `${storagePercent}%` }}
+              />
+            </div>
+            {storagePercent >= 80 && (
+              <p className="brutal-mono text-xs text-destructive font-bold">
+                ⚠ Storage almost full — export your data or clear old receipts
+              </p>
+            )}
           </div>
         </div>
 

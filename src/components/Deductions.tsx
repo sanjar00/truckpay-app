@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, ScanLine } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -19,6 +19,8 @@ import {
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import DeductionsSummary from './DeductionsSummary';
+import ReceiptScanner from './ReceiptScanner';
+import { useSubscription } from '@/hooks/useSubscription';
 import { formatCurrency } from '@/lib/utils';
 import { startOfWeek } from 'date-fns';
 
@@ -35,15 +37,18 @@ interface DeductionsProps {
   onBack: () => void;
   deductions: Deduction[];
   setDeductions: React.Dispatch<React.SetStateAction<Deduction[]>>;
+  onUpgrade?: () => void;
 }
 
-const Deductions = ({ onBack, deductions, setDeductions }: DeductionsProps) => {
+const Deductions = ({ onBack, deductions, setDeductions, onUpgrade }: DeductionsProps) => {
   const { user } = useAuth();
+  const { isFeatureAllowed } = useSubscription();
   const [fixedDeductions, setFixedDeductions] = useState({});
   const [newDeductionType, setNewDeductionType] = useState('');
   const [customDeductionTypes, setCustomDeductionTypes] = useState([]);
   const [loading, setLoading] = useState(false);
   const [pendingFixAction, setPendingFixAction] = useState<{type: string, checked: boolean} | null>(null);
+  const [showReceiptScanner, setShowReceiptScanner] = useState(false);
 
   // Fetch deductions from Supabase on component mount
   useEffect(() => {
@@ -312,9 +317,36 @@ const Deductions = ({ onBack, deductions, setDeductions }: DeductionsProps) => {
     .filter(d => d.isCustomType)
     .map(d => d.type)
     .filter((type, index, self) => self.indexOf(type) === index); // Remove duplicates
-  
+
   // Only use custom deduction types - no predefined types
   const allDeductionTypes = [...customTypesFromDeductions];
+
+  const handleScanReceiptClick = () => {
+    if (!isFeatureAllowed('receipts')) {
+      onUpgrade?.();
+      return;
+    }
+    setShowReceiptScanner(true);
+  };
+
+  const handleReceiptConfirm = async (receipts: any[]) => {
+    if (!user) return;
+    setShowReceiptScanner(false);
+    for (const r of receipts) {
+      if (!r.amount) continue;
+      const weekStart = r.date
+        ? startOfWeek(new Date(r.date), { weekStartsOn: 0 }).toISOString().split('T')[0]
+        : startOfWeek(new Date(), { weekStartsOn: 0 }).toISOString().split('T')[0];
+      const deductionName = r.merchant ? `${r.category} — ${r.merchant}` : r.category;
+      await supabase.from('weekly_extra_deductions').insert({
+        user_id: user.id,
+        week_start: weekStart,
+        name: deductionName,
+        amount: parseFloat(r.amount),
+        date_added: r.date || null,
+      });
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background brutal-grid p-3 sm:p-6">
@@ -467,6 +499,20 @@ const Deductions = ({ onBack, deductions, setDeductions }: DeductionsProps) => {
           </div>
         )}
 
+        {/* AI Receipt Scanner Button */}
+        <div className="brutal-border bg-gradient-to-r from-primary/20 to-accent/20 p-5 brutal-shadow-lg">
+          <Button
+            onClick={handleScanReceiptClick}
+            className="w-full h-14 brutal-border bg-primary text-primary-foreground brutal-shadow brutal-hover"
+          >
+            <ScanLine className="w-6 h-6 mr-3" />
+            <div className="text-left">
+              <p className="brutal-text text-base">SCAN RECEIPT WITH AI</p>
+              <p className="brutal-mono text-xs opacity-80">AI-POWERED</p>
+            </div>
+          </Button>
+        </div>
+
         {/* Add Custom Deduction Type */}
         <div className="brutal-border-accent bg-accent p-6 brutal-shadow-lg">
           <h2 className="brutal-text text-2xl text-accent-foreground mb-4">
@@ -518,6 +564,13 @@ const Deductions = ({ onBack, deductions, setDeductions }: DeductionsProps) => {
           </div>
         )}
       </div>
+
+      {showReceiptScanner && (
+        <ReceiptScanner
+          onClose={() => setShowReceiptScanner(false)}
+          onConfirm={handleReceiptConfirm}
+        />
+      )}
     </div>
   );
 };
