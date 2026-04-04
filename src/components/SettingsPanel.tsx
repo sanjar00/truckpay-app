@@ -127,7 +127,7 @@ const SettingsPanel = ({ userProfile, setUserProfile, onBack }) => {
       
       // Fetch all user data
       const [profileResponse, loadReportsResponse, deductionsResponse] = await Promise.all([
-        supabase.from('profiles').select('*').eq('id', user.id).single(),
+        supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
         supabase.from('load_reports').select('*').eq('user_id', user.id),
         supabase.from('deductions').select('*').eq('user_id', user.id)
       ]);

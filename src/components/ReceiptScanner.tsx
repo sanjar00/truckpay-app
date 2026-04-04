@@ -15,6 +15,7 @@ interface ScannedReceipt {
   amountUnclear: boolean;
   notAReceipt: boolean;
   apiFailed: boolean;
+  failReason?: string;
 }
 
 const CATEGORIES = ['FUEL', 'TOLL', 'MAINTENANCE', 'PARTS', 'FOOD', 'LODGING', 'OTHER'];
@@ -156,7 +157,7 @@ const ReceiptScanner = ({ onClose, onConfirm }: ReceiptScannerProps) => {
           notAReceipt: false,
           apiFailed: false,
         };
-      } catch {
+      } catch (err) {
         scanned = {
           id: crypto.randomUUID(),
           merchant: '',
@@ -168,6 +169,7 @@ const ReceiptScanner = ({ onClose, onConfirm }: ReceiptScannerProps) => {
           amountUnclear: false,
           notAReceipt: false,
           apiFailed: true,
+          failReason: err instanceof Error ? err.message : String(err),
         };
       }
 
@@ -287,9 +289,14 @@ const ReceiptScanner = ({ onClose, onConfirm }: ReceiptScannerProps) => {
                 )}
                 <div className="flex-1 min-w-0">
                   {r.apiFailed && (
-                    <div className="flex items-center gap-1 text-destructive brutal-mono text-xs mb-2">
-                      <AlertCircle className="w-3 h-3" />
-                      AI couldn't read this receipt — enter details manually
+                    <div className="flex flex-col gap-0.5 text-destructive brutal-mono text-xs mb-2">
+                      <div className="flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3 flex-shrink-0" />
+                        AI couldn't read this receipt — enter details manually
+                      </div>
+                      {r.failReason && (
+                        <span className="opacity-70 pl-4">{r.failReason}</span>
+                      )}
                     </div>
                   )}
                   {r.notAReceipt && (

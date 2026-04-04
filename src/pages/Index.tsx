@@ -74,7 +74,7 @@ const Index = () => {
       .from('profiles')
       .select('*')
       .eq('id', user.id)
-      .single();
+      .maybeSingle();
 
     if (data) {
       setUserProfile({
