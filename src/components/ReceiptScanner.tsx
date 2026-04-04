@@ -3,8 +3,6 @@ import { Camera, Upload, X, Check, AlertCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
 
 interface ScannedReceipt {
   id: string;
@@ -55,13 +53,16 @@ function toBase64(dataUrl: string): string {
   return dataUrl.split(',')[1];
 }
 
-async function analyzeReceiptWithOpenAI(base64Image: string, apiKey: string): Promise<{
+async function analyzeReceiptWithOpenAI(base64Image: string): Promise<{
   merchant: string;
   category: string;
   amount: number | null;
   date: string | null;
   notes: string;
 }> {
+  const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
+  if (!apiKey) throw new Error('VITE_OPENAI_API_KEY not set in .env');
+
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -71,17 +72,16 @@ async function analyzeReceiptWithOpenAI(base64Image: string, apiKey: string): Pr
     body: JSON.stringify({
       model: 'gpt-4o',
       max_tokens: 500,
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'image_url',
-              image_url: { url: `data:image/jpeg;base64,${base64Image}` },
-            },
-            {
-              type: 'text',
-              text: `Analyze this receipt or invoice for a truck driver.
+      messages: [{
+        role: 'user',
+        content: [
+          {
+            type: 'image_url',
+            image_url: { url: `data:image/jpeg;base64,${base64Image}` },
+          },
+          {
+            type: 'text',
+            text: `Analyze this receipt or invoice for a truck driver.
 Return ONLY a valid JSON object, no markdown, no explanation:
 {
   "merchant": "name of business or service provider",
@@ -96,20 +96,16 @@ Rules:
 - If date is not visible, use null
 - If amount is not clear, use null
 - merchant should be the business name only, not address`,
-            },
-          ],
-        },
-      ],
+          },
+        ],
+      }],
     }),
   });
 
-  if (!response.ok) {
-    throw new Error(`OpenAI API error: ${response.status}`);
-  }
+  if (!response.ok) throw new Error(`OpenAI error: ${response.status}`);
 
   const data = await response.json();
   const text = data.choices?.[0]?.message?.content || '';
-  // Strip markdown code fences if present
   const cleaned = text.replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/i, '').trim();
   return JSON.parse(cleaned);
 }
@@ -120,14 +116,11 @@ interface ReceiptScannerProps {
 }
 
 const ReceiptScanner = ({ onClose, onConfirm }: ReceiptScannerProps) => {
-  const { user } = useAuth();
   const [phase, setPhase] = useState<'select' | 'scanning' | 'review'>('select');
   const [receipts, setReceipts] = useState<ScannedReceipt[]>([]);
   const [scanProgress, setScanProgress] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
-
-  const apiKey = import.meta.env.VITE_OPENAI_API_KEY || localStorage.getItem('truckpay_openai_key') || '';
 
   const processFiles = async (files: File[]) => {
     if (files.length === 0) return;
@@ -147,37 +140,22 @@ const ReceiptScanner = ({ onClose, onConfirm }: ReceiptScannerProps) => {
         const storageImage = await compressImage(file, 800, 0.65);
         imageForStorage = storageImage;
 
-        if (!apiKey) {
-          scanned = {
-            id: crypto.randomUUID(),
-            merchant: '',
-            category: 'OTHER',
-            amount: '',
-            date: new Date().toISOString().split('T')[0],
-            notes: '',
-            imageDataUrl: storageImage,
-            amountUnclear: false,
-            notAReceipt: false,
-            apiFailed: true,
-          };
-        } else {
-          const result = await analyzeReceiptWithOpenAI(toBase64(apiImage), apiKey);
-          const today = new Date().toISOString().split('T')[0];
-          const amountUnclear = result.amount === null;
-          const category = CATEGORIES.includes(result.category) ? result.category : 'OTHER';
-          scanned = {
-            id: crypto.randomUUID(),
-            merchant: result.merchant || '',
-            category,
-            amount: result.amount !== null ? String(result.amount) : '',
-            date: result.date || today,
-            notes: result.notes || '',
-            imageDataUrl: storageImage,
-            amountUnclear,
-            notAReceipt: false,
-            apiFailed: false,
-          };
-        }
+        const result = await analyzeReceiptWithOpenAI(toBase64(apiImage));
+        const today = new Date().toISOString().split('T')[0];
+        const amountUnclear = result.amount === null;
+        const category = CATEGORIES.includes(result.category) ? result.category : 'OTHER';
+        scanned = {
+          id: crypto.randomUUID(),
+          merchant: result.merchant || '',
+          category,
+          amount: result.amount !== null ? String(result.amount) : '',
+          date: result.date || today,
+          notes: result.notes || '',
+          imageDataUrl: storageImage,
+          amountUnclear,
+          notAReceipt: false,
+          apiFailed: false,
+        };
       } catch {
         scanned = {
           id: crypto.randomUUID(),
@@ -232,12 +210,6 @@ const ReceiptScanner = ({ onClose, onConfirm }: ReceiptScannerProps) => {
               <X className="w-4 h-4" />
             </Button>
           </div>
-
-          {!apiKey && (
-            <div className="brutal-border p-3 bg-destructive/10 text-destructive brutal-mono text-xs">
-              No OpenAI API key set. Go to Settings to add your key.
-            </div>
-          )}
 
           <Button
             className="w-full h-14 brutal-border bg-primary text-primary-foreground brutal-shadow brutal-hover"
