@@ -1,9 +1,10 @@
 import { useState, useCallback, useRef } from 'react';
 
-const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 interface ZipInfo {
-  cityState: string;  // e.g. "Chicago, IL"
+  cityState: string;
   lat: number;
   lng: number;
 }
@@ -19,75 +20,6 @@ interface ZipLookupState {
   deliveryError: string | null;
 }
 
-// Cache to avoid duplicate API calls for same zip
-const zipCache: Record<string, ZipInfo | null> = {};
-
-async function geocodeZip(zip: string): Promise<ZipInfo | null> {
-  const trimmed = zip.trim();
-  if (!/^\d{5}$/.test(trimmed)) return null;
-
-  if (trimmed in zipCache) return zipCache[trimmed];
-
-  try {
-    console.log('GOOGLE_MAPS_API_KEY:', GOOGLE_MAPS_API_KEY ? 'present' : 'MISSING');
-    const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${trimmed}&components=country:US&language=en&key=${GOOGLE_MAPS_API_KEY}`;
-    console.log('Geocoding URL:', url);
-    const res = await fetch(url);
-    const data = await res.json();
-
-    console.log('Geocoding response:', data);
-    if (data.status !== 'OK' || !data.results?.length) {
-      zipCache[trimmed] = null;
-      return null;
-    }
-
-    const result = data.results[0];
-    const components = result.address_components as Array<{ long_name: string; short_name: string; types: string[] }>;
-
-    const city =
-      components.find(c => c.types.includes('locality'))?.long_name ||
-      components.find(c => c.types.includes('sublocality'))?.long_name ||
-      components.find(c => c.types.includes('administrative_area_level_3'))?.long_name ||
-      '';
-    const state =
-      components.find(c => c.types.includes('administrative_area_level_1'))?.short_name || '';
-
-    const cityState = city && state ? `${city}, ${state}` : state || '';
-    const { lat, lng } = result.geometry.location;
-
-    const info: ZipInfo = { cityState, lat, lng };
-    zipCache[trimmed] = info;
-    return info;
-  } catch {
-    return null;
-  }
-}
-
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-async function getDrivingMiles(origin: ZipInfo, destination: ZipInfo): Promise<number | null> {
-  try {
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/driving-distance`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-      },
-      body: JSON.stringify({
-        originLat: origin.lat,
-        originLng: origin.lng,
-        destLat: destination.lat,
-        destLng: destination.lng,
-      }),
-    });
-    const data = await res.json();
-    return data.miles ?? null;
-  } catch {
-    return null;
-  }
-}
-
 export function useZipLookup() {
   const [state, setState] = useState<ZipLookupState>({
     pickupInfo: null,
@@ -100,64 +32,111 @@ export function useZipLookup() {
     deliveryError: null,
   });
 
-  // Refs always hold the latest resolved info — no stale closure issues
-  const pickupInfoRef = useRef<ZipInfo | null>(null);
-  const deliveryInfoRef = useRef<ZipInfo | null>(null);
+  const pickupZipRef = useRef<string>('');
+  const deliveryZipRef = useRef<string>('');
 
-  const fetchDistance = useCallback(async (pickup: ZipInfo, delivery: ZipInfo) => {
+  const callEdgeFunction = useCallback(async (pickupZip: string, deliveryZip: string) => {
+    if (!pickupZip || !deliveryZip) return;
+
     setState(prev => ({ ...prev, loadingDistance: true }));
-    const miles = await getDrivingMiles(pickup, delivery);
-    setState(prev => ({ ...prev, estimatedMiles: miles, loadingDistance: false }));
-    return miles;
+
+    try {
+      const url = `${SUPABASE_URL}/functions/v1/driving-distance`;
+      console.log('Calling edge function:', url);
+      console.log('With ZIPs:', { pickupZip, deliveryZip });
+
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({
+          pickupZip,
+          deliveryZip,
+        }),
+      });
+
+      console.log('Edge function response status:', res.status);
+      const data = await res.json();
+      console.log('Edge function response data:', data);
+
+      if (data.error) {
+        console.log('Error from edge function:', data.error);
+        setState(prev => ({
+          ...prev,
+          pickupError: data.error.includes('Pickup') ? data.error : null,
+          deliveryError: data.error.includes('Delivery') ? data.error : null,
+          loadingDistance: false,
+        }));
+        return;
+      }
+
+      setState(prev => ({
+        ...prev,
+        pickupInfo: { cityState: data.pickupCityState, lat: 0, lng: 0 },
+        deliveryInfo: { cityState: data.deliveryCityState, lat: 0, lng: 0 },
+        estimatedMiles: data.miles,
+        loadingDistance: false,
+        pickupError: null,
+        deliveryError: null,
+      }));
+    } catch (err) {
+      setState(prev => ({ ...prev, loadingDistance: false, pickupError: 'Error looking up ZIPs' }));
+    }
   }, []);
 
   const lookupPickupZip = useCallback(async (zip: string) => {
-    if (!/^\d{5}$/.test(zip.trim())) {
-      setState(prev => ({ ...prev, pickupInfo: null, estimatedMiles: null, pickupError: zip.trim().length > 0 ? 'Enter a valid 5-digit ZIP' : null }));
-      pickupInfoRef.current = null;
+    const trimmed = zip.trim();
+    if (!/^\d{5}$/.test(trimmed)) {
+      setState(prev => ({
+        ...prev,
+        pickupInfo: null,
+        estimatedMiles: null,
+        pickupError: trimmed.length > 0 ? 'Enter a valid 5-digit ZIP' : null,
+      }));
+      pickupZipRef.current = '';
       return null;
     }
+
+    pickupZipRef.current = trimmed;
     setState(prev => ({ ...prev, loadingPickup: true, pickupError: null }));
-    const info = await geocodeZip(zip);
-    if (!info) {
-      setState(prev => ({ ...prev, loadingPickup: false, pickupInfo: null, pickupError: 'ZIP not found' }));
-      pickupInfoRef.current = null;
-      return null;
+
+    if (deliveryZipRef.current) {
+      await callEdgeFunction(trimmed, deliveryZipRef.current);
     }
-    pickupInfoRef.current = info;
-    setState(prev => ({ ...prev, loadingPickup: false, pickupInfo: info }));
-    // Use ref to get latest delivery info — avoids stale closure
-    if (deliveryInfoRef.current) {
-      await fetchDistance(info, deliveryInfoRef.current);
-    }
-    return info;
-  }, [fetchDistance]);
+
+    setState(prev => ({ ...prev, loadingPickup: false }));
+    return { cityState: '', lat: 0, lng: 0 };
+  }, [callEdgeFunction]);
 
   const lookupDeliveryZip = useCallback(async (zip: string) => {
-    if (!/^\d{5}$/.test(zip.trim())) {
-      setState(prev => ({ ...prev, deliveryInfo: null, estimatedMiles: null, deliveryError: zip.trim().length > 0 ? 'Enter a valid 5-digit ZIP' : null }));
-      deliveryInfoRef.current = null;
+    const trimmed = zip.trim();
+    if (!/^\d{5}$/.test(trimmed)) {
+      setState(prev => ({
+        ...prev,
+        deliveryInfo: null,
+        estimatedMiles: null,
+        deliveryError: trimmed.length > 0 ? 'Enter a valid 5-digit ZIP' : null,
+      }));
+      deliveryZipRef.current = '';
       return null;
     }
+
+    deliveryZipRef.current = trimmed;
     setState(prev => ({ ...prev, loadingDelivery: true, deliveryError: null }));
-    const info = await geocodeZip(zip);
-    if (!info) {
-      setState(prev => ({ ...prev, loadingDelivery: false, deliveryInfo: null, deliveryError: 'ZIP not found' }));
-      deliveryInfoRef.current = null;
-      return null;
+
+    if (pickupZipRef.current) {
+      await callEdgeFunction(pickupZipRef.current, trimmed);
     }
-    deliveryInfoRef.current = info;
-    setState(prev => ({ ...prev, loadingDelivery: false, deliveryInfo: info }));
-    // Use ref to get latest pickup info — avoids stale closure
-    if (pickupInfoRef.current) {
-      await fetchDistance(pickupInfoRef.current, info);
-    }
-    return info;
-  }, [fetchDistance]);
+
+    setState(prev => ({ ...prev, loadingDelivery: false }));
+    return { cityState: '', lat: 0, lng: 0 };
+  }, [callEdgeFunction]);
 
   const reset = useCallback(() => {
-    pickupInfoRef.current = null;
-    deliveryInfoRef.current = null;
+    pickupZipRef.current = '';
+    deliveryZipRef.current = '';
     setState({
       pickupInfo: null,
       deliveryInfo: null,
@@ -170,10 +149,7 @@ export function useZipLookup() {
     });
   }, []);
 
-  // Pre-populate from saved data (when editing an existing load)
   const preload = useCallback((pickupInfo: ZipInfo | null, deliveryInfo: ZipInfo | null, miles: number | null) => {
-    pickupInfoRef.current = pickupInfo;
-    deliveryInfoRef.current = deliveryInfo;
     setState(prev => ({
       ...prev,
       pickupInfo,

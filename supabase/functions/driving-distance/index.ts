@@ -11,10 +11,10 @@ serve(async (req) => {
   }
 
   try {
-    const { originLat, originLng, destLat, destLng } = await req.json();
+    const { pickupZip, deliveryZip } = await req.json();
 
-    if (originLat == null || originLng == null || destLat == null || destLng == null) {
-      return new Response(JSON.stringify({ error: 'originLat, originLng, destLat, destLng are required' }), {
+    if (!pickupZip || !deliveryZip) {
+      return new Response(JSON.stringify({ error: 'pickupZip and deliveryZip are required' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -28,22 +28,79 @@ serve(async (req) => {
       });
     }
 
-    const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${originLat},${originLng}&destinations=${destLat},${destLng}&mode=driving&units=imperial&key=${apiKey}`;
-    const res = await fetch(url);
-    const data = await res.json();
+    // Geocode pickup ZIP
+    const pickupGeoRes = await fetch(
+      `https://maps.googleapis.com/maps/api/geocode/json?address=${pickupZip}&components=country:US&language=en&key=${apiKey}`
+    );
+    const pickupGeoData = await pickupGeoRes.json();
 
-    const element = data.rows?.[0]?.elements?.[0];
-    if (element?.status !== 'OK') {
-      return new Response(JSON.stringify({ miles: null, error: 'Could not calculate distance' }), {
+    if (pickupGeoData.status !== 'OK' || !pickupGeoData.results?.length) {
+      return new Response(JSON.stringify({ error: 'Pickup ZIP not found' }), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // distance.value is in meters
+    // Geocode delivery ZIP
+    const deliveryGeoRes = await fetch(
+      `https://maps.googleapis.com/maps/api/geocode/json?address=${deliveryZip}&components=country:US&language=en&key=${apiKey}`
+    );
+    const deliveryGeoData = await deliveryGeoRes.json();
+
+    if (deliveryGeoData.status !== 'OK' || !deliveryGeoData.results?.length) {
+      return new Response(JSON.stringify({ error: 'Delivery ZIP not found' }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const pickupResult = pickupGeoData.results[0];
+    const deliveryResult = deliveryGeoData.results[0];
+
+    const pickupLat = pickupResult.geometry.location.lat;
+    const pickupLng = pickupResult.geometry.location.lng;
+    const deliveryLat = deliveryResult.geometry.location.lat;
+    const deliveryLng = deliveryResult.geometry.location.lng;
+
+    // Extract city and state from pickup
+    const pickupComponents = pickupResult.address_components as Array<{ long_name: string; short_name: string; types: string[] }>;
+    const pickupCity =
+      pickupComponents.find(c => c.types.includes('locality'))?.long_name ||
+      pickupComponents.find(c => c.types.includes('sublocality'))?.long_name ||
+      '';
+    const pickupState = pickupComponents.find(c => c.types.includes('administrative_area_level_1'))?.short_name || '';
+    const pickupCityState = pickupCity && pickupState ? `${pickupCity}, ${pickupState}` : pickupState || '';
+
+    // Extract city and state from delivery
+    const deliveryComponents = deliveryResult.address_components as Array<{ long_name: string; short_name: string; types: string[] }>;
+    const deliveryCity =
+      deliveryComponents.find(c => c.types.includes('locality'))?.long_name ||
+      deliveryComponents.find(c => c.types.includes('sublocality'))?.long_name ||
+      '';
+    const deliveryState = deliveryComponents.find(c => c.types.includes('administrative_area_level_1'))?.short_name || '';
+    const deliveryCityState = deliveryCity && deliveryState ? `${deliveryCity}, ${deliveryState}` : deliveryState || '';
+
+    // Get driving distance
+    const distanceRes = await fetch(
+      `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${pickupLat},${pickupLng}&destinations=${deliveryLat},${deliveryLng}&mode=driving&units=imperial&key=${apiKey}`
+    );
+    const distanceData = await distanceRes.json();
+
+    const element = distanceData.rows?.[0]?.elements?.[0];
+    if (element?.status !== 'OK') {
+      return new Response(JSON.stringify({ error: 'Could not calculate distance' }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const miles = Math.round(element.distance.value / 1609.344);
 
-    return new Response(JSON.stringify({ miles }), {
+    return new Response(JSON.stringify({
+      pickupCityState,
+      deliveryCityState,
+      miles,
+    }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
