@@ -41,11 +41,7 @@ export function useZipLookup() {
     setState(prev => ({ ...prev, loadingDistance: true }));
 
     try {
-      const url = `${SUPABASE_URL}/functions/v1/driving-distance`;
-      console.log('Calling edge function:', url);
-      console.log('With ZIPs:', { pickupZip, deliveryZip });
-
-      const res = await fetch(url, {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/driving-distance`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -57,12 +53,9 @@ export function useZipLookup() {
         }),
       });
 
-      console.log('Edge function response status:', res.status);
       const data = await res.json();
-      console.log('Edge function response data:', data);
 
       if (data.error) {
-        console.log('Error from edge function:', data.error);
         setState(prev => ({
           ...prev,
           pickupError: data.error.includes('Pickup') ? data.error : null,
