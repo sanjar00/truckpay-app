@@ -61,7 +61,8 @@ const LoadReports = ({ onBack, user, userProfile, deductions, onUpgrade }: LoadR
   const {
     weeklyMileage,
     handleMileageChange,
-    calculateRPM
+    calculateRPM,
+    autoFilledFields
   } = useMileageManager(user, weekStart);
 
   const handleDeleteLoad = async (id: string) => {
@@ -151,10 +152,11 @@ const LoadReports = ({ onBack, user, userProfile, deductions, onUpgrade }: LoadR
           totalGrossPay={totalGrossPay}
         />
 
-        <MileageTracking 
+        <MileageTracking
           weeklyMileage={weeklyMileage}
           onMileageChange={handleMileageChange}
           calculateRPM={() => calculateRPM(totalGrossPay)}
+          autoFilledFields={autoFilledFields}
         />
 
         <WeeklyForecastCard

@@ -8,6 +8,7 @@ export const useMileageManager = (user: any, weekStart: Date) => {
     endMileage: '',
     totalMiles: 0
   });
+  const [autoFilledFields, setAutoFilledFields] = useState({ startMileage: false, endMileage: false });
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isUserInputRef = useRef(false);
   const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -15,11 +16,11 @@ export const useMileageManager = (user: any, weekStart: Date) => {
 
   const fetchWeeklyMileage = async () => {
     if (!user || isLoading) return;
-    
+
     setIsLoading(true);
     try {
       const weekStartDate = weekStart.toISOString().split('T')[0];
-      
+
       const { data, error } = await supabase
         .from('weekly_mileage')
         .select('*')
@@ -33,22 +34,112 @@ export const useMileageManager = (user: any, weekStart: Date) => {
       }
 
       if (data && !isUserInputRef.current) {
+        let startMileage = data.start_mileage?.toString() || '';
+        let endMileage = data.end_mileage?.toString() || '';
+        let startAutoFilled = false;
+        let endAutoFilled = false;
+
+        // Auto-fill: If start mileage is empty, try to get it from previous week's end mileage
+        if (!startMileage && user) {
+          const prevWeekStart = new Date(weekStart);
+          prevWeekStart.setDate(prevWeekStart.getDate() - 7);
+          const prevWeekStartDate = prevWeekStart.toISOString().split('T')[0];
+
+          const { data: prevWeekData } = await supabase
+            .from('weekly_mileage')
+            .select('end_mileage')
+            .eq('user_id', user.id)
+            .eq('week_start', prevWeekStartDate)
+            .maybeSingle();
+
+          if (prevWeekData?.end_mileage) {
+            startMileage = prevWeekData.end_mileage.toString();
+            startAutoFilled = true;
+          }
+        }
+
+        // Auto-fill: If end mileage is empty, try to get it from next week's start mileage
+        if (!endMileage && user) {
+          const nextWeekStart = new Date(weekStart);
+          nextWeekStart.setDate(nextWeekStart.getDate() + 7);
+          const nextWeekStartDate = nextWeekStart.toISOString().split('T')[0];
+
+          const { data: nextWeekData } = await supabase
+            .from('weekly_mileage')
+            .select('start_mileage')
+            .eq('user_id', user.id)
+            .eq('week_start', nextWeekStartDate)
+            .maybeSingle();
+
+          if (nextWeekData?.start_mileage) {
+            endMileage = nextWeekData.start_mileage.toString();
+            endAutoFilled = true;
+          }
+        }
+
         // Compute safe totalMiles: only if both values are positive and difference is valid
-        const start = data.start_mileage || 0;
-        const end = data.end_mileage || 0;
+        const start = parseInt(startMileage) || 0;
+        const end = parseInt(endMileage) || 0;
         const rawTotal = (start > 0 && end > 0) ? Math.max(0, end - start) : 0;
         const safeTotalMiles = rawTotal > 15000 ? 0 : rawTotal;
+
         setWeeklyMileage({
-          startMileage: data.start_mileage?.toString() || '',
-          endMileage: data.end_mileage?.toString() || '',
+          startMileage: startMileage,
+          endMileage: endMileage,
           totalMiles: safeTotalMiles
         });
-      } else if (!data) {
-        setWeeklyMileage({
-          startMileage: '',
-          endMileage: '',
-          totalMiles: 0
+        setAutoFilledFields({
+          startMileage: startAutoFilled,
+          endMileage: endAutoFilled
         });
+      } else if (!data) {
+        // No data for this week - try to auto-fill both fields
+        if (user) {
+          const prevWeekStart = new Date(weekStart);
+          prevWeekStart.setDate(prevWeekStart.getDate() - 7);
+          const prevWeekStartDate = prevWeekStart.toISOString().split('T')[0];
+
+          const nextWeekStart = new Date(weekStart);
+          nextWeekStart.setDate(nextWeekStart.getDate() + 7);
+          const nextWeekStartDate = nextWeekStart.toISOString().split('T')[0];
+
+          const { data: prevWeekData } = await supabase
+            .from('weekly_mileage')
+            .select('end_mileage')
+            .eq('user_id', user.id)
+            .eq('week_start', prevWeekStartDate)
+            .maybeSingle();
+
+          const { data: nextWeekData } = await supabase
+            .from('weekly_mileage')
+            .select('start_mileage')
+            .eq('user_id', user.id)
+            .eq('week_start', nextWeekStartDate)
+            .maybeSingle();
+
+          const autoFilledStart = prevWeekData?.end_mileage?.toString() || '';
+          const autoFilledEnd = nextWeekData?.start_mileage?.toString() || '';
+
+          setWeeklyMileage({
+            startMileage: autoFilledStart,
+            endMileage: autoFilledEnd,
+            totalMiles: 0
+          });
+          setAutoFilledFields({
+            startMileage: !!autoFilledStart,
+            endMileage: !!autoFilledEnd
+          });
+        } else {
+          setWeeklyMileage({
+            startMileage: '',
+            endMileage: '',
+            totalMiles: 0
+          });
+          setAutoFilledFields({
+            startMileage: false,
+            endMileage: false
+          });
+        }
       }
     } catch (error) {
       console.error('Error fetching weekly mileage:', error);
@@ -147,6 +238,7 @@ export const useMileageManager = (user: any, weekStart: Date) => {
     weeklyMileage,
     setWeeklyMileage,
     handleMileageChange,
-    calculateRPM
+    calculateRPM,
+    autoFilledFields
   };
 };

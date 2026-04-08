@@ -1,26 +1,25 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
-import { MapPin, Calendar, Trash2, Edit, Save, X, MoreHorizontal, ChevronDown, ChevronUp } from 'lucide-react';
+import { MapPin, Calendar, Trash2, Edit, Save, X, MoreHorizontal, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { formatCurrency } from '@/lib/utils';
-import LocationCombobox from './LocationCombobox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
+import { useZipLookup } from '@/hooks/useZipLookup';
 
-function getProfitabilityGrade(driverPay: number, estimatedMiles: number) {
-  if (!estimatedMiles || estimatedMiles <= 0) return null;
-  const rpm = driverPay / estimatedMiles;
+function getProfitabilityGrade(driverPay: number, miles: number) {
+  if (!miles || miles <= 0) return null;
+  const rpm = driverPay / miles;
   if (rpm >= 2.50) return { score: 'A', label: 'EXCELLENT', color: 'bg-green-600 text-white', rpm };
   if (rpm >= 2.00) return { score: 'B', label: 'GOOD', color: 'bg-blue-600 text-white', rpm };
   if (rpm >= 1.50) return { score: 'C', label: 'AVERAGE', color: 'bg-yellow-500 text-black', rpm };
   return { score: 'D', label: 'POOR', color: 'bg-red-600 text-white', rpm };
 }
 
-// Helper function to format dates without timezone issues
 const formatDateForDB = (date: Date): string => {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -28,10 +27,9 @@ const formatDateForDB = (date: Date): string => {
   return `${year}-${month}-${day}`;
 };
 
-// Add this new helper function to parse dates without timezone issues
 const parseDateFromDB = (dateString: string): Date => {
   const [year, month, day] = dateString.split('-').map(Number);
-  return new Date(year, month - 1, day); // month is 0-indexed in Date constructor
+  return new Date(year, month - 1, day);
 };
 
 interface Load {
@@ -45,6 +43,19 @@ interface Load {
   deliveryDate?: string;
   dateAdded: string;
   weekPeriod: string;
+  deadheadMiles?: number;
+  dispatcherName?: string;
+  dispatcherCompany?: string;
+  dispatcherPhone?: string;
+  brokerName?: string;
+  brokerCompany?: string;
+  bolNumber?: string;
+  notes?: string;
+  pickupZip?: string;
+  deliveryZip?: string;
+  pickupCityState?: string;
+  deliveryCityState?: string;
+  estimatedMiles?: number;
 }
 
 interface LoadCardProps {
@@ -57,49 +68,70 @@ interface LoadCardProps {
 }
 
 const LoadCard = ({ load, onDelete, onEdit, isEditing, setIsEditing, estimatedMiles }: LoadCardProps) => {
-  const grade = estimatedMiles ? getProfitabilityGrade(load.driverPay, estimatedMiles) : null;
+  // Use load's own estimatedMiles if available, fall back to prop
+  const milesForGrade = load.estimatedMiles || estimatedMiles;
+  const grade = milesForGrade ? getProfitabilityGrade(load.driverPay, milesForGrade) : null;
+
   const [editData, setEditData] = useState({
     rate: load.rate.toString(),
     companyDeduction: load.companyDeduction.toString(),
-    locationFrom: load.locationFrom,
-    locationTo: load.locationTo,
-    pickupDate: load.pickupDate ? parseDateFromDB(load.pickupDate) : undefined,
-    deliveryDate: load.deliveryDate ? parseDateFromDB(load.deliveryDate) : undefined,
-    deadheadMiles: (load as any).deadheadMiles?.toString() || '',
-    dispatcherName: (load as any).dispatcherName || '',
-    dispatcherCompany: (load as any).dispatcherCompany || '',
-    dispatcherPhone: (load as any).dispatcherPhone || '',
-    brokerName: (load as any).brokerName || '',
-    brokerCompany: (load as any).brokerCompany || '',
-    bolNumber: (load as any).bolNumber || '',
-    notes: (load as any).notes || ''
+    pickupDate: load.pickupDate ? parseDateFromDB(load.pickupDate) : undefined as Date | undefined,
+    deliveryDate: load.deliveryDate ? parseDateFromDB(load.deliveryDate) : undefined as Date | undefined,
+    deadheadMiles: load.deadheadMiles?.toString() || '',
+    dispatcherName: load.dispatcherName || '',
+    dispatcherCompany: load.dispatcherCompany || '',
+    dispatcherPhone: load.dispatcherPhone || '',
+    brokerName: load.brokerName || '',
+    brokerCompany: load.brokerCompany || '',
+    bolNumber: load.bolNumber || '',
+    notes: load.notes || '',
+    pickupZip: load.pickupZip || '',
+    deliveryZip: load.deliveryZip || '',
+    estimatedMiles: load.estimatedMiles?.toString() || '',
   });
+
   const [pickupCalendarOpen, setPickupCalendarOpen] = useState(false);
   const [deliveryCalendarOpen, setDeliveryCalendarOpen] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [showOptional, setShowOptional] = useState(false);
 
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return 'Not set';
-    try {
-      // Use the same timezone-safe parsing as in editing mode
-      const [year, month, day] = dateString.split('-').map(Number);
-      const date = new Date(year, month - 1, day); // month is 0-indexed
-      return format(date, 'MMM dd, yyyy');
-    } catch {
-      return 'Invalid date';
+  const zip = useZipLookup();
+
+  // Pre-populate zip lookup state when entering edit mode
+  useEffect(() => {
+    if (isEditing && load.pickupZip && load.deliveryZip) {
+      zip.preload(
+        load.pickupCityState ? { cityState: load.pickupCityState, lat: 0, lng: 0 } : null,
+        load.deliveryCityState ? { cityState: load.deliveryCityState, lat: 0, lng: 0 } : null,
+        load.estimatedMiles ?? null
+      );
+    }
+  }, [isEditing]);
+
+  const handlePickupZipChange = (value: string) => {
+    setEditData(prev => ({ ...prev, pickupZip: value }));
+    if (value.length === 5) {
+      zip.lookupPickupZip(value);
+    }
+  };
+
+  const handleDeliveryZipChange = (value: string) => {
+    setEditData(prev => ({ ...prev, deliveryZip: value }));
+    if (value.length === 5) {
+      zip.lookupDeliveryZip(value);
     }
   };
 
   const handleSave = () => {
     if (onEdit) {
       const driverPay = parseFloat(editData.rate) * (1 - parseFloat(editData.companyDeduction) / 100);
+      const resolvedMiles = zip.estimatedMiles ?? (editData.estimatedMiles ? parseInt(editData.estimatedMiles) : undefined);
       onEdit(load.id, {
         rate: parseFloat(editData.rate),
         companyDeduction: parseFloat(editData.companyDeduction),
         driverPay,
-        locationFrom: editData.locationFrom,
-        locationTo: editData.locationTo,
+        locationFrom: zip.pickupInfo?.cityState || load.locationFrom,
+        locationTo: zip.deliveryInfo?.cityState || load.locationTo,
         pickupDate: editData.pickupDate ? formatDateForDB(editData.pickupDate) : undefined,
         deliveryDate: editData.deliveryDate ? formatDateForDB(editData.deliveryDate) : undefined,
         deadheadMiles: editData.deadheadMiles ? parseFloat(editData.deadheadMiles) : undefined,
@@ -109,7 +141,12 @@ const LoadCard = ({ load, onDelete, onEdit, isEditing, setIsEditing, estimatedMi
         brokerName: editData.brokerName || undefined,
         brokerCompany: editData.brokerCompany || undefined,
         bolNumber: editData.bolNumber || undefined,
-        notes: editData.notes || undefined
+        notes: editData.notes || undefined,
+        pickupZip: editData.pickupZip || undefined,
+        deliveryZip: editData.deliveryZip || undefined,
+        pickupCityState: zip.pickupInfo?.cityState || load.pickupCityState,
+        deliveryCityState: zip.deliveryInfo?.cityState || load.deliveryCityState,
+        estimatedMiles: resolvedMiles,
       });
     }
   };
@@ -118,21 +155,33 @@ const LoadCard = ({ load, onDelete, onEdit, isEditing, setIsEditing, estimatedMi
     setEditData({
       rate: load.rate.toString(),
       companyDeduction: load.companyDeduction.toString(),
-      locationFrom: load.locationFrom,
-      locationTo: load.locationTo,
       pickupDate: load.pickupDate ? parseDateFromDB(load.pickupDate) : undefined,
       deliveryDate: load.deliveryDate ? parseDateFromDB(load.deliveryDate) : undefined,
-      deadheadMiles: (load as any).deadheadMiles?.toString() || '',
-      dispatcherName: (load as any).dispatcherName || '',
-      dispatcherCompany: (load as any).dispatcherCompany || '',
-      dispatcherPhone: (load as any).dispatcherPhone || '',
-      brokerName: (load as any).brokerName || '',
-      brokerCompany: (load as any).brokerCompany || '',
-      bolNumber: (load as any).bolNumber || '',
-      notes: (load as any).notes || ''
+      deadheadMiles: load.deadheadMiles?.toString() || '',
+      dispatcherName: load.dispatcherName || '',
+      dispatcherCompany: load.dispatcherCompany || '',
+      dispatcherPhone: load.dispatcherPhone || '',
+      brokerName: load.brokerName || '',
+      brokerCompany: load.brokerCompany || '',
+      bolNumber: load.bolNumber || '',
+      notes: load.notes || '',
+      pickupZip: load.pickupZip || '',
+      deliveryZip: load.deliveryZip || '',
+      estimatedMiles: load.estimatedMiles?.toString() || '',
     });
     setShowOptional(false);
+    zip.reset();
     if (setIsEditing) setIsEditing(false);
+  };
+
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return 'Not set';
+    try {
+      const [year, month, day] = dateString.split('-').map(Number);
+      return format(new Date(year, month - 1, day), 'MMM dd, yyyy');
+    } catch {
+      return 'Invalid date';
+    }
   };
 
   if (isEditing) {
@@ -140,24 +189,74 @@ const LoadCard = ({ load, onDelete, onEdit, isEditing, setIsEditing, estimatedMi
       <Card className="border-l-4 border-l-orange-500">
         <CardContent className="p-4">
           <div className="space-y-4">
-            {/* Location Fields */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm font-medium mb-1 block">From State</label>
-                <LocationCombobox
-                  value={editData.locationFrom}
-                  onValueChange={(value) => setEditData(prev => ({ ...prev, locationFrom: value }))}
-                  placeholder="Select origin state..."
+            {/* Pickup ZIP */}
+            <div>
+              <label className="text-sm font-medium mb-1 block">Pickup ZIP Code</label>
+              <Input
+                type="text"
+                inputMode="numeric"
+                maxLength={5}
+                placeholder="e.g. 60601"
+                value={editData.pickupZip}
+                onChange={(e) => handlePickupZipChange(e.target.value)}
+                className="h-10"
+              />
+              {zip.loadingPickup && (
+                <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                  <Loader2 className="w-3 h-3 animate-spin" /> Looking up...
+                </p>
+              )}
+              {zip.pickupError && <p className="text-xs text-red-600 mt-1">{zip.pickupError}</p>}
+              {zip.pickupInfo && (
+                <p className="text-xs text-green-700 font-semibold mt-1">{zip.pickupInfo.cityState}</p>
+              )}
+              {!zip.pickupInfo && load.pickupCityState && (
+                <p className="text-xs text-muted-foreground mt-1">{load.pickupCityState}</p>
+              )}
+            </div>
+
+            {/* Delivery ZIP */}
+            <div>
+              <label className="text-sm font-medium mb-1 block">Delivery ZIP Code</label>
+              <Input
+                type="text"
+                inputMode="numeric"
+                maxLength={5}
+                placeholder="e.g. 77001"
+                value={editData.deliveryZip}
+                onChange={(e) => handleDeliveryZipChange(e.target.value)}
+                className="h-10"
+              />
+              {zip.loadingDelivery && (
+                <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                  <Loader2 className="w-3 h-3 animate-spin" /> Looking up...
+                </p>
+              )}
+              {zip.deliveryError && <p className="text-xs text-red-600 mt-1">{zip.deliveryError}</p>}
+              {zip.deliveryInfo && (
+                <p className="text-xs text-green-700 font-semibold mt-1">{zip.deliveryInfo.cityState}</p>
+              )}
+              {!zip.deliveryInfo && load.deliveryCityState && (
+                <p className="text-xs text-muted-foreground mt-1">{load.deliveryCityState}</p>
+              )}
+            </div>
+
+            {/* Estimated Miles */}
+            <div>
+              <label className="text-sm font-medium mb-1 block">Estimated Miles</label>
+              {zip.loadingDistance ? (
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Loader2 className="w-3 h-3 animate-spin" /> Calculating...
+                </p>
+              ) : (
+                <Input
+                  type="number"
+                  placeholder="Miles"
+                  value={zip.estimatedMiles ?? editData.estimatedMiles}
+                  onChange={(e) => setEditData(prev => ({ ...prev, estimatedMiles: e.target.value }))}
+                  className="h-10"
                 />
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-1 block">To State</label>
-                <LocationCombobox
-                  value={editData.locationTo}
-                  onValueChange={(value) => setEditData(prev => ({ ...prev, locationTo: value }))}
-                  placeholder="Select destination state..."
-                />
-              </div>
+              )}
             </div>
 
             {/* Date Fields */}
@@ -168,10 +267,7 @@ const LoadCard = ({ load, onDelete, onEdit, isEditing, setIsEditing, estimatedMi
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
-                      className={cn(
-                        "w-full justify-start text-left font-normal",
-                        !editData.pickupDate && "text-muted-foreground"
-                      )}
+                      className={cn("w-full justify-start text-left font-normal", !editData.pickupDate && "text-muted-foreground")}
                     >
                       <Calendar className="mr-2 h-4 w-4" />
                       {editData.pickupDate ? format(editData.pickupDate, "PPP") : "Select pickup date"}
@@ -181,10 +277,7 @@ const LoadCard = ({ load, onDelete, onEdit, isEditing, setIsEditing, estimatedMi
                     <CalendarComponent
                       mode="single"
                       selected={editData.pickupDate}
-                      onSelect={(date) => {
-                        setEditData(prev => ({ ...prev, pickupDate: date }));
-                        setPickupCalendarOpen(false);
-                      }}
+                      onSelect={(date) => { setEditData(prev => ({ ...prev, pickupDate: date })); setPickupCalendarOpen(false); }}
                       initialFocus
                     />
                   </PopoverContent>
@@ -196,10 +289,7 @@ const LoadCard = ({ load, onDelete, onEdit, isEditing, setIsEditing, estimatedMi
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
-                      className={cn(
-                        "w-full justify-start text-left font-normal",
-                        !editData.deliveryDate && "text-muted-foreground"
-                      )}
+                      className={cn("w-full justify-start text-left font-normal", !editData.deliveryDate && "text-muted-foreground")}
                     >
                       <Calendar className="mr-2 h-4 w-4" />
                       {editData.deliveryDate ? format(editData.deliveryDate, "PPP") : "Select delivery date"}
@@ -209,17 +299,8 @@ const LoadCard = ({ load, onDelete, onEdit, isEditing, setIsEditing, estimatedMi
                     <CalendarComponent
                       mode="single"
                       selected={editData.deliveryDate}
-                      onSelect={(date) => {
-                        setEditData(prev => ({ ...prev, deliveryDate: date }));
-                        setDeliveryCalendarOpen(false);
-                      }}
-                      disabled={(date) => {
-                        // Only disable dates before pickup date if pickup is selected
-                        if (editData.pickupDate && date < editData.pickupDate) {
-                          return true;
-                        }
-                        return false;
-                      }}
+                      onSelect={(date) => { setEditData(prev => ({ ...prev, deliveryDate: date })); setDeliveryCalendarOpen(false); }}
+                      disabled={(date) => editData.pickupDate ? date < editData.pickupDate : false}
                       initialFocus
                     />
                   </PopoverContent>
@@ -227,7 +308,7 @@ const LoadCard = ({ load, onDelete, onEdit, isEditing, setIsEditing, estimatedMi
               </div>
             </div>
 
-            {/* Rate and Deduction Fields */}
+            {/* Rate and Deduction */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="text-sm font-medium mb-1 block">Load Rate ($)</label>
@@ -236,7 +317,7 @@ const LoadCard = ({ load, onDelete, onEdit, isEditing, setIsEditing, estimatedMi
                   step="0.01"
                   value={editData.rate}
                   onChange={(e) => setEditData(prev => ({ ...prev, rate: e.target.value }))}
-                  placeholder="1200.00"
+                  placeholder="0.00"
                 />
               </div>
               <div>
@@ -265,9 +346,8 @@ const LoadCard = ({ load, onDelete, onEdit, isEditing, setIsEditing, estimatedMi
 
             {showOptional && (
               <div className="space-y-4 border-t pt-4">
-                {/* Deadhead Miles */}
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Deadhead Miles (empty miles to pickup)</label>
+                  <label className="text-sm font-medium">Deadhead Miles</label>
                   <Input
                     type="number"
                     placeholder="e.g. 45"
@@ -276,92 +356,45 @@ const LoadCard = ({ load, onDelete, onEdit, isEditing, setIsEditing, estimatedMi
                     className="h-10"
                   />
                 </div>
-
-                {/* Dispatcher */}
                 <div className="space-y-2">
                   <label className="text-sm font-semibold">Dispatcher</label>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    <Input
-                      placeholder="Name"
-                      value={editData.dispatcherName}
-                      onChange={(e) => setEditData(prev => ({ ...prev, dispatcherName: e.target.value }))}
-                      className="h-10"
-                    />
-                    <Input
-                      placeholder="Company"
-                      value={editData.dispatcherCompany}
-                      onChange={(e) => setEditData(prev => ({ ...prev, dispatcherCompany: e.target.value }))}
-                      className="h-10"
-                    />
-                    <Input
-                      placeholder="Phone"
-                      type="tel"
-                      value={editData.dispatcherPhone}
-                      onChange={(e) => setEditData(prev => ({ ...prev, dispatcherPhone: e.target.value }))}
-                      className="h-10"
-                    />
+                    <Input placeholder="Name" value={editData.dispatcherName} onChange={(e) => setEditData(prev => ({ ...prev, dispatcherName: e.target.value }))} className="h-10" />
+                    <Input placeholder="Company" value={editData.dispatcherCompany} onChange={(e) => setEditData(prev => ({ ...prev, dispatcherCompany: e.target.value }))} className="h-10" />
+                    <Input placeholder="Phone" type="tel" value={editData.dispatcherPhone} onChange={(e) => setEditData(prev => ({ ...prev, dispatcherPhone: e.target.value }))} className="h-10" />
                   </div>
                 </div>
-
-                {/* Broker */}
                 <div className="space-y-2">
                   <label className="text-sm font-semibold">Broker</label>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <Input
-                      placeholder="Broker Name"
-                      value={editData.brokerName}
-                      onChange={(e) => setEditData(prev => ({ ...prev, brokerName: e.target.value }))}
-                      className="h-10"
-                    />
-                    <Input
-                      placeholder="Broker Company"
-                      value={editData.brokerCompany}
-                      onChange={(e) => setEditData(prev => ({ ...prev, brokerCompany: e.target.value }))}
-                      className="h-10"
-                    />
+                    <Input placeholder="Broker Name" value={editData.brokerName} onChange={(e) => setEditData(prev => ({ ...prev, brokerName: e.target.value }))} className="h-10" />
+                    <Input placeholder="Broker Company" value={editData.brokerCompany} onChange={(e) => setEditData(prev => ({ ...prev, brokerCompany: e.target.value }))} className="h-10" />
                   </div>
                 </div>
-
-                {/* BOL & Notes */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <div className="space-y-1">
                     <label className="text-sm font-medium">BOL Number</label>
-                    <Input
-                      placeholder="Bill of Lading #"
-                      value={editData.bolNumber}
-                      onChange={(e) => setEditData(prev => ({ ...prev, bolNumber: e.target.value }))}
-                      className="h-10"
-                    />
+                    <Input placeholder="Bill of Lading #" value={editData.bolNumber} onChange={(e) => setEditData(prev => ({ ...prev, bolNumber: e.target.value }))} className="h-10" />
                   </div>
                   <div className="space-y-1">
                     <label className="text-sm font-medium">Notes</label>
-                    <Input
-                      placeholder="Notes..."
-                      value={editData.notes}
-                      onChange={(e) => setEditData(prev => ({ ...prev, notes: e.target.value }))}
-                      className="h-10"
-                    />
+                    <Input placeholder="Notes..." value={editData.notes} onChange={(e) => setEditData(prev => ({ ...prev, notes: e.target.value }))} className="h-10" />
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Action Buttons */}
             <div className="flex gap-2 justify-end">
               <Button
                 onClick={handleSave}
                 size="sm"
                 className="bg-green-600 hover:bg-green-700"
-                disabled={!editData.rate || !editData.companyDeduction || !editData.locationFrom || !editData.locationTo}
+                disabled={!editData.rate || !editData.companyDeduction || !editData.pickupZip || !editData.deliveryZip}
               >
                 <Save className="w-4 h-4 mr-1" />
                 Save
               </Button>
-              <Button
-                onClick={handleCancel}
-                variant="outline"
-                size="sm"
-              >
+              <Button onClick={handleCancel} variant="outline" size="sm">
                 <X className="w-4 h-4 mr-1" />
                 Cancel
               </Button>
@@ -372,22 +405,37 @@ const LoadCard = ({ load, onDelete, onEdit, isEditing, setIsEditing, estimatedMi
     );
   }
 
+  // View mode
+  const pickupLabel = load.pickupZip
+    ? `${load.pickupZip}${load.pickupCityState ? ` · ${load.pickupCityState}` : ''}`
+    : load.locationFrom;
+  const deliveryLabel = load.deliveryZip
+    ? `${load.deliveryZip}${load.deliveryCityState ? ` · ${load.deliveryCityState}` : ''}`
+    : load.locationTo;
+
   return (
     <Card className="border-l-4 border-l-blue-500">
       <CardContent className="p-4">
         <div className="flex justify-between items-start">
           <div className="flex-1">
-            <div className="flex items-center gap-2 mb-2">
-              <MapPin className="w-4 h-4 text-gray-500" />
-              <span className="font-medium">{load.locationFrom} → {load.locationTo}</span>
+            <div className="flex items-start gap-2 mb-2">
+              <MapPin className="w-4 h-4 text-gray-500 mt-0.5 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-sm leading-tight">{pickupLabel}</p>
+                <p className="text-xs text-gray-400 my-0.5">↓</p>
+                <p className="font-medium text-sm leading-tight">{deliveryLabel}</p>
+              </div>
               {grade && (
-                <span className={`ml-auto text-xs font-bold px-2 py-0.5 rounded ${grade.color}`}>
+                <span className={`shrink-0 text-xs font-bold px-2 py-0.5 rounded ${grade.color}`}>
                   {grade.score} · ${grade.rpm.toFixed(2)}/mi
                 </span>
               )}
             </div>
-            
-            {/* Date Information */}
+
+            {load.estimatedMiles && (
+              <p className="text-xs text-muted-foreground mb-2">{load.estimatedMiles.toLocaleString()} miles</p>
+            )}
+
             <div className="flex items-center gap-4 mb-3 text-sm text-gray-600">
               <div className="flex items-center gap-1">
                 <Calendar className="w-3 h-3" />
@@ -398,7 +446,7 @@ const LoadCard = ({ load, onDelete, onEdit, isEditing, setIsEditing, estimatedMi
                 <span>Delivery: {formatDate(load.deliveryDate)}</span>
               </div>
             </div>
-            
+
             <div className="grid grid-cols-3 gap-4 text-sm">
               <div>
                 <p className="text-gray-600 text-xs">Driver Pay</p>
@@ -414,64 +462,38 @@ const LoadCard = ({ load, onDelete, onEdit, isEditing, setIsEditing, estimatedMi
               </div>
             </div>
           </div>
+
           <div className="flex gap-2">
-            {/* Desktop buttons - hidden on mobile */}
             <div className="hidden sm:flex gap-2">
               {onEdit && setIsEditing && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setIsEditing(true)}
-                  className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                >
+                <Button variant="ghost" size="sm" onClick={() => setIsEditing(true)} className="text-blue-600 hover:text-blue-700 hover:bg-blue-50">
                   <Edit className="w-4 h-4" />
                 </Button>
               )}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onDelete(load.id)}
-                className="text-red-600 hover:text-red-700 hover:bg-red-50"
-              >
+              <Button variant="ghost" size="sm" onClick={() => onDelete(load.id)} className="text-red-600 hover:text-red-700 hover:bg-red-50">
                 <Trash2 className="w-4 h-4" />
               </Button>
             </div>
-            
-            {/* Mobile 3-dot menu */}
+
             <div className="sm:hidden relative">
-              <Button
-                onClick={() => setShowMobileMenu(!showMobileMenu)}
-                variant="ghost"
-                size="sm"
-                className="p-1"
-              >
+              <Button onClick={() => setShowMobileMenu(!showMobileMenu)} variant="ghost" size="sm" className="p-1">
                 <MoreHorizontal className="w-4 h-4" />
               </Button>
-              
-              {/* Mobile dropdown menu */}
               {showMobileMenu && (
                 <div className="absolute right-0 top-8 bg-white border border-gray-200 rounded-md shadow-lg z-10 min-w-[120px]">
                   {onEdit && setIsEditing && (
                     <button
-                      onClick={() => {
-                        setIsEditing(true);
-                        setShowMobileMenu(false);
-                      }}
+                      onClick={() => { setIsEditing(true); setShowMobileMenu(false); }}
                       className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
                     >
-                      <Edit className="w-4 h-4" />
-                      Edit
+                      <Edit className="w-4 h-4" /> Edit
                     </button>
                   )}
                   <button
-                    onClick={() => {
-                      onDelete(load.id);
-                      setShowMobileMenu(false);
-                    }}
+                    onClick={() => { onDelete(load.id); setShowMobileMenu(false); }}
                     className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 text-red-600 flex items-center gap-2"
                   >
-                    <Trash2 className="w-4 h-4" />
-                    Delete
+                    <Trash2 className="w-4 h-4" /> Delete
                   </button>
                 </div>
               )}

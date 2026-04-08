@@ -13,12 +13,12 @@ export const getWeeklyPeriodDisplay = (weeklyPeriod: string) => {
 
 export const calculateFixedDeductionsForWeek = (deductions: any[], weekStartDate: Date) => {
   if (!deductions) return 0;
-  
+
   const weekStartString = weekStartDate.toISOString().split('T')[0];
-  
+
   // Group deductions by type
   const deductionsByType = deductions
-    .filter(d => d.isFixed)
+    .filter(d => d.isFixed) // Only include active fixed deductions
     .reduce((acc, deduction) => {
       if (!acc[deduction.type]) {
         acc[deduction.type] = [];
@@ -26,21 +26,29 @@ export const calculateFixedDeductionsForWeek = (deductions: any[], weekStartDate
       acc[deduction.type].push(deduction);
       return acc;
     }, {} as Record<string, typeof deductions>);
-  
+
   let totalFixedDeductions = 0;
-  
+
   // For each deduction type, find the amount that was effective for this week
   Object.values(deductionsByType).forEach(typeDeductions => {
     // Get all deductions for this type that were effective on or before this week
+    // Parse the date properly to compare (extract just the date part from dateAdded which may be ISO string)
     const applicableDeductions = typeDeductions
-      .filter(d => (d.dateAdded || d.created_at) <= weekStartString)
-      .sort((a, b) => (b.dateAdded || b.created_at).localeCompare(a.dateAdded || a.created_at));
-    
+      .filter(d => {
+        const dateStr = d.dateAdded ? d.dateAdded.split('T')[0] : (d.created_at ? d.created_at.split('T')[0] : null);
+        return dateStr && dateStr <= weekStartString;
+      })
+      .sort((a, b) => {
+        const dateA = a.dateAdded ? a.dateAdded.split('T')[0] : (a.created_at ? a.created_at.split('T')[0] : '');
+        const dateB = b.dateAdded ? b.dateAdded.split('T')[0] : (b.created_at ? b.created_at.split('T')[0] : '');
+        return dateB.localeCompare(dateA); // Descending order (most recent first)
+      });
+
     // Use the most recent amount that was effective for this week
     if (applicableDeductions.length > 0) {
       totalFixedDeductions += applicableDeductions[0].amount;
     }
   });
-  
+
   return totalFixedDeductions;
 };

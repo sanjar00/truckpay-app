@@ -1,6 +1,6 @@
 
 import { useState } from 'react';
-import { DollarSign, Percent, Calendar as CalendarIcon, ChevronDown, ChevronUp } from 'lucide-react';
+import { DollarSign, Percent, Calendar as CalendarIcon, ChevronDown, ChevronUp, MapPin, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,24 +9,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
-import LocationCombobox from './LocationCombobox';
-
-interface NewLoad {
-  rate: string;
-  companyDeduction: string;
-  locationFrom: string;
-  locationTo: string;
-  pickupDate?: Date;
-  deliveryDate?: Date;
-  deadheadMiles?: string;
-  dispatcherName?: string;
-  dispatcherCompany?: string;
-  dispatcherPhone?: string;
-  brokerName?: string;
-  brokerCompany?: string;
-  bolNumber?: string;
-  notes?: string;
-}
+import { useZipLookup } from '@/hooks/useZipLookup';
+import { NewLoad } from '@/types/loadReports';
 
 interface AddLoadFormProps {
   newLoad: NewLoad;
@@ -51,9 +35,49 @@ const AddLoadForm = ({
   const [deliveryCalendarOpen, setDeliveryCalendarOpen] = useState(false);
   const [showOptional, setShowOptional] = useState(false);
 
+  const zip = useZipLookup();
+
   const driverPayPreview = newLoad.rate && newLoad.companyDeduction
     ? (parseFloat(newLoad.rate) * (1 - parseFloat(newLoad.companyDeduction) / 100)).toFixed(2)
     : null;
+
+  const handlePickupZipChange = (value: string) => {
+    setNewLoad({ ...newLoad, pickupZip: value, pickupCityState: '', estimatedMiles: undefined });
+    if (value.length === 5) {
+      zip.lookupPickupZip(value).then(info => {
+        if (info) {
+          setNewLoad({
+            ...newLoad,
+            pickupZip: value,
+            pickupCityState: info.cityState,
+            locationFrom: info.cityState,
+          });
+        }
+      });
+    }
+  };
+
+  const handleDeliveryZipChange = (value: string) => {
+    setNewLoad({ ...newLoad, deliveryZip: value, deliveryCityState: '', estimatedMiles: undefined });
+    if (value.length === 5) {
+      zip.lookupDeliveryZip(value).then(info => {
+        if (info) {
+          setNewLoad({
+            ...newLoad,
+            deliveryZip: value,
+            deliveryCityState: info.cityState,
+            locationTo: info.cityState,
+          });
+        }
+      });
+    }
+  };
+
+  // Sync estimated miles into newLoad then submit
+  const handleAddLoad = () => {
+    setNewLoad({ ...newLoad, estimatedMiles: zip.estimatedMiles ?? newLoad.estimatedMiles });
+    onAddLoad();
+  };
 
   return (
     <Card>
@@ -64,29 +88,89 @@ const AddLoadForm = ({
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Location From */}
+
+        {/* Pickup ZIP */}
         <div className="space-y-2">
           <Label className="flex items-center gap-2">
-            From State
+            <MapPin className="w-4 h-4" />
+            Pickup ZIP Code
           </Label>
-          <LocationCombobox
-            value={newLoad.locationFrom}
-            onValueChange={(value) => setNewLoad({ ...newLoad, locationFrom: value })}
-            placeholder="Select origin state..."
+          <Input
+            type="text"
+            inputMode="numeric"
+            maxLength={5}
+            placeholder="e.g. 60601"
+            value={newLoad.pickupZip || ''}
+            onChange={(e) => handlePickupZipChange(e.target.value)}
+            className="h-12"
           />
+          {zip.loadingPickup && (
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              <Loader2 className="w-3 h-3 animate-spin" /> Looking up ZIP...
+            </p>
+          )}
+          {zip.pickupError && (
+            <p className="text-xs text-red-600">{zip.pickupError}</p>
+          )}
+          {zip.pickupInfo && (
+            <p className="text-xs text-green-700 font-semibold brutal-mono">
+              {zip.pickupInfo.cityState}
+            </p>
+          )}
         </div>
 
-        {/* Location To */}
+        {/* Delivery ZIP */}
         <div className="space-y-2">
           <Label className="flex items-center gap-2">
-            To State
+            <MapPin className="w-4 h-4" />
+            Delivery ZIP Code
           </Label>
-          <LocationCombobox
-            value={newLoad.locationTo}
-            onValueChange={(value) => setNewLoad({ ...newLoad, locationTo: value })}
-            placeholder="Select destination state..."
+          <Input
+            type="text"
+            inputMode="numeric"
+            maxLength={5}
+            placeholder="e.g. 77001"
+            value={newLoad.deliveryZip || ''}
+            onChange={(e) => handleDeliveryZipChange(e.target.value)}
+            className="h-12"
           />
+          {zip.loadingDelivery && (
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              <Loader2 className="w-3 h-3 animate-spin" /> Looking up ZIP...
+            </p>
+          )}
+          {zip.deliveryError && (
+            <p className="text-xs text-red-600">{zip.deliveryError}</p>
+          )}
+          {zip.deliveryInfo && (
+            <p className="text-xs text-green-700 font-semibold brutal-mono">
+              {zip.deliveryInfo.cityState}
+            </p>
+          )}
         </div>
+
+        {/* Estimated Miles (auto-filled, but editable) */}
+        {(zip.pickupInfo && zip.deliveryInfo) && (
+          <div className="space-y-2">
+            <Label className="text-sm">Estimated Miles</Label>
+            {zip.loadingDistance ? (
+              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                <Loader2 className="w-3 h-3 animate-spin" /> Calculating distance...
+              </p>
+            ) : (
+              <Input
+                type="number"
+                placeholder="Miles"
+                value={zip.estimatedMiles ?? newLoad.estimatedMiles ?? ''}
+                onChange={(e) => setNewLoad({ ...newLoad, estimatedMiles: e.target.value ? parseInt(e.target.value) : undefined })}
+                className="h-10"
+              />
+            )}
+            {zip.estimatedMiles != null && !zip.loadingDistance && (
+              <p className="text-xs text-muted-foreground">Auto-filled via Google Maps — you can edit if needed</p>
+            )}
+          </div>
+        )}
 
         {/* Pickup Date */}
         <div className="space-y-2">
@@ -115,7 +199,7 @@ const AddLoadForm = ({
                   setNewLoad({ ...newLoad, pickupDate: date });
                   setPickupCalendarOpen(false);
                 }}
-                disabled={(date) => 
+                disabled={(date) =>
                   date < weekStart || date > weekEnd
                 }
                 initialFocus
@@ -124,7 +208,7 @@ const AddLoadForm = ({
           </Popover>
         </div>
 
-        {/* Delivery Date - Remove future date restriction */}
+        {/* Delivery Date */}
         <div className="space-y-2">
           <Label className="flex items-center gap-2">
             <CalendarIcon className="w-4 h-4" />
@@ -153,11 +237,7 @@ const AddLoadForm = ({
                 }}
                 initialFocus
                 disabled={(date) => {
-                  // Only disable dates before pickup date if pickup is selected
-                  // Remove the weekly period restriction for delivery dates
-                  if (newLoad.pickupDate && date < newLoad.pickupDate) {
-                    return true;
-                  }
+                  if (newLoad.pickupDate && date < newLoad.pickupDate) return true;
                   return false;
                 }}
               />
@@ -266,9 +346,9 @@ const AddLoadForm = ({
         {/* Action Buttons */}
         <div className="flex gap-3 pt-4">
           <Button
-            onClick={onAddLoad}
+            onClick={handleAddLoad}
             className="flex-1 bg-green-600 hover:bg-green-700"
-            disabled={loading || !newLoad.rate || !newLoad.locationFrom || !newLoad.locationTo}
+            disabled={loading || !newLoad.rate || !newLoad.pickupZip || !newLoad.deliveryZip || !zip.pickupInfo || !zip.deliveryInfo}
           >
             {loading ? 'Adding...' : 'Add Load'}
           </Button>

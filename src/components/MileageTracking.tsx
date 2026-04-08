@@ -5,20 +5,21 @@ interface MileageTrackingProps {
   weeklyMileage: WeeklyMileage;
   onMileageChange: (field: 'startMileage' | 'endMileage', value: string) => void;
   calculateRPM: () => number;
+  autoFilledFields?: { startMileage?: boolean; endMileage?: boolean };
 }
 
-const MileageTracking = ({ weeklyMileage, onMileageChange, calculateRPM }: MileageTrackingProps) => {
+const MileageTracking = ({ weeklyMileage, onMileageChange, calculateRPM, autoFilledFields = {} }: MileageTrackingProps) => {
   return (
     <div className="brutal-border-accent bg-accent/10 p-6 brutal-shadow">
       <div className="flex items-center gap-3 mb-4">
         <Navigation className="w-6 h-6 text-accent-foreground" />
-        <h3 className="brutal-text text-xl text-accent-foreground">WEEKLY_MILEAGE</h3>
+        <h3 className="brutal-text text-xl text-accent-foreground">Miles This Week</h3>
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
         <div>
           <label className="brutal-mono text-sm text-accent-foreground mb-2 block">
-            START_OF_WEEK_MILEAGE
+            ODOMETER MONDAY
           </label>
           <input
             type="number"
@@ -27,11 +28,16 @@ const MileageTracking = ({ weeklyMileage, onMileageChange, calculateRPM }: Milea
             onChange={(e) => onMileageChange('startMileage', e.target.value)}
             className="w-full p-3 brutal-border bg-background text-foreground brutal-mono"
           />
+          {autoFilledFields.startMileage && weeklyMileage.startMileage && (
+            <p className="brutal-mono text-xs text-accent-foreground opacity-70 mt-1">
+              Auto-filled from previous week
+            </p>
+          )}
         </div>
-        
+
         <div>
           <label className="brutal-mono text-sm text-accent-foreground mb-2 block">
-            END_OF_WEEK_MILEAGE
+            ODOMETER SUNDAY
           </label>
           <input
             type="number"
@@ -40,6 +46,11 @@ const MileageTracking = ({ weeklyMileage, onMileageChange, calculateRPM }: Milea
             onChange={(e) => onMileageChange('endMileage', e.target.value)}
             className="w-full p-3 brutal-border bg-background text-foreground brutal-mono"
           />
+          {autoFilledFields.endMileage && weeklyMileage.endMileage && (
+            <p className="brutal-mono text-xs text-accent-foreground opacity-70 mt-1">
+              Auto-filled from next week
+            </p>
+          )}
         </div>
       </div>
       
@@ -48,16 +59,16 @@ const MileageTracking = ({ weeklyMileage, onMileageChange, calculateRPM }: Milea
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Miles Driven Display */}
           <div className="brutal-border-success bg-success p-4 brutal-shadow text-center">
-            <p className="brutal-mono text-sm text-success-foreground mb-1">MILES_DRIVEN_THIS_WEEK</p>
+            <p className="brutal-mono text-sm text-success-foreground mb-1">Miles Driven</p>
             <p className="brutal-text text-2xl text-success-foreground">{weeklyMileage.totalMiles.toLocaleString()}</p>
-            <p className="brutal-mono text-xs text-success-foreground opacity-80">TOTAL_MILES</p>
+            <p className="brutal-mono text-xs text-success-foreground opacity-80">Total</p>
           </div>
-          
+
           {/* Rate Per Mile Display */}
           <div className="brutal-border-warning bg-warning p-4 brutal-shadow text-center">
-            <p className="brutal-mono text-sm text-warning-foreground mb-1">RATE_PER_MILE_(RPM)</p>
+            <p className="brutal-mono text-sm text-warning-foreground mb-1">Rate Per Mile</p>
             <p className="brutal-text text-2xl text-warning-foreground">${calculateRPM().toFixed(2)}</p>
-            <p className="brutal-mono text-xs text-warning-foreground opacity-80">PER_MILE</p>
+            <p className="brutal-mono text-xs text-warning-foreground opacity-80">per mile</p>
           </div>
         </div>
       )}

@@ -11,37 +11,38 @@ TruckPay (truckpay.app) is a Progressive Web App (PWA) for truck drivers to trac
 their weekly earnings, deductions, and expenses. It is built and maintained by
 Sanjar Azizov. The app is currently in active use by real truck drivers.
 
-The app is **vanilla JavaScript, HTML, and CSS — no frameworks, no build tools,
-no backend**. All data is stored in the browser's localStorage. It must work
-fully offline. Do not introduce React, Vue, npm packages, or any external
-dependencies unless explicitly asked.
-
 Current live version: **V2.1**
 
 ---
 
 ## Tech Stack
 
-- **Frontend:** Vanilla JS, HTML5, CSS3
-- **Storage:** localStorage only (no backend, no database)
-- **Hosting:** truckpay.app (Netlify or similar static host)
+- **Frontend:** React 18, TypeScript, Vite
+- **UI Components:** shadcn/ui (Button, Input, Card, Popover, Calendar, Select, etc.)
+- **Styling:** Tailwind CSS + custom brutal design system classes
+- **Database:** Supabase (PostgreSQL)
+- **Authentication:** Supabase Auth
 - **AI integration:** Anthropic Claude API (claude-sonnet-4-20250514) for
   receipt scanning via vision — called directly from client-side fetch()
-- **No build step** — edit files directly, changes go live immediately
-- **PWA** — has a service worker and manifest.json for installability
+- **Utilities:** date-fns for date manipulation, lucide-react for icons
+- **PWA:** Service worker and manifest.json for installability
+- **Hosting:** Netlify (or similar)
 
 ---
 
 ## File Structure
 
-The app is likely a single `index.html` with embedded or linked:
-- All JS in one or a few `.js` files
-- All CSS in one or a few `.css` files
-- `manifest.json` for PWA
-- `sw.js` for service worker
+Standard React + Vite project structure:
+- `src/pages/` — page components (Index.tsx = Home, LoadReports.tsx, etc.)
+- `src/components/` — reusable components (LoadCard, AddLoadForm, ReceiptScanner, etc.)
+- `src/lib/` — utility functions (Supabase client, date helpers, etc.)
+- `src/styles/` — global CSS
+- `public/` — static assets, manifest.json, service worker
+- `vite.config.ts` — Vite configuration
+- `tailwind.config.js` — Tailwind CSS configuration
 
-When modifying, always ask which file a section lives in before editing.
-Do not create new files unless instructed — keep the codebase minimal.
+When modifying components, maintain existing patterns for imports, styling, and state management.
+Do not break the Supabase query patterns or date/locale formatting conventions.
 
 ---
 
@@ -107,87 +108,36 @@ Storage format: `YYYY-MM-DD` (ISO)
 
 ## Data Architecture
 
-All data lives in localStorage. Keys follow the pattern `truckpay_XXXXX`.
+All data is stored in Supabase PostgreSQL database. User authentication via Supabase Auth.
+Components fetch data via Supabase client with proper error handling and real-time subscriptions where needed.
 
-### Profile — `truckpay_profile`
-```json
-{
-  "name": "Akrom Aripov",
-  "phone": "6787022212",
-  "email": "akrom1980@gmail.com",
-  "driverType": "solo",
-  "companyDeduction": 11,
-  "weeklyPeriod": "monday",
-  "annualGoal": null,
-  "weeklyGoal": null
-}
-```
+### Key Tables
 
-### Loads — `truckpay_loads`
-```json
-[{
-  "id": "uuid",
-  "origin": "Georgia",
-  "destination": "Texas",
-  "pickupDate": "2026-03-14",
-  "deliveryDate": "2026-03-15",
-  "loadRate": 1607.00,
-  "deductionRate": 11,
-  "weekId": "2026-W11",
-  "deadheadMiles": null,
-  "loadMiles": null,
-  "dispatcher": { "name": "", "company": "", "phone": "" },
-  "broker": { "name": "", "company": "" },
-  "bolNumber": "",
-  "notes": ""
-}]
-```
+**profiles** — User profile settings
+- name, email, phone, driverType, companyDeduction, weeklyPeriod, annualGoal, weeklyGoal
 
-### Deductions — `truckpay_deductions`
-```json
-[{
-  "id": "uuid",
-  "type": "FUEL",
-  "amount": 975.00,
-  "date": "2026-03-09",
-  "weekId": "2026-W10",
-  "isFixed": false,
-  "receiptPhoto": null
-}]
-```
+**load_reports** — Truck loads with earnings data
+- id, user_id, origin, destination, pickupDate, deliveryDate, loadRate, deductionRate, weekId
+- deadheadMiles, loadMiles, estimatedMiles, driverPay
+- dispatcher, broker, bolNumber, notes
+- created_at, updated_at
 
-### Fixed Deductions — `truckpay_fixed_deductions`
-```json
-[{
-  "id": "uuid",
-  "name": "Weekly Insurance",
-  "amount": 345.00,
-  "isFixed": true,
-  "effectiveFrom": "2025-11-01"
-}]
-```
+**weekly_deductions** — Fixed weekly expense categories (FUEL, TOLL, MAINTENANCE, etc.)
+- id, user_id, type, amount, week_start, category, notes
 
-### Weekly Mileage — `truckpay_mileage`
-```json
-{
-  "2026-W11": { "startMileage": 992950, "endMileage": 997572 },
-  "2026-W12": { "startMileage": 997572, "endMileage": 0 }
-}
-```
+**weekly_extra_deductions** — One-off weekly expenses
+- id, user_id, description, amount, week_start, category
 
-### Subscription — `truckpay_subscription`
-```json
-{
-  "tier": "pro",
-  "startDate": "2026-01-01",
-  "endDate": "2026-07-02",
-  "trialUsed": false,
-  "earlyAdopter": true
-}
-```
+**deductions** — Legacy deductions table (use weekly_deductions/weekly_extra_deductions for new data)
 
-### Schema Version — `truckpay_schema_version`
-Integer. Currently `3`. Increment when data structure changes and add migration.
+**fixed_deductions** — Recurring weekly costs
+- id, user_id, name, amount, effectiveFrom
+
+**weekly_mileage** — Odometer readings per week
+- id, user_id, weekId, startMileage, endMileage
+
+**subscriptions** — User subscription tier and status
+- id, user_id, tier, startDate, endDate, trialUsed, earlyAdopter
 
 ---
 
@@ -437,22 +387,10 @@ const IFTA_DIESEL_RATES = {
 
 ## Data Safety Rules
 
-Before ANY destructive operation (clear, import, schema migration):
-```javascript
-localStorage.setItem(
-  'truckpay_backup_' + Date.now(),
-  JSON.stringify(exportAllData())
-);
-```
-
-Always wrap localStorage in try/catch — it can be full or disabled:
-```javascript
-try {
-  localStorage.setItem(key, value);
-} catch (e) {
-  showError('Storage full. Please export your data to free up space.');
-}
-```
+- Always test database migrations in development before deploying to production
+- Supabase provides built-in backup and rollback capabilities
+- When adding new Supabase queries, always add error handling and null checks
+- Do not assume data exists — always handle missing or incomplete records gracefully
 
 ---
 
@@ -480,18 +418,16 @@ parked at a truck stop?"* If no, simplify it.
 
 ## What NOT to Do
 
-- Do NOT add React, Vue, or any JS framework
-- Do NOT add npm dependencies or a build step
-- Do NOT create a backend or database — localStorage only
 - Do NOT add desktop-specific layouts (mobile-only app)
 - Do NOT use technical labels visible to users (see Language Rules above)
 - Do NOT show a negative number for miles — show `--` if data incomplete
 - Do NOT pre-fill Load Rate with a fake number like `1200.00`
-- Do NOT break existing data in localStorage when adding new features
-- Do NOT introduce new localStorage keys without documenting them here
-- Do NOT make network calls in offline-critical paths (mileage, loads list)
-- Do NOT implement Stripe payments directly — add a TODO comment and
-  simulate with localStorage for now
+- Do NOT break existing Supabase data when adding new features or migrations
+- Do NOT modify database schema without planning a migration
+- Do NOT make unnecessary network calls — batch queries where possible
+- Do NOT implement Stripe payments directly — add a TODO comment and simulate with Supabase for now
+- Do NOT introduce new date input fields without using calendar picker Popover pattern
+- Do NOT break existing component patterns or styling conventions
 
 ---
 
@@ -505,19 +441,23 @@ parked at a truck stop?"* If no, simplify it.
 - IFTA Report page
 - Weekly Pay Forecast ("AT THIS PACE")
 - State dropdowns on Add Load form
-- Optional fields: deadhead, dispatcher, broker, BOL
+- Optional fields: deadhead, dispatcher, broker, BOL (now fully editable in Load card edit mode)
 - Early Adopter Pro bonus
 - Version V2.1
+- Fixed blank space on Home screen
+- Replaced all technical labels with plain English throughout
+- Added live weekly snapshot on Home screen (Loads, Earned, Expenses, Take-Home)
+- Added info icons with tooltips on snapshot stats explaining calculations
+- Simplified Add Load form (placeholder $0.00, pre-fill dates, company deduction moved to optional)
+- Made Driver Pay the hero number on load cards
+- Added editable optional fields in Load card edit mode (deadhead, dispatcher, broker, BOL, notes)
+- Converted all date input fields to calendar picker dropdowns (LoadCard, WeeklySummary, PersonalExpenses, ReceiptScanner)
 
 ### 🔄 In Progress / Next Up
 - Bottom tab bar navigation (highest UX priority)
-- Fix blank space on Home screen
 - Load Profitability grade badges on load cards
 - Lane Performance RPM column
-- AI Receipt Scanner (flagship Pro feature)
 - Annual Income Goal (Settings + YTD progress bar)
-- Edit button on Summary load cards
-- Plain English label replacement throughout
 
 ### 📋 Backlog
 - Stripe payment integration (replace localStorage simulation)

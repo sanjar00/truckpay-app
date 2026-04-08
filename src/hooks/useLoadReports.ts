@@ -83,7 +83,20 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
           pickupDate: load.pickup_date,
           deliveryDate: load.delivery_date,
           dateAdded: load.date_added,
-          weekPeriod: load.week_period
+          weekPeriod: load.week_period,
+          deadheadMiles: load.deadhead_miles,
+          dispatcherName: load.dispatcher_name,
+          dispatcherCompany: load.dispatcher_company,
+          dispatcherPhone: load.dispatcher_phone,
+          brokerName: load.broker_name,
+          brokerCompany: load.broker_company,
+          bolNumber: load.bol_number,
+          notes: load.notes,
+          pickupZip: load.pickup_zip,
+          deliveryZip: load.delivery_zip,
+          pickupCityState: load.pickup_city_state,
+          deliveryCityState: load.delivery_city_state,
+          estimatedMiles: load.estimated_miles,
         }));
         
         setLoads(formattedLoads);
@@ -109,8 +122,8 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
             rate: parseFloat(newLoad.rate),
             company_deduction: parseFloat(newLoad.companyDeduction),
             driver_pay: driverPay,
-            location_from: newLoad.locationFrom,
-            location_to: newLoad.locationTo,
+            location_from: newLoad.locationFrom || newLoad.pickupCityState || newLoad.pickupZip || '',
+            location_to: newLoad.locationTo || newLoad.deliveryCityState || newLoad.deliveryZip || '',
             pickup_date: newLoad.pickupDate ? formatDateForDB(newLoad.pickupDate) : null,
             delivery_date: newLoad.deliveryDate ? formatDateForDB(newLoad.deliveryDate) : null,
             date_added: loadDate,
@@ -123,6 +136,11 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
             broker_company: newLoad.brokerCompany || null,
             bol_number: newLoad.bolNumber || null,
             notes: newLoad.notes || null,
+            pickup_zip: newLoad.pickupZip || null,
+            delivery_zip: newLoad.deliveryZip || null,
+            pickup_city_state: newLoad.pickupCityState || null,
+            delivery_city_state: newLoad.deliveryCityState || null,
+            estimated_miles: newLoad.estimatedMiles ?? null,
           })
           .select()
           .single();
@@ -143,9 +161,22 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
             pickupDate: data.pickup_date,
             deliveryDate: data.delivery_date,
             dateAdded: data.date_added,
-            weekPeriod: data.week_period
+            weekPeriod: data.week_period,
+            deadheadMiles: data.deadhead_miles,
+            dispatcherName: data.dispatcher_name,
+            dispatcherCompany: data.dispatcher_company,
+            dispatcherPhone: data.dispatcher_phone,
+            brokerName: data.broker_name,
+            brokerCompany: data.broker_company,
+            bolNumber: data.bol_number,
+            notes: data.notes,
+            pickupZip: data.pickup_zip,
+            deliveryZip: data.delivery_zip,
+            pickupCityState: data.pickup_city_state,
+            deliveryCityState: data.delivery_city_state,
+            estimatedMiles: data.estimated_miles,
           };
-          
+
           setLoads(prev => [...prev, newLoadEntry]);
           setNewLoad({
             rate: '',
@@ -162,6 +193,11 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
             brokerCompany: '',
             bolNumber: '',
             notes: '',
+            pickupZip: '',
+            deliveryZip: '',
+            pickupCityState: '',
+            deliveryCityState: '',
+            estimatedMiles: undefined,
           });
           setShowAddForm(false);
         }
@@ -203,7 +239,20 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
           location_from: updatedLoad.locationFrom,
           location_to: updatedLoad.locationTo,
           pickup_date: updatedLoad.pickupDate,
-          delivery_date: updatedLoad.deliveryDate
+          delivery_date: updatedLoad.deliveryDate,
+          deadhead_miles: updatedLoad.deadheadMiles ?? null,
+          dispatcher_name: updatedLoad.dispatcherName ?? null,
+          dispatcher_company: updatedLoad.dispatcherCompany ?? null,
+          dispatcher_phone: updatedLoad.dispatcherPhone ?? null,
+          broker_name: updatedLoad.brokerName ?? null,
+          broker_company: updatedLoad.brokerCompany ?? null,
+          bol_number: updatedLoad.bolNumber ?? null,
+          notes: updatedLoad.notes ?? null,
+          pickup_zip: updatedLoad.pickupZip ?? null,
+          delivery_zip: updatedLoad.deliveryZip ?? null,
+          pickup_city_state: updatedLoad.pickupCityState ?? null,
+          delivery_city_state: updatedLoad.deliveryCityState ?? null,
+          estimated_miles: updatedLoad.estimatedMiles ?? null,
         })
         .eq('id', id)
         .eq('user_id', user.id);

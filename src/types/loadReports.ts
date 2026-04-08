@@ -17,6 +17,11 @@ export interface Load {
   brokerCompany?: string;
   bolNumber?: string;
   notes?: string;
+  pickupZip?: string;
+  deliveryZip?: string;
+  pickupCityState?: string;
+  deliveryCityState?: string;
+  estimatedMiles?: number;
 }
 
 export interface LoadReportsProps {
@@ -55,6 +60,11 @@ export interface NewLoad {
   brokerCompany?: string;
   bolNumber?: string;
   notes?: string;
+  pickupZip?: string;
+  deliveryZip?: string;
+  pickupCityState?: string;
+  deliveryCityState?: string;
+  estimatedMiles?: number;
 }
 
 export interface DeleteConfirmation {

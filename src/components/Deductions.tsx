@@ -91,28 +91,43 @@ const Deductions = ({ onBack, deductions, setDeductions, onUpgrade }: Deductions
 
   const handleFixedToggle = async (type, checked) => {
     if (!checked) {
-      // If unchecking, update is_fixed to false instead of deleting
-      const existingDeduction = deductions.find(d => d.type === type && d.isFixed);
-      if (existingDeduction && user) {
+      // If unchecking, disable all future occurrences of this fixed deduction
+      // Get the current week start
+      const currentWeekStart = startOfWeek(new Date(), { weekStartsOn: 0 }).toISOString().split('T')[0];
+
+      // Find all deductions of this type with date_added >= current week
+      const futureDeductions = deductions.filter(d =>
+        d.type === type &&
+        d.isFixed &&
+        d.dateAdded &&
+        d.dateAdded.split('T')[0] >= currentWeekStart
+      );
+
+      if (user) {
         try {
-          const { error } = await supabase
-            .from('deductions')
-            .update({ is_fixed: false })  // ✅ Update instead of delete
-            .eq('id', existingDeduction.id)
-            .eq('user_id', user.id);
-          
-          if (!error) {
-            // Update local state to reflect the change
-            setDeductions(prev => prev.map(d => 
-              d.id === existingDeduction.id 
-                ? { ...d, isFixed: false }
-                : d
-            ));
-            setFixedDeductions(prev => ({
-              ...prev,
-              [type]: undefined
-            }));
+          // Set is_fixed = false for all future occurrences
+          for (const deduction of futureDeductions) {
+            const { error } = await supabase
+              .from('deductions')
+              .update({ is_fixed: false })
+              .eq('id', deduction.id)
+              .eq('user_id', user.id);
+
+            if (error) {
+              console.error('Error updating fixed deduction:', error);
+            }
           }
+
+          // Update local state to reflect the change
+          setDeductions(prev => prev.map(d =>
+            futureDeductions.some(fd => fd.id === d.id)
+              ? { ...d, isFixed: false }
+              : d
+          ));
+          setFixedDeductions(prev => ({
+            ...prev,
+            [type]: undefined
+          }));
         } catch (error) {
           console.error('Error updating fixed deduction:', error);
         }
@@ -301,15 +316,24 @@ const Deductions = ({ onBack, deductions, setDeductions, onUpgrade }: Deductions
 
   const handleDeleteDeductionsByType = async (type: string) => {
     if (!user) return;
-    const ids = deductions.filter(d => d.type === type).map(d => d.id);
-    if (ids.length === 0) return;
+    // Only delete future fixed deductions of this type, not historical ones
+    const currentWeekStart = startOfWeek(new Date(), { weekStartsOn: 0 }).toISOString().split('T')[0];
+    const idsToDelete = deductions
+      .filter(d =>
+        d.type === type &&
+        d.isFixed &&
+        d.dateAdded &&
+        d.dateAdded.split('T')[0] >= currentWeekStart
+      )
+      .map(d => d.id);
+    if (idsToDelete.length === 0) return;
     const { error } = await supabase
       .from('deductions')
       .delete()
-      .in('id', ids)
+      .in('id', idsToDelete)
       .eq('user_id', user.id);
     if (!error) {
-      setDeductions(prev => prev.filter(d => !ids.includes(d.id)));
+      setDeductions(prev => prev.filter(d => !idsToDelete.includes(d.id)));
     }
   };
 
