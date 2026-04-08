@@ -176,15 +176,15 @@ const LoadReports = ({ onBack, user, userProfile, deductions, onUpgrade }: LoadR
         >
           <Plus className="w-8 h-8 mr-3" />
           <div className="text-left">
-            <p className="brutal-text text-xl">ADD_NEW_LOAD</p>
-            <p className="brutal-mono text-sm opacity-80">RECORD_LOAD_DATA</p>
+            <p className="brutal-text text-xl">Add Load</p>
+            <p className="brutal-mono text-sm opacity-80">Record this week's load</p>
           </div>
         </Button>
 
         {/* Add Load Form */}
         {showAddForm && (
           <div className="brutal-border-secondary bg-secondary p-6 brutal-shadow-lg">
-            <h3 className="brutal-text text-xl text-secondary-foreground mb-4">NEW_LOAD_ENTRY</h3>
+            <h3 className="brutal-text text-xl text-secondary-foreground mb-4">New Load</h3>
             <AddLoadForm 
               newLoad={newLoad}
               setNewLoad={setNewLoad}
@@ -200,7 +200,7 @@ const LoadReports = ({ onBack, user, userProfile, deductions, onUpgrade }: LoadR
         {/* Load Cards */}
         {currentWeekLoads.length > 0 ? (
           <div className="space-y-4">
-            <h3 className="brutal-text text-xl text-foreground">WEEK_LOADS ({currentWeekLoads.length})</h3>
+            <h3 className="brutal-text text-xl text-foreground">This Week's Loads ({currentWeekLoads.length})</h3>
             {currentWeekLoads.map((load) => (
               <div key={load.id} className="brutal-border bg-card p-6 brutal-shadow">
                 <LoadCard
@@ -221,8 +221,8 @@ const LoadReports = ({ onBack, user, userProfile, deductions, onUpgrade }: LoadR
         ) : (
           <div className="brutal-border bg-muted p-8 brutal-shadow text-center">
             <Truck className="w-16 h-16 text-muted-foreground mx-auto mb-4 opacity-50" />
-            <p className="brutal-text text-xl text-muted-foreground">NO_LOADS_RECORDED</p>
-            <p className="brutal-mono text-sm text-muted-foreground">FOR_THIS_WEEK</p>
+            <p className="brutal-text text-xl text-muted-foreground">No loads recorded</p>
+            <p className="brutal-mono text-sm text-muted-foreground">for this week</p>
           </div>
         )}
 

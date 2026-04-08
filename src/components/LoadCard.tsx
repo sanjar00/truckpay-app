@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
-import { MapPin, Calendar, Trash2, Edit, Save, X, MoreHorizontal } from 'lucide-react';
+import { MapPin, Calendar, Trash2, Edit, Save, X, MoreHorizontal, ChevronDown, ChevronUp } from 'lucide-react';
 import { format } from 'date-fns';
 import { formatCurrency } from '@/lib/utils';
 import LocationCombobox from './LocationCombobox';
@@ -64,11 +64,20 @@ const LoadCard = ({ load, onDelete, onEdit, isEditing, setIsEditing, estimatedMi
     locationFrom: load.locationFrom,
     locationTo: load.locationTo,
     pickupDate: load.pickupDate ? parseDateFromDB(load.pickupDate) : undefined,
-    deliveryDate: load.deliveryDate ? parseDateFromDB(load.deliveryDate) : undefined
+    deliveryDate: load.deliveryDate ? parseDateFromDB(load.deliveryDate) : undefined,
+    deadheadMiles: (load as any).deadheadMiles?.toString() || '',
+    dispatcherName: (load as any).dispatcherName || '',
+    dispatcherCompany: (load as any).dispatcherCompany || '',
+    dispatcherPhone: (load as any).dispatcherPhone || '',
+    brokerName: (load as any).brokerName || '',
+    brokerCompany: (load as any).brokerCompany || '',
+    bolNumber: (load as any).bolNumber || '',
+    notes: (load as any).notes || ''
   });
   const [pickupCalendarOpen, setPickupCalendarOpen] = useState(false);
   const [deliveryCalendarOpen, setDeliveryCalendarOpen] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [showOptional, setShowOptional] = useState(false);
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'Not set';
@@ -92,7 +101,15 @@ const LoadCard = ({ load, onDelete, onEdit, isEditing, setIsEditing, estimatedMi
         locationFrom: editData.locationFrom,
         locationTo: editData.locationTo,
         pickupDate: editData.pickupDate ? formatDateForDB(editData.pickupDate) : undefined,
-        deliveryDate: editData.deliveryDate ? formatDateForDB(editData.deliveryDate) : undefined
+        deliveryDate: editData.deliveryDate ? formatDateForDB(editData.deliveryDate) : undefined,
+        deadheadMiles: editData.deadheadMiles ? parseFloat(editData.deadheadMiles) : undefined,
+        dispatcherName: editData.dispatcherName || undefined,
+        dispatcherCompany: editData.dispatcherCompany || undefined,
+        dispatcherPhone: editData.dispatcherPhone || undefined,
+        brokerName: editData.brokerName || undefined,
+        brokerCompany: editData.brokerCompany || undefined,
+        bolNumber: editData.bolNumber || undefined,
+        notes: editData.notes || undefined
       });
     }
   };
@@ -104,8 +121,17 @@ const LoadCard = ({ load, onDelete, onEdit, isEditing, setIsEditing, estimatedMi
       locationFrom: load.locationFrom,
       locationTo: load.locationTo,
       pickupDate: load.pickupDate ? parseDateFromDB(load.pickupDate) : undefined,
-      deliveryDate: load.deliveryDate ? parseDateFromDB(load.deliveryDate) : undefined
+      deliveryDate: load.deliveryDate ? parseDateFromDB(load.deliveryDate) : undefined,
+      deadheadMiles: (load as any).deadheadMiles?.toString() || '',
+      dispatcherName: (load as any).dispatcherName || '',
+      dispatcherCompany: (load as any).dispatcherCompany || '',
+      dispatcherPhone: (load as any).dispatcherPhone || '',
+      brokerName: (load as any).brokerName || '',
+      brokerCompany: (load as any).brokerCompany || '',
+      bolNumber: (load as any).bolNumber || '',
+      notes: (load as any).notes || ''
     });
+    setShowOptional(false);
     if (setIsEditing) setIsEditing(false);
   };
 
@@ -227,6 +253,99 @@ const LoadCard = ({ load, onDelete, onEdit, isEditing, setIsEditing, estimatedMi
               </div>
             </div>
 
+            {/* More Details Toggle */}
+            <button
+              type="button"
+              onClick={() => setShowOptional(!showOptional)}
+              className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors w-full py-2"
+            >
+              {showOptional ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+              {showOptional ? 'Hide Details' : 'More Details'}
+            </button>
+
+            {showOptional && (
+              <div className="space-y-4 border-t pt-4">
+                {/* Deadhead Miles */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Deadhead Miles (empty miles to pickup)</label>
+                  <Input
+                    type="number"
+                    placeholder="e.g. 45"
+                    value={editData.deadheadMiles}
+                    onChange={(e) => setEditData(prev => ({ ...prev, deadheadMiles: e.target.value }))}
+                    className="h-10"
+                  />
+                </div>
+
+                {/* Dispatcher */}
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold">Dispatcher</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <Input
+                      placeholder="Name"
+                      value={editData.dispatcherName}
+                      onChange={(e) => setEditData(prev => ({ ...prev, dispatcherName: e.target.value }))}
+                      className="h-10"
+                    />
+                    <Input
+                      placeholder="Company"
+                      value={editData.dispatcherCompany}
+                      onChange={(e) => setEditData(prev => ({ ...prev, dispatcherCompany: e.target.value }))}
+                      className="h-10"
+                    />
+                    <Input
+                      placeholder="Phone"
+                      type="tel"
+                      value={editData.dispatcherPhone}
+                      onChange={(e) => setEditData(prev => ({ ...prev, dispatcherPhone: e.target.value }))}
+                      className="h-10"
+                    />
+                  </div>
+                </div>
+
+                {/* Broker */}
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold">Broker</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <Input
+                      placeholder="Broker Name"
+                      value={editData.brokerName}
+                      onChange={(e) => setEditData(prev => ({ ...prev, brokerName: e.target.value }))}
+                      className="h-10"
+                    />
+                    <Input
+                      placeholder="Broker Company"
+                      value={editData.brokerCompany}
+                      onChange={(e) => setEditData(prev => ({ ...prev, brokerCompany: e.target.value }))}
+                      className="h-10"
+                    />
+                  </div>
+                </div>
+
+                {/* BOL & Notes */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium">BOL Number</label>
+                    <Input
+                      placeholder="Bill of Lading #"
+                      value={editData.bolNumber}
+                      onChange={(e) => setEditData(prev => ({ ...prev, bolNumber: e.target.value }))}
+                      className="h-10"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium">Notes</label>
+                    <Input
+                      placeholder="Notes..."
+                      value={editData.notes}
+                      onChange={(e) => setEditData(prev => ({ ...prev, notes: e.target.value }))}
+                      className="h-10"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Action Buttons */}
             <div className="flex gap-2 justify-end">
               <Button
@@ -282,16 +401,16 @@ const LoadCard = ({ load, onDelete, onEdit, isEditing, setIsEditing, estimatedMi
             
             <div className="grid grid-cols-3 gap-4 text-sm">
               <div>
-                <p className="text-gray-600">Load Rate</p>
-                <p className="font-semibold text-green-600">${formatCurrency(load.rate)}</p>
+                <p className="text-gray-600 text-xs">Driver Pay</p>
+                <p className="font-bold text-lg text-green-700">${formatCurrency(load.driverPay)}</p>
               </div>
               <div>
-                <p className="text-gray-600">Deduction</p>
-                <p className="font-semibold text-red-600">{load.companyDeduction}%</p>
+                <p className="text-gray-600 text-xs">Load Rate</p>
+                <p className="font-semibold text-gray-600">${formatCurrency(load.rate)}</p>
               </div>
               <div>
-                <p className="text-gray-600">Driver Pay</p>
-                <p className="font-semibold text-blue-600">${formatCurrency(load.driverPay)}</p>
+                <p className="text-gray-600 text-xs">Co. Cut</p>
+                <p className="font-semibold text-red-500">{load.companyDeduction}%</p>
               </div>
             </div>
           </div>

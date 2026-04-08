@@ -3,7 +3,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, X, Navigation, Edit, Save, MoreHorizontal } from 'lucide-react';
+import { Plus, X, Navigation, Edit, Save, MoreHorizontal, Calendar as CalendarIcon } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
 import { formatCurrency } from '@/lib/utils';
 
 interface WeeklySummaryProps {
@@ -54,10 +58,13 @@ const WeeklySummary = ({
   setEditingDeduction
 }: WeeklySummaryProps) => {
   // Restore the pendingDeductions state for input fields
-  const [pendingDeductions, setPendingDeductions] = useState<Record<string, { amount: string, date: string }>>({});
-  const [editingData, setEditingData] = useState<{name: string, amount: string}>({name: '', amount: ''});
-  const [showMobileMenu, setShowMobileMenu] = useState<string | null>(null);
   const todayStr = new Date().toISOString().split('T')[0];
+  const [pendingDeductions, setPendingDeductions] = useState<Record<string, { amount: string, date: string }>>({});
+  const [editingData, setEditingData] = useState<{name: string, amount: string, date: string}>({name: '', amount: '', date: todayStr});
+  const [showMobileMenu, setShowMobileMenu] = useState<string | null>(null);
+  const [editDateCalendarOpen, setEditDateCalendarOpen] = useState(false);
+  const [pendingDateCalendarOpen, setPendingDateCalendarOpen] = useState<string | null>(null);
+  const [newExtraDeductionDateCalendarOpen, setNewExtraDeductionDateCalendarOpen] = useState(false);
 
   // Fix the handleAddDeduction function
   const handleAddDeduction = async (type: string) => {
@@ -76,10 +83,11 @@ const WeeklySummary = ({
     }
   };
 
-  const handleEditDeduction = (deduction: {id: string, name: string, amount: string}) => {
+  const handleEditDeduction = (deduction: {id: string, name: string, amount: string, dateAdded?: string}) => {
     if (setEditingDeduction) {
       setEditingDeduction(deduction.id);
-      setEditingData({ name: deduction.name, amount: deduction.amount });
+      const dateStr = deduction.dateAdded ? new Date(deduction.dateAdded).toISOString().split('T')[0] : todayStr;
+      setEditingData({ name: deduction.name, amount: deduction.amount, date: dateStr });
     }
   };
 
@@ -92,21 +100,21 @@ const WeeklySummary = ({
   const handleCancelEdit = () => {
     if (setEditingDeduction) {
       setEditingDeduction(null);
-      setEditingData({ name: '', amount: '' });
+      setEditingData({ name: '', amount: '', date: todayStr });
     }
   };
 
   return (
     <div className="brutal-border bg-card p-6 brutal-shadow-lg">
-      <h2 className="brutal-text text-2xl text-foreground mb-6">WEEKLY_SUMMARY</h2>
-      
+      <h2 className="brutal-text text-2xl text-foreground mb-6">Pay Breakdown</h2>
+
       {/* Weekly Deductions */}
       <div className="space-y-4 mb-6">
-        <h3 className="brutal-text text-lg text-foreground">WEEKLY_DEDUCTIONS</h3>
+        <h3 className="brutal-text text-lg text-foreground">Fuel & Expenses</h3>
         {/* Display existing weekly deductions */}
         {Object.entries(weeklyDeductions).filter(([type, amount]) => amount && parseFloat(amount) > 0).length > 0 && (
           <div className="space-y-4 mb-6">
-            <h4 className="brutal-text text-md text-foreground">CURRENT_WEEKLY_DEDUCTIONS</h4>
+            <h4 className="brutal-text text-md text-foreground">Expenses Added</h4>
             <div className="brutal-border bg-background p-4 brutal-shadow">
               {Object.entries(weeklyDeductions)
                 .filter(([type, amount]) => amount && parseFloat(amount) > 0)
@@ -114,7 +122,7 @@ const WeeklySummary = ({
                   <div key={type} className="py-2 border-b border-border last:border-b-0">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
-                        <span className="brutal-mono text-sm text-foreground">{type.toUpperCase().replace(/ /g, '_')}</span>
+                        <span className="brutal-mono text-sm text-foreground">{type}</span>
                         <span className="brutal-text text-foreground">${formatCurrency(parseFloat(amount))}</span>
                       </div>
                       <div className="flex gap-1">
@@ -145,7 +153,7 @@ const WeeklySummary = ({
         {availableDeductionTypes.map((type) => (
           <div key={type} className="brutal-border bg-background p-4 brutal-shadow">
             <Label className="brutal-mono text-sm text-foreground mb-2 block">
-              {type.toUpperCase().replace(/ /g, '_')}
+              {type}
             </Label>
             <div className="flex gap-2">
               <Input
@@ -160,17 +168,37 @@ const WeeklySummary = ({
                 }
                 className="brutal-border bg-input flex-1"
               />
-              <Input
-                type="date"
-                value={pendingDeductions[type]?.date || todayStr}
-                onChange={(e) =>
-                  setPendingDeductions(prev => ({
-                    ...prev,
-                    [type]: { ...(prev[type] || { amount: '' }), date: e.target.value }
-                  }))
-                }
-                className="brutal-border bg-input w-36"
-              />
+              <Popover open={pendingDateCalendarOpen === type} onOpenChange={(open) => setPendingDateCalendarOpen(open ? type : null)}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-36 justify-start text-left font-normal",
+                      !pendingDeductions[type]?.date && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {pendingDeductions[type]?.date ? format(new Date(pendingDeductions[type].date + 'T00:00:00'), "MMM dd") : format(new Date(todayStr + 'T00:00:00'), "MMM dd")}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={pendingDeductions[type]?.date ? new Date(pendingDeductions[type].date + 'T00:00:00') : new Date(todayStr + 'T00:00:00')}
+                    onSelect={(date) => {
+                      if (date) {
+                        const dateStr = date.toISOString().split('T')[0];
+                        setPendingDeductions(prev => ({
+                          ...prev,
+                          [type]: { ...(prev[type] || { amount: '' }), date: dateStr }
+                        }));
+                        setPendingDateCalendarOpen(null);
+                      }
+                    }}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
               <Button
                 onClick={() => handleAddDeduction(type)}
                 variant="secondary"
@@ -185,31 +213,31 @@ const WeeklySummary = ({
           </div>
         ))}
         {/* Add Extra Button */}
-        <Button 
+        <Button
           onClick={() => setShowAddExtraDeduction(!showAddExtraDeduction)}
           variant="secondary"
           className="w-full brutal-border-secondary bg-secondary text-secondary-foreground"
         >
           <Plus className="w-5 h-5 mr-2" />
-          ADD_CUSTOM_DEDUCTION
+          Add Expense
         </Button>
       </div>
 
       {/* Add Extra Deduction Form - Moved above the deductions list */}
       {showAddExtraDeduction && (
         <div className="brutal-border-accent bg-accent/10 p-6 brutal-shadow mb-6">
-          <h4 className="brutal-text text-lg text-foreground mb-4">ADD_CUSTOM_DEDUCTION</h4>
+          <h4 className="brutal-text text-lg text-foreground mb-4">Add Expense</h4>
           <div className="space-y-4">
             <div>
-              <Label className="brutal-mono text-sm text-foreground mb-2 block">NAME</Label>
+              <Label className="brutal-mono text-sm text-foreground mb-2 block">Name</Label>
               <Input
-                placeholder="DEDUCTION_NAME"
+                placeholder="e.g. Truck wash"
                 value={newExtraDeduction.name}
                 onChange={(e) => setNewExtraDeduction(prev => ({ ...prev, name: e.target.value }))}
               />
             </div>
             <div>
-              <Label className="brutal-mono text-sm text-foreground mb-2 block">AMOUNT</Label>
+              <Label className="brutal-mono text-sm text-foreground mb-2 block">Amount</Label>
               <Input
                 type="number"
                 placeholder="0.00"
@@ -218,12 +246,35 @@ const WeeklySummary = ({
               />
             </div>
             <div>
-              <Label className="brutal-mono text-sm text-foreground mb-2 block">DATE</Label>
-              <Input
-                type="date"
-                value={newExtraDeduction.date}
-                onChange={(e) => setNewExtraDeduction(prev => ({ ...prev, date: e.target.value }))}
-              />
+              <Label className="brutal-mono text-sm text-foreground mb-2 block">Date</Label>
+              <Popover open={newExtraDeductionDateCalendarOpen} onOpenChange={setNewExtraDeductionDateCalendarOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !newExtraDeduction.date && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {newExtraDeduction.date ? format(new Date(newExtraDeduction.date + 'T00:00:00'), "MMM dd") : "Select date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={newExtraDeduction.date ? new Date(newExtraDeduction.date + 'T00:00:00') : undefined}
+                    onSelect={(date) => {
+                      if (date) {
+                        const dateStr = date.toISOString().split('T')[0];
+                        setNewExtraDeduction(prev => ({ ...prev, date: dateStr }));
+                        setNewExtraDeductionDateCalendarOpen(false);
+                      }
+                    }}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
             <div className="flex gap-3">
               <Button
@@ -249,17 +300,17 @@ const WeeklySummary = ({
       {/* Added Deductions Display with Edit Functionality */}
       {extraDeductionTypes.length > 0 && (
         <div className="space-y-4 mb-6">
-          <h3 className="brutal-text text-lg text-foreground">ADDED_DEDUCTIONS_THIS_WEEK</h3>
+          <h3 className="brutal-text text-lg text-foreground">Expenses Added</h3>
           <div className="brutal-border bg-background p-4 brutal-shadow">
             {extraDeductionTypes.map((extra) => (
               <div key={extra.id} className="py-2 border-b border-border last:border-b-0">
                 {editingDeduction === extra.id ? (
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <Input
                       value={editingData.name}
                       onChange={(e) => setEditingData(prev => ({ ...prev, name: e.target.value }))}
                       placeholder="Deduction name"
-                      className="flex-1"
+                      className="flex-1 min-w-[150px]"
                     />
                     <Input
                       type="number"
@@ -269,6 +320,34 @@ const WeeklySummary = ({
                       placeholder="Amount"
                       className="w-24"
                     />
+                    <Popover open={editDateCalendarOpen} onOpenChange={setEditDateCalendarOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-32 justify-start text-left font-normal",
+                            !editingData.date && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {editingData.date ? format(new Date(editingData.date + 'T00:00:00'), "MMM dd") : "Select date"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={editingData.date ? new Date(editingData.date + 'T00:00:00') : undefined}
+                          onSelect={(date) => {
+                            if (date) {
+                              const dateStr = date.toISOString().split('T')[0];
+                              setEditingData(prev => ({ ...prev, date: dateStr }));
+                              setEditDateCalendarOpen(false);
+                            }
+                          }}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
                     <Button
                       onClick={() => handleSaveEdit(extra.id)}
                       size="sm"
@@ -367,16 +446,16 @@ const WeeklySummary = ({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Gross Pay Tab */}
         <div className="brutal-border-info bg-info p-6 brutal-shadow">
-          <h3 className="brutal-text text-lg text-info-foreground mb-2">GROSS_PAY</h3>
+          <h3 className="brutal-text text-lg text-info-foreground mb-2">Total Earned</h3>
           <p className="brutal-text text-3xl text-info-foreground">${formatCurrency(totalGrossPay)}</p>
-          <p className="brutal-mono text-xs text-info-foreground opacity-80 mt-2">TOTAL_LOAD_RATES</p>
+          <p className="brutal-mono text-xs text-info-foreground opacity-80 mt-2">Load rates this week</p>
         </div>
 
         {/* Net Pay Tab */}
         <div className="brutal-border-success bg-success p-6 brutal-shadow">
-          <h3 className="brutal-text text-lg text-success-foreground mb-2">NET_PAY</h3>
+          <h3 className="brutal-text text-lg text-success-foreground mb-2">Take-Home</h3>
           <p className="brutal-text text-3xl text-success-foreground">${formatCurrency(netPay)}</p>
-          <p className="brutal-mono text-xs text-success-foreground opacity-80 mt-2">AFTER_ALL_DEDUCTIONS</p>
+          <p className="brutal-mono text-xs text-success-foreground opacity-80 mt-2">After all deductions</p>
         </div>
 
         {/* Mileage Tab */}
@@ -384,46 +463,46 @@ const WeeklySummary = ({
           <div className="brutal-border-accent bg-accent p-6 brutal-shadow">
             <div className="flex items-center gap-2 mb-2">
               <Navigation className="w-5 h-5 text-accent-foreground" />
-              <h3 className="brutal-text text-lg text-accent-foreground">MILEAGE</h3>
+              <h3 className="brutal-text text-lg text-accent-foreground">Miles This Week</h3>
             </div>
             <p className="brutal-text text-3xl text-accent-foreground">{weeklyMileage.totalMiles.toLocaleString()}</p>
-            <p className="brutal-mono text-xs text-accent-foreground opacity-80 mt-2">TOTAL_MILES</p>
+            <p className="brutal-mono text-xs text-accent-foreground opacity-80 mt-2">Total miles</p>
           </div>
         )}
       </div>
 
       {/* Payment Breakdown */}
       <div className="brutal-border bg-background p-4 brutal-shadow mt-6">
-        <h4 className="brutal-text text-lg text-foreground mb-4">PAYMENT_BREAKDOWN</h4>
+        <h4 className="brutal-text text-lg text-foreground mb-4">Pay Breakdown</h4>
         <div className="space-y-2 brutal-mono text-sm text-foreground">
           <div className="flex justify-between">
-            <span>GROSS_PAY:</span>
+            <span>Total Earned:</span>
             <span>${formatCurrency(totalGrossPay)}</span>
           </div>
           <div className="flex justify-between">
-            <span>AFTER_COMPANY_CUT:</span>
+            <span>After Company Cut:</span>
             <span>${formatCurrency(totalDriverPay)}</span>
           </div>
           {totalWeeklyDeductions > 0 && (
             <div className="flex justify-between">
-              <span>WEEKLY_DEDUCTIONS:</span>
+              <span>Fuel & Expenses:</span>
               <span>-${formatCurrency(totalWeeklyDeductions)}</span>
             </div>
           )}
           {totalExtraDeductions > 0 && (
             <div className="flex justify-between">
-              <span>ADDED_DEDUCTIONS:</span>
+              <span>Other Expenses:</span>
               <span>-${formatCurrency(totalExtraDeductions)}</span>
             </div>
           )}
           {totalFixedDeductions > 0 && (
             <div className="flex justify-between">
-              <span>FIXED_DEDUCTIONS:</span>
+              <span>Weekly Fixed Costs:</span>
               <span>-${formatCurrency(totalFixedDeductions)}</span>
             </div>
           )}
           <div className="flex justify-between border-t border-border pt-2 font-bold">
-            <span>NET_PAY:</span>
+            <span>Take-Home:</span>
             <span>${formatCurrency(netPay)}</span>
           </div>
         </div>

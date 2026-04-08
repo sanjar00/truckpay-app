@@ -1,10 +1,13 @@
 
-import { useState, useEffect } from 'react';
-import { Truck, Calculator, Settings, DollarSign, FileText, LogOut, Receipt, Calendar, Map, Lock } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Truck, Calculator, Settings, DollarSign, FileText, LogOut, Receipt, Calendar, Map, Lock, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useSubscription } from '@/hooks/useSubscription';
 import { supabase } from '@/integrations/supabase/client';
+import { format } from 'date-fns';
+import { getUserWeekStart, getUserWeekEnd } from '@/lib/weeklyPeriodUtils';
+import { calculateFixedDeductionsForWeek } from '@/lib/loadReportsUtils';
 import LoginPage from '@/components/LoginPage';
 import Registration from '@/components/Registration';
 import LoadReports from '@/components/LoadReports';
@@ -15,6 +18,41 @@ import PersonalExpenses from '@/components/PersonalExpenses';
 import PerDiemCalculator from '@/components/PerDiemCalculator';
 import IFTAReport from '@/components/IFTAReport';
 import UpgradeModal from '@/components/UpgradeModal';
+
+const SnapshotTooltip = ({ text }: { text: string }) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative inline-flex items-center">
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        onMouseEnter={() => setOpen(true)}
+        onMouseLeave={() => setOpen(false)}
+        className="text-accent-foreground opacity-50 hover:opacity-100 focus:opacity-100 transition-opacity ml-1"
+        aria-label="More info"
+      >
+        <Info className="w-3 h-3" />
+      </button>
+      {open && (
+        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-foreground text-background text-xs rounded px-2 py-1.5 shadow-lg z-50 leading-snug pointer-events-none">
+          {text}
+          <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-foreground" />
+        </div>
+      )}
+    </div>
+  );
+};
 
 const Index = () => {
   const { user, loading, signOut } = useAuth();
@@ -28,6 +66,7 @@ const Index = () => {
   const [earlyAdopterBannerDismissed, setEarlyAdopterBannerDismissed] = useState(
     () => localStorage.getItem('truckpay_ea_banner_dismissed') === 'true'
   );
+  const [weekSnapshot, setWeekSnapshot] = useState<{ loadCount: number; gross: number; expenses: number; net: number; weekStart: Date; weekEnd: Date } | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -35,6 +74,12 @@ const Index = () => {
       fetchDeductions();
     }
   }, [user]);
+
+  useEffect(() => {
+    if (user && userProfile) {
+      fetchWeekSnapshot(deductions);
+    }
+  }, [user, userProfile, deductions]);
 
   const fetchDeductions = async () => {
     if (!user) return;
@@ -64,6 +109,55 @@ const Index = () => {
       }
     } catch (error) {
       console.error('Error fetching deductions:', error);
+    }
+  };
+
+  const fetchWeekSnapshot = async (fixedDeductions: any[] = []) => {
+    if (!user || !userProfile) return;
+    const now = new Date();
+    const weekStart = getUserWeekStart(now, userProfile);
+    const weekEnd = getUserWeekEnd(now, userProfile);
+    const weekStartStr = weekStart.toISOString().split('T')[0];
+    const weekEndStr = weekEnd.toISOString().split('T')[0];
+
+    try {
+      const { data: loadsData } = await supabase
+        .from('load_reports')
+        .select('rate, company_deduction, driver_pay')
+        .eq('user_id', user.id)
+        .gte('date_added', weekStartStr)
+        .lte('date_added', weekEndStr);
+
+      const { data: weeklyDeductionsData } = await supabase
+        .from('weekly_deductions')
+        .select('amount')
+        .eq('user_id', user.id)
+        .eq('week_start', weekStartStr);
+
+      const { data: extraDeductionsData } = await supabase
+        .from('weekly_extra_deductions')
+        .select('amount')
+        .eq('user_id', user.id)
+        .eq('week_start', weekStartStr);
+
+      const gross = (loadsData || []).reduce((sum, l) => sum + (l.rate || 0), 0);
+      const driverPay = (loadsData || []).reduce((sum, l) => sum + (l.driver_pay || 0), 0);
+      const fixedTotal = calculateFixedDeductionsForWeek(fixedDeductions, weekStart);
+      const expenses =
+        (weeklyDeductionsData || []).reduce((sum, d) => sum + (d.amount || 0), 0) +
+        (extraDeductionsData || []).reduce((sum, d) => sum + (d.amount || 0), 0) +
+        fixedTotal;
+
+      setWeekSnapshot({
+        loadCount: (loadsData || []).length,
+        gross,
+        expenses,
+        net: driverPay - expenses,
+        weekStart,
+        weekEnd,
+      });
+    } catch {
+      // non-critical — snapshot stays null
     }
   };
 
@@ -215,65 +309,93 @@ const Index = () => {
         );
       default:
         return (
-          <div className="min-h-screen bg-background brutal-grid p-3 sm:p-6">
-            <div className="max-w-4xl mx-auto space-y-4 sm:space-y-8">
+          <div className="bg-background brutal-grid p-3 sm:p-6">
+            <div className="max-w-4xl mx-auto space-y-4">
               {/* Header */}
-              <div className="brutal-border bg-card p-4 sm:p-8 brutal-shadow-xl">
-                <div className="flex items-center justify-between mb-4 sm:mb-6 flex-wrap gap-4">
-                  <div className="flex items-center gap-2 sm:gap-4">
-                    
-                      <img 
-                        src="/logo.png" 
-                        alt="TruckPay Logo" 
-                        className="w-12 h-12 sm:w-20 sm:h-20 object-contain brutal-shadow"
-                      />
-                    
+              <div className="brutal-border bg-card p-4 brutal-shadow-xl">
+                <div className="flex items-center justify-between mb-3 flex-wrap gap-3">
+                  <div className="flex items-center gap-3">
+                    <img
+                      src="/logo.png"
+                      alt="TruckPay Logo"
+                      className="w-10 h-10 sm:w-14 sm:h-14 object-contain brutal-shadow"
+                    />
                     <div>
-                      <h1 className="brutal-text text-2xl sm:text-4xl text-foreground">TRUCKPAY</h1>
-                      <h2 className="brutal-text text-lg sm:text-2xl text-accent">DRIVE SMART. EARN MORE.</h2>
+                      <h1 className="brutal-text text-2xl sm:text-3xl text-foreground">TRUCKPAY</h1>
+                      <p className="brutal-text text-sm text-accent">DRIVE SMART. EARN MORE.</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button 
+                    <Button
                       onClick={() => setCurrentView('settings')}
-                      variant="outline" 
+                      variant="outline"
                       size="sm"
                       className="brutal-border-secondary bg-secondary hover:bg-secondary text-secondary-foreground brutal-shadow brutal-hover brutal-active"
                     >
-                      <Settings className="w-4 h-4 sm:w-6 sm:h-6" />
+                      <Settings className="w-4 h-4 sm:w-5 sm:h-5" />
                     </Button>
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       size="sm"
                       onClick={handleLogout}
                       className="brutal-border-destructive bg-destructive hover:bg-destructive text-destructive-foreground brutal-shadow brutal-hover brutal-active brutal-text text-xs sm:text-sm"
                     >
-                      <LogOut className="w-4 h-4 sm:w-6 sm:h-6 mr-1 sm:mr-2" />
+                      <LogOut className="w-4 h-4 sm:w-5 sm:h-5 mr-1" />
                       <span className="hidden sm:inline">LOGOUT</span>
                       <span className="sm:hidden">OUT</span>
                     </Button>
                   </div>
                 </div>
-                
-                <div className="space-y-3 sm:space-y-4">
-                  <p className="brutal-text text-base sm:text-xl text-foreground mobile-truncate">
-                    WELCOME, {(userProfile?.name || 'DRIVER').toUpperCase()}!
-                  </p>
-                  {userProfile && (
-                    <div className="brutal-border-info bg-accent p-3 sm:p-6 brutal-shadow">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                        <div>
-                          <p className="brutal-mono text-xs sm:text-sm text-accent-foreground">TYPE:</p>
-                          <p className="brutal-text text-sm sm:text-lg text-accent-foreground mobile-truncate">{userProfile.driverType?.toUpperCase()}</p>
+
+                <p className="brutal-text text-sm text-foreground mb-3">
+                  WELCOME, {(userProfile?.name || 'DRIVER').toUpperCase()}!
+                </p>
+
+                {/* Weekly Snapshot */}
+                {weekSnapshot ? (
+                  <div className="brutal-border-info bg-accent p-3 brutal-shadow">
+                    <p className="brutal-mono text-xs text-accent-foreground mb-2 uppercase">
+                      This Week ({format(weekSnapshot.weekStart, 'MMM d')}–{format(weekSnapshot.weekEnd, 'MMM d')})
+                    </p>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <div>
+                        <div className="flex items-center">
+                          <p className="brutal-mono text-xs text-accent-foreground opacity-75">Loads</p>
+                          <SnapshotTooltip text="Total loads recorded this week." />
                         </div>
-                        <div>
-                          <p className="brutal-mono text-xs sm:text-sm text-accent-foreground">COMPANY DEDUCTION:</p>
-                          <p className="brutal-text text-sm sm:text-lg text-accent-foreground">{userProfile.companyDeduction}%</p>
+                        <p className="brutal-text text-xl text-accent-foreground">{weekSnapshot.loadCount}</p>
+                      </div>
+                      <div>
+                        <div className="flex items-center">
+                          <p className="brutal-mono text-xs text-accent-foreground opacity-75">Earned</p>
+                          <SnapshotTooltip text="Sum of all load rates before any deductions." />
                         </div>
+                        <p className="brutal-text text-xl text-accent-foreground">${weekSnapshot.gross.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
+                      </div>
+                      <div>
+                        <div className="flex items-center">
+                          <p className="brutal-mono text-xs text-accent-foreground opacity-75">Expenses</p>
+                          <SnapshotTooltip text="Fuel, tolls, and other costs added this week, plus your weekly fixed costs (e.g. insurance)." />
+                        </div>
+                        <p className="brutal-text text-xl text-accent-foreground">${weekSnapshot.expenses.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
+                      </div>
+                      <div>
+                        <div className="flex items-center">
+                          <p className="brutal-mono text-xs text-accent-foreground opacity-75">Take-Home</p>
+                          <SnapshotTooltip text="Your driver pay (after company cut) minus all expenses this week." />
+                        </div>
+                        <p className={`brutal-text text-xl ${weekSnapshot.net >= 0 ? 'text-accent-foreground' : 'text-destructive'}`}>
+                          ${weekSnapshot.net.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                        </p>
                       </div>
                     </div>
-                  )}
-                </div>
+                  </div>
+                ) : userProfile && (
+                  <div className="brutal-border-info bg-accent p-3 brutal-shadow">
+                    <p className="brutal-mono text-xs text-accent-foreground opacity-75">This Week</p>
+                    <p className="brutal-text text-sm text-accent-foreground mt-1">No loads recorded yet — tap Load Reports to add your first load.</p>
+                  </div>
+                )}
               </div>
 
               {/* Early Adopter Banner */}

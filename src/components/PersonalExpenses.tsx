@@ -4,7 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Trash2, Edit, Save, X, DollarSign, Calendar, Filter, Calculator, ArrowLeft } from 'lucide-react';
+import { Plus, Trash2, Edit, Save, X, DollarSign, Calendar, Filter, Calculator, ArrowLeft, Calendar as CalendarIcon } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
@@ -50,6 +53,7 @@ const PersonalExpenses: React.FC<PersonalExpensesProps> = ({ onBack, userProfile
   const [editingExpenseType, setEditingExpenseType] = useState<string | null>(null);
   const [editExpenseTypeName, setEditExpenseTypeName] = useState('');
   const [newExpenses, setNewExpenses] = useState<{ [key: string]: { amount: string; note: string; date: string } }>({});
+  const [dateCalendarOpen, setDateCalendarOpen] = useState<string | null>(null);
 
   // Calculate date range based on period filter
   const getDateRange = () => {
@@ -691,18 +695,38 @@ const PersonalExpenses: React.FC<PersonalExpensesProps> = ({ onBack, userProfile
                           <label className="brutal-mono text-xs text-muted-foreground mb-1 block">
                             DATE
                           </label>
-                          <Input
-                            type="date"
-                            value={newExpenses[type.id]?.date || format(new Date(), 'yyyy-MM-dd')}
-                            onChange={(e) => {
-                              initializeNewExpense(type.id);
-                              setNewExpenses(prev => ({
-                                ...prev,
-                                [type.id]: { ...prev[type.id], date: e.target.value }
-                              }));
-                            }}
-                            className="brutal-border"
-                          />
+                          <Popover open={dateCalendarOpen === type.id} onOpenChange={(open) => setDateCalendarOpen(open ? type.id : null)}>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                className={cn(
+                                  "w-full justify-start text-left font-normal",
+                                  !newExpenses[type.id]?.date && "text-muted-foreground"
+                                )}
+                              >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {newExpenses[type.id]?.date ? format(new Date(newExpenses[type.id].date + 'T00:00:00'), "MMM dd, yyyy") : format(new Date(), "MMM dd, yyyy")}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <CalendarComponent
+                                mode="single"
+                                selected={newExpenses[type.id]?.date ? new Date(newExpenses[type.id].date + 'T00:00:00') : new Date()}
+                                onSelect={(date) => {
+                                  if (date) {
+                                    initializeNewExpense(type.id);
+                                    const dateStr = date.toISOString().split('T')[0];
+                                    setNewExpenses(prev => ({
+                                      ...prev,
+                                      [type.id]: { ...prev[type.id], date: dateStr }
+                                    }));
+                                    setDateCalendarOpen(null);
+                                  }
+                                }}
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
                         </div>
                         <div>
                           <label className="brutal-mono text-xs text-muted-foreground mb-1 block">

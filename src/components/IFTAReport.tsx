@@ -194,7 +194,7 @@ const IFTAReport = ({ onBack }: IFTAReportProps) => {
           </Button>
           <div>
             <h1 className="brutal-text text-2xl sm:text-3xl font-bold">IFTA FUEL TAX REPORT</h1>
-            <p className="brutal-mono text-sm text-muted-foreground">INTERNATIONAL FUEL TAX AGREEMENT</p>
+            <p className="brutal-mono text-sm text-muted-foreground">If you drive across state lines, you're required to file this tax report every 3 months.</p>
           </div>
         </div>
 

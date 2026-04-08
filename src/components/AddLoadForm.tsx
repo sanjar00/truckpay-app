@@ -104,7 +104,7 @@ const AddLoadForm = ({
                 )}
               >
                 <CalendarIcon className="mr-2 h-4 w-4" />
-                {newLoad.pickupDate ? format(newLoad.pickupDate, "PPP") : "Select pickup date"}
+                {newLoad.pickupDate ? format(newLoad.pickupDate, "PPP") : format(new Date(), "PPP")}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
@@ -140,7 +140,7 @@ const AddLoadForm = ({
                 )}
               >
                 <CalendarIcon className="mr-2 h-4 w-4" />
-                {newLoad.deliveryDate ? format(newLoad.deliveryDate, "PPP") : "Select delivery date"}
+                {newLoad.deliveryDate ? format(newLoad.deliveryDate, "PPP") : format(new Date(), "PPP")}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
@@ -174,7 +174,7 @@ const AddLoadForm = ({
           <Input
             id="loadRate"
             type="number"
-            placeholder="1200.00"
+            placeholder="$0.00"
             step="0.01"
             value={newLoad.rate}
             onChange={(e) => setNewLoad({ ...newLoad, rate: e.target.value })}
@@ -187,25 +187,6 @@ const AddLoadForm = ({
           )}
         </div>
 
-        {/* Company Deduction */}
-        <div className="space-y-2">
-          <Label htmlFor="companyDeduction" className="flex items-center gap-2">
-            <Percent className="w-4 h-4" />
-            Company Deduction (%)
-          </Label>
-          <Input
-            id="companyDeduction"
-            type="number"
-            placeholder="25.00"
-            step="0.01"
-            min="0"
-            max="100"
-            value={newLoad.companyDeduction}
-            onChange={(e) => setNewLoad({ ...newLoad, companyDeduction: e.target.value })}
-            className="h-12"
-          />
-        </div>
-
         {/* Optional Fields Toggle */}
         <button
           type="button"
@@ -213,11 +194,30 @@ const AddLoadForm = ({
           className="flex items-center gap-2 brutal-mono text-xs text-muted-foreground hover:text-foreground transition-colors w-full py-2"
         >
           {showOptional ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-          {showOptional ? 'HIDE OPTIONAL FIELDS' : 'SHOW OPTIONAL FIELDS (deadhead, dispatcher, BOL...)'}
+          {showOptional ? 'Hide Details' : 'More Details'}
         </button>
 
         {showOptional && (
           <div className="space-y-4 border-t pt-4">
+            {/* Company Deduction */}
+            <div className="space-y-2">
+              <Label htmlFor="companyDeduction" className="flex items-center gap-2">
+                <Percent className="w-4 h-4" />
+                Company Deduction (%)
+              </Label>
+              <Input
+                id="companyDeduction"
+                type="number"
+                placeholder="25.00"
+                step="0.01"
+                min="0"
+                max="100"
+                value={newLoad.companyDeduction}
+                onChange={(e) => setNewLoad({ ...newLoad, companyDeduction: e.target.value })}
+                className="h-12"
+              />
+            </div>
+
             {/* Deadhead Miles */}
             <div className="space-y-2">
               <Label className="text-sm">Deadhead Miles (empty miles to pickup)</Label>
@@ -268,7 +268,7 @@ const AddLoadForm = ({
           <Button
             onClick={onAddLoad}
             className="flex-1 bg-green-600 hover:bg-green-700"
-            disabled={loading || !newLoad.rate || !newLoad.companyDeduction || !newLoad.locationFrom || !newLoad.locationTo}
+            disabled={loading || !newLoad.rate || !newLoad.locationFrom || !newLoad.locationTo}
           >
             {loading ? 'Adding...' : 'Add Load'}
           </Button>

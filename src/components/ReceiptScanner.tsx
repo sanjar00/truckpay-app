@@ -1,5 +1,9 @@
 import { useState, useRef } from 'react';
-import { Camera, Upload, X, Check, AlertCircle, Loader2 } from 'lucide-react';
+import { Camera, Upload, X, Check, AlertCircle, Loader2, Calendar as CalendarIcon } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -120,6 +124,7 @@ const ReceiptScanner = ({ onClose, onConfirm }: ReceiptScannerProps) => {
   const [phase, setPhase] = useState<'select' | 'scanning' | 'review'>('select');
   const [receipts, setReceipts] = useState<ScannedReceipt[]>([]);
   const [scanProgress, setScanProgress] = useState('');
+  const [dateCalendarOpen, setDateCalendarOpen] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
@@ -354,12 +359,34 @@ const ReceiptScanner = ({ onClose, onConfirm }: ReceiptScannerProps) => {
                 </div>
                 <div className="col-span-2">
                   <label className="brutal-mono text-xs text-muted-foreground block mb-1">DATE</label>
-                  <Input
-                    value={r.date}
-                    onChange={e => updateReceipt(r.id, 'date', e.target.value)}
-                    type="date"
-                    className="brutal-border h-8 text-sm"
-                  />
+                  <Popover open={dateCalendarOpen === r.id} onOpenChange={(open) => setDateCalendarOpen(open ? r.id : null)}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full h-8 justify-start text-left font-normal text-sm brutal-border",
+                          !r.date && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-3 w-3 flex-shrink-0" />
+                        {r.date ? format(new Date(r.date + 'T00:00:00'), 'MMM dd') : 'Select date'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={r.date ? new Date(r.date + 'T00:00:00') : undefined}
+                        onSelect={(date) => {
+                          if (date) {
+                            const dateStr = format(date, 'yyyy-MM-dd');
+                            updateReceipt(r.id, 'date', dateStr);
+                            setDateCalendarOpen(null);
+                          }
+                        }}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
                 </div>
               </div>
             </div>

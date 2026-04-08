@@ -165,7 +165,7 @@ const PerDiemCalculator = ({ onBack, userProfile }: PerDiemCalculatorProps) => {
           </Button>
           <div>
             <h1 className="brutal-text text-2xl sm:text-3xl font-bold">PER DIEM TRACKER</h1>
-            <p className="brutal-mono text-sm text-muted-foreground">IRS MEAL & INCIDENTAL DEDUCTION</p>
+            <p className="brutal-mono text-sm text-muted-foreground">The IRS lets you deduct $80/day for being away from home. This saves you money on taxes.</p>
           </div>
         </div>
 
