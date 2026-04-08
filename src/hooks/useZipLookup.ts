@@ -41,6 +41,9 @@ export function useZipLookup() {
     setState(prev => ({ ...prev, loadingDistance: true }));
 
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
       const res = await fetch(`${SUPABASE_URL}/functions/v1/driving-distance`, {
         method: 'POST',
         headers: {
@@ -51,8 +54,10 @@ export function useZipLookup() {
           pickupZip,
           deliveryZip,
         }),
+        signal: controller.signal,
       });
 
+      clearTimeout(timeoutId);
       const data = await res.json();
 
       if (data.error) {
@@ -74,8 +79,9 @@ export function useZipLookup() {
         pickupError: null,
         deliveryError: null,
       }));
-    } catch (err) {
-      setState(prev => ({ ...prev, loadingDistance: false, pickupError: 'Error looking up ZIPs' }));
+    } catch (err: any) {
+      const errorMsg = err?.name === 'AbortError' ? 'Request timed out' : 'Error looking up ZIPs';
+      setState(prev => ({ ...prev, loadingDistance: false, pickupError: errorMsg }));
     }
   }, []);
 
@@ -95,6 +101,7 @@ export function useZipLookup() {
     pickupZipRef.current = trimmed;
     setState(prev => ({ ...prev, loadingPickup: true, pickupError: null }));
 
+    // Call edge function if both zips are now available
     if (deliveryZipRef.current) {
       await callEdgeFunction(trimmed, deliveryZipRef.current);
     }
@@ -119,6 +126,7 @@ export function useZipLookup() {
     deliveryZipRef.current = trimmed;
     setState(prev => ({ ...prev, loadingDelivery: true, deliveryError: null }));
 
+    // Call edge function if both zips are now available
     if (pickupZipRef.current) {
       await callEdgeFunction(pickupZipRef.current, trimmed);
     }

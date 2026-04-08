@@ -29,26 +29,44 @@ serve(async (req) => {
     }
 
     // Geocode pickup ZIP
-    const pickupGeoRes = await fetch(
-      `https://maps.googleapis.com/maps/api/geocode/json?address=${pickupZip}&components=country:US&language=en&key=${apiKey}`
-    );
-    const pickupGeoData = await pickupGeoRes.json();
+    let pickupGeoRes: Response;
+    let pickupGeoData: any;
+    try {
+      pickupGeoRes = await fetch(
+        `https://maps.googleapis.com/maps/api/geocode/json?address=${pickupZip}&components=country:US&language=en&key=${apiKey}`
+      );
+      pickupGeoData = await pickupGeoRes.json();
+    } catch (err) {
+      return new Response(JSON.stringify({ error: 'Failed to geocode pickup ZIP: ' + String(err) }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     if (pickupGeoData.status !== 'OK' || !pickupGeoData.results?.length) {
-      return new Response(JSON.stringify({ error: 'Pickup ZIP not found' }), {
+      return new Response(JSON.stringify({ error: 'Pickup ZIP not found: ' + (pickupGeoData.status || 'unknown') }), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     // Geocode delivery ZIP
-    const deliveryGeoRes = await fetch(
-      `https://maps.googleapis.com/maps/api/geocode/json?address=${deliveryZip}&components=country:US&language=en&key=${apiKey}`
-    );
-    const deliveryGeoData = await deliveryGeoRes.json();
+    let deliveryGeoRes: Response;
+    let deliveryGeoData: any;
+    try {
+      deliveryGeoRes = await fetch(
+        `https://maps.googleapis.com/maps/api/geocode/json?address=${deliveryZip}&components=country:US&language=en&key=${apiKey}`
+      );
+      deliveryGeoData = await deliveryGeoRes.json();
+    } catch (err) {
+      return new Response(JSON.stringify({ error: 'Failed to geocode delivery ZIP: ' + String(err) }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     if (deliveryGeoData.status !== 'OK' || !deliveryGeoData.results?.length) {
-      return new Response(JSON.stringify({ error: 'Delivery ZIP not found' }), {
+      return new Response(JSON.stringify({ error: 'Delivery ZIP not found: ' + (deliveryGeoData.status || 'unknown') }), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -81,14 +99,22 @@ serve(async (req) => {
     const deliveryCityState = deliveryCity && deliveryState ? `${deliveryCity}, ${deliveryState}` : deliveryState || '';
 
     // Get driving distance
-    const distanceRes = await fetch(
-      `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${pickupLat},${pickupLng}&destinations=${deliveryLat},${deliveryLng}&mode=driving&units=imperial&key=${apiKey}`
-    );
-    const distanceData = await distanceRes.json();
+    let distanceData: any;
+    try {
+      const distanceRes = await fetch(
+        `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${pickupLat},${pickupLng}&destinations=${deliveryLat},${deliveryLng}&mode=driving&units=imperial&key=${apiKey}`
+      );
+      distanceData = await distanceRes.json();
+    } catch (err) {
+      return new Response(JSON.stringify({ error: 'Failed to get distance: ' + String(err) }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     const element = distanceData.rows?.[0]?.elements?.[0];
     if (element?.status !== 'OK') {
-      return new Response(JSON.stringify({ error: 'Could not calculate distance' }), {
+      return new Response(JSON.stringify({ error: 'Could not calculate distance: ' + (element?.status || 'unknown') }), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
