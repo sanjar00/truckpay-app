@@ -9,6 +9,14 @@ export interface Load {
   deliveryDate?: string;
   dateAdded: string;
   weekPeriod: string;
+  deadheadMiles?: number;
+  dispatcherName?: string;
+  dispatcherCompany?: string;
+  dispatcherPhone?: string;
+  brokerName?: string;
+  brokerCompany?: string;
+  bolNumber?: string;
+  notes?: string;
 }
 
 export interface LoadReportsProps {
@@ -16,6 +24,7 @@ export interface LoadReportsProps {
   user: any;
   userProfile: any;
   deductions: any[];
+  onUpgrade?: () => void;
 }
 
 export interface WeeklyMileage {
@@ -38,6 +47,14 @@ export interface NewLoad {
   locationTo: string;
   pickupDate: Date | undefined;
   deliveryDate: Date | undefined;
+  deadheadMiles?: string;
+  dispatcherName?: string;
+  dispatcherCompany?: string;
+  dispatcherPhone?: string;
+  brokerName?: string;
+  brokerCompany?: string;
+  bolNumber?: string;
+  notes?: string;
 }
 
 export interface DeleteConfirmation {

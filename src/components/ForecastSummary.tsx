@@ -1,15 +1,16 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, TrendingUp, DollarSign, Minus, Calculator, Calendar, Filter, Truck, FileText, Navigation } from 'lucide-react';
+import { ArrowLeft, TrendingUp, DollarSign, Minus, Calculator, Calendar, Filter, Truck, FileText, Navigation, BarChart2, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DatePickerWithRange } from '@/components/ui/date-picker';
-import { format, startOfWeek, endOfWeek, subWeeks, isWithinInterval, parseISO, addWeeks } from 'date-fns';
+import { format, startOfWeek, endOfWeek, subWeeks, isWithinInterval, parseISO, addWeeks, startOfYear, getMonth } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { formatCurrency } from '@/lib/utils';
 import LoadCard from './LoadCard';
 import { useAuth } from '@/hooks/useAuth';
 import { getUserWeekStart, getUserWeekEnd, getWeekStartForPeriod, getWeekEndForPeriod } from '../lib/weeklyPeriodUtils';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 interface Load {
   id: string;
@@ -49,12 +50,13 @@ const ForecastSummary = ({ onBack, deductions, userProfile }: ForecastSummaryPro
   const [loading, setLoading] = useState(false);
   // Add mileage state
   const [weeklyMileageData, setWeeklyMileageData] = useState<Record<string, {startMileage: number, endMileage: number, totalMiles: number}>>({});
+  const [editingLoad, setEditingLoad] = useState<string | null>(null);
 
   // Calculate date range based on filter
   const getDateRange = () => {
     const today = new Date();
     const currentWeekStart = getUserWeekStart(today, userProfile);
-    
+
     switch (periodFilter) {
       case 'last2':
         return {
@@ -71,11 +73,16 @@ const ForecastSummary = ({ onBack, deductions, userProfile }: ForecastSummaryPro
           start: getUserWeekStart(subWeeks(currentWeekStart, 3), userProfile),
           end: getUserWeekEnd(currentWeekStart, userProfile)
         };
+      case 'ytd':
+        return {
+          start: startOfYear(today),
+          end: today
+        };
       case 'custom':
         if (customDateRange && customDateRange.from && customDateRange.to) {
           const fromDate = new Date(customDateRange.from);
           const toDate = new Date(customDateRange.to);
-          
+
           if (!isNaN(fromDate.getTime()) && !isNaN(toDate.getTime())) {
             return {
               start: getUserWeekStart(fromDate, userProfile),
@@ -274,6 +281,22 @@ const ForecastSummary = ({ onBack, deductions, userProfile }: ForecastSummaryPro
   const netIncome = (totalDriverPay || 0) - (totalDeductions || 0);
   const netIncomePercentage = totalDriverPay > 0 ? ((netIncome / totalDriverPay) * 100) : 0;
 
+  // Annual goal progress (YTD only)
+  const annualGoal = parseFloat(localStorage.getItem('truckpay_annual_goal') || '0');
+  const annualGoalProgress = (() => {
+    if (!annualGoal || annualGoal <= 0 || periodFilter !== 'ytd') return null;
+    const today = new Date();
+    const startOfYearDate = new Date(today.getFullYear(), 0, 1);
+    const dayOfYear = Math.ceil((today.getTime() - startOfYearDate.getTime()) / (1000 * 60 * 60 * 24));
+    const weeksElapsed = Math.max(1, dayOfYear / 7);
+    const weeklyAvg = netIncome / weeksElapsed;
+    const projectedAnnual = weeklyAvg * 52;
+    const pct = Math.min(100, (netIncome / annualGoal) * 100);
+    const isOnPace = projectedAnnual >= annualGoal;
+    const isBehindSlightly = !isOnPace && projectedAnnual >= annualGoal * 0.9;
+    return { pct, projectedAnnual, isOnPace, isBehindSlightly };
+  })();
+
   // Add mileage fetch function
   const fetchWeeklyMileage = async () => {
     if (!user) return;
@@ -302,10 +325,14 @@ const ForecastSummary = ({ onBack, deductions, userProfile }: ForecastSummaryPro
       if (data) {
         const mileageMap: Record<string, {startMileage: number, endMileage: number, totalMiles: number}> = {};
         data.forEach(mileage => {
+          const start = mileage.start_mileage || 0;
+          const end = mileage.end_mileage || 0;
+          const rawTotal = (start > 0 && end > 0) ? Math.max(0, end - start) : 0;
+          const safeTotalMiles = rawTotal > 15000 ? 0 : rawTotal;
           mileageMap[mileage.week_start] = {
-            startMileage: mileage.start_mileage || 0,
-            endMileage: mileage.end_mileage || 0,
-            totalMiles: mileage.total_miles || 0
+            startMileage: start,
+            endMileage: end,
+            totalMiles: safeTotalMiles
           };
         });
         setWeeklyMileageData(mileageMap);
@@ -329,9 +356,62 @@ const ForecastSummary = ({ onBack, deductions, userProfile }: ForecastSummaryPro
     }
   }, [user, periodFilter, customDateRange]);
 
+  // Monthly chart data (for YTD view)
+  const MONTH_NAMES = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  const monthlyData = (() => {
+    const map: Record<number, { gross: number; net: number; count: number }> = {};
+    filteredLoads.forEach((load) => {
+      if (!load.dateAdded) return;
+      const m = getMonth(parseISO(load.dateAdded));
+      if (!map[m]) map[m] = { gross: 0, net: 0, count: 0 };
+      map[m].gross += load.rate || 0;
+      map[m].net += load.driverPay || 0;
+      map[m].count += 1;
+    });
+    const avgNet = Object.values(map).reduce((s, v) => s + v.net, 0) / Math.max(1, Object.keys(map).length);
+    return Object.entries(map).map(([month, val]) => ({
+      month: MONTH_NAMES[Number(month)],
+      net: Math.round(val.net),
+      gross: Math.round(val.gross),
+      loads: val.count,
+      aboveAvg: val.net >= avgNet,
+    }));
+  })();
+
+  // Lane analytics
+  const laneStats = (() => {
+    const map: Record<string, { totalDriverPay: number; totalMiles: number; count: number }> = {};
+    filteredLoads.forEach((load) => {
+      const key = `${load.locationFrom} → ${load.locationTo}`;
+      if (!map[key]) map[key] = { totalDriverPay: 0, totalMiles: 0, count: 0 };
+      map[key].totalDriverPay += load.driverPay || 0;
+      map[key].count += 1;
+      // Estimated miles for this load based on its week's mileage
+      const wMileage = weeklyMileageData[load.dateAdded];
+      const loadsInWeek = filteredLoads.filter(l => l.dateAdded === load.dateAdded).length;
+      const estMiles = (wMileage && wMileage.totalMiles > 0 && loadsInWeek > 0)
+        ? wMileage.totalMiles / loadsInWeek
+        : 0;
+      map[key].totalMiles += estMiles;
+    });
+    return Object.entries(map)
+      .map(([lane, stats]) => ({
+        lane,
+        avgDriverPay: stats.totalDriverPay / stats.count,
+        avgRPM: stats.totalMiles > 0 ? stats.totalDriverPay / stats.totalMiles : null,
+        count: stats.count,
+      }))
+      .sort((a, b) => {
+        if (a.avgRPM !== null && b.avgRPM !== null) return b.avgRPM - a.avgRPM;
+        if (a.avgRPM !== null) return -1;
+        if (b.avgRPM !== null) return 1;
+        return b.avgDriverPay - a.avgDriverPay;
+      });
+  })();
+
   const handleDeleteLoad = async (loadId: string) => {
     if (!user) return;
-    
+
     try {
       const { error } = await supabase
         .from('load_reports')
@@ -348,6 +428,33 @@ const ForecastSummary = ({ onBack, deductions, userProfile }: ForecastSummaryPro
       fetchLoads();
     } catch (error) {
       console.error('Error deleting load:', error);
+    }
+  };
+
+  const handleEditLoad = async (loadId: string, updatedLoad: Partial<Load>) => {
+    if (!user) return;
+    try {
+      const { error } = await supabase
+        .from('load_reports')
+        .update({
+          rate: updatedLoad.rate,
+          company_deduction: updatedLoad.companyDeduction,
+          driver_pay: updatedLoad.driverPay,
+          location_from: updatedLoad.locationFrom,
+          location_to: updatedLoad.locationTo,
+          pickup_date: updatedLoad.pickupDate ?? null,
+          delivery_date: updatedLoad.deliveryDate ?? null,
+        })
+        .eq('id', loadId)
+        .eq('user_id', user.id);
+      if (error) {
+        console.error('Error editing load:', error);
+        return;
+      }
+      setEditingLoad(null);
+      fetchLoads();
+    } catch (error) {
+      console.error('Error editing load:', error);
     }
   };
 
@@ -394,6 +501,7 @@ const ForecastSummary = ({ onBack, deductions, userProfile }: ForecastSummaryPro
                     <SelectItem value="last2">LAST 2 WEEKS</SelectItem>
                     <SelectItem value="last3">LAST 3 WEEKS</SelectItem>
                     <SelectItem value="last4">LAST 4 WEEKS</SelectItem>
+                    <SelectItem value="ytd">YEAR TO DATE</SelectItem>
                     <SelectItem value="custom">CUSTOM RANGE</SelectItem>
                   </SelectContent>
                 </Select>
@@ -450,6 +558,35 @@ const ForecastSummary = ({ onBack, deductions, userProfile }: ForecastSummaryPro
             </div>
           </CardContent>
         </Card>
+
+        {/* Annual Goal Progress (YTD only) */}
+        {annualGoalProgress && (
+          <Card className="brutal-border brutal-shadow bg-background">
+            <CardHeader className="pb-2">
+              <CardTitle className="mobile-text-xl brutal-text font-bold">ANNUAL GOAL PROGRESS</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="h-3 brutal-border bg-muted">
+                <div
+                  className={`h-full transition-all ${annualGoalProgress.isOnPace ? 'bg-green-600' : annualGoalProgress.isBehindSlightly ? 'bg-yellow-500' : 'bg-destructive'}`}
+                  style={{ width: `${annualGoalProgress.pct.toFixed(1)}%` }}
+                />
+              </div>
+              <p className="brutal-mono text-sm">
+                You've earned ${formatCurrency(netIncome)} of your ${formatCurrency(annualGoal)} annual goal ({annualGoalProgress.pct.toFixed(1)}%)
+              </p>
+              <p className={`brutal-mono text-xs font-bold ${annualGoalProgress.isOnPace ? 'text-green-600' : annualGoalProgress.isBehindSlightly ? 'text-yellow-600' : 'text-destructive'}`}>
+                On pace to earn ${formatCurrency(annualGoalProgress.projectedAnnual)} this year
+                {annualGoalProgress.isOnPace ? ' ✓' : ''}
+              </p>
+            </CardContent>
+          </Card>
+        )}
+        {periodFilter === 'ytd' && !annualGoal && (
+          <p className="brutal-mono text-xs text-muted-foreground text-center">
+            <button onClick={() => {}} className="underline">Set Annual Goal →</button>
+          </p>
+        )}
 
         {/* Total Mileage Card */}
         <Card className="brutal-border brutal-shadow bg-accent/10 mb-8">
@@ -573,6 +710,86 @@ const ForecastSummary = ({ onBack, deductions, userProfile }: ForecastSummaryPro
           </CardContent>
         </Card>
 
+        {/* Monthly Bar Chart (YTD only) */}
+        {periodFilter === 'ytd' && monthlyData.length > 0 && (
+          <Card className="brutal-border brutal-shadow bg-background">
+            <CardHeader className="pb-4">
+              <CardTitle className="mobile-text-xl brutal-text font-bold flex items-center gap-2">
+                <BarChart2 className="mobile-icon" />
+                MONTHLY NET INCOME
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={monthlyData} margin={{ top: 4, right: 4, left: 0, bottom: 4 }}>
+                  <XAxis dataKey="month" tick={{ fontSize: 11, fontFamily: 'monospace' }} />
+                  <YAxis tick={{ fontSize: 10, fontFamily: 'monospace' }} tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`} />
+                  <Tooltip
+                    formatter={(val: number) => [`$${formatCurrency(val)}`, 'Net Pay']}
+                    contentStyle={{ fontFamily: 'monospace', fontSize: 12 }}
+                  />
+                  <Bar dataKey="net" radius={0}>
+                    {monthlyData.map((entry, i) => (
+                      <Cell key={i} fill={entry.aboveAvg ? 'hsl(120 100% 25%)' : 'hsl(39 94% 52%)'} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+              <p className="brutal-mono text-xs text-muted-foreground mt-2">
+                🟢 Above average &nbsp; 🟡 Below average
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Lane Performance Analytics */}
+        {laneStats.length > 0 && (
+          <Card className="brutal-border brutal-shadow bg-background">
+            <CardHeader className="pb-4">
+              <CardTitle className="mobile-text-xl brutal-text font-bold flex items-center gap-2">
+                <MapPin className="mobile-icon" />
+                LANE PERFORMANCE
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {laneStats.slice(0, 8).map((lane, i) => (
+                <div key={lane.lane} className={`brutal-border p-3 flex justify-between items-center gap-2 ${i === 0 ? 'bg-success/10' : i === laneStats.length - 1 ? 'bg-destructive/5' : 'bg-background'}`}>
+                  <div className="flex-1 min-w-0">
+                    <p className="brutal-text text-sm font-bold truncate">{lane.lane}</p>
+                    <p className="brutal-mono text-xs text-muted-foreground">{lane.count} load{lane.count !== 1 ? 's' : ''}</p>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <p className="brutal-text text-sm font-bold text-primary">${formatCurrency(lane.avgDriverPay)}</p>
+                    <p className="brutal-mono text-xs text-muted-foreground">
+                      {lane.avgRPM !== null ? `$${lane.avgRPM.toFixed(2)}/mi` : '--'} · AVG DRIVER PAY
+                    </p>
+                  </div>
+                </div>
+              ))}
+              {laneStats.length > 1 && (
+                <div className="pt-2 grid grid-cols-2 gap-3">
+                  <div className="brutal-border p-3 bg-success/10">
+                    <p className="brutal-mono text-xs text-muted-foreground">BEST LANE</p>
+                    <p className="brutal-text text-sm font-bold text-green-700 truncate">{laneStats[0].lane}</p>
+                    <p className="brutal-text text-lg font-bold">${formatCurrency(laneStats[0].avgDriverPay)}</p>
+                    {laneStats[0].avgRPM !== null && (
+                      <p className="brutal-mono text-xs text-green-700">${laneStats[0].avgRPM.toFixed(2)}/mi</p>
+                    )}
+                  </div>
+                  <div className="brutal-border p-3 bg-destructive/5">
+                    <p className="brutal-mono text-xs text-muted-foreground">WORST LANE</p>
+                    <p className="brutal-text text-sm font-bold text-red-700 truncate">{laneStats[laneStats.length - 1].lane}</p>
+                    <p className="brutal-text text-lg font-bold">${formatCurrency(laneStats[laneStats.length - 1].avgDriverPay)}</p>
+                    {laneStats[laneStats.length - 1].avgRPM !== null && (
+                      <p className="brutal-mono text-xs text-red-700">${laneStats[laneStats.length - 1].avgRPM!.toFixed(2)}/mi</p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         {/* Loads List */}
         {filteredLoads.length > 0 && (
           <Card className="brutal-border brutal-shadow bg-background">
@@ -583,14 +800,25 @@ const ForecastSummary = ({ onBack, deductions, userProfile }: ForecastSummaryPro
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {filteredLoads.map((load) => (
-                <div key={load.id} className="brutal-border bg-card p-4 brutal-shadow">
-                  <LoadCard 
-                    load={load} 
-                    onDelete={handleDeleteLoad}
-                  />
-                </div>
-              ))}
+              {filteredLoads.map((load) => {
+                const wMileage = weeklyMileageData[load.dateAdded];
+                const loadsInWeek = filteredLoads.filter(l => l.dateAdded === load.dateAdded).length;
+                const estMiles = (wMileage && wMileage.totalMiles > 0 && loadsInWeek > 0)
+                  ? wMileage.totalMiles / loadsInWeek
+                  : 500; // fallback per spec
+                return (
+                  <div key={load.id} className="brutal-border bg-card p-4 brutal-shadow">
+                    <LoadCard
+                      load={load}
+                      onDelete={handleDeleteLoad}
+                      onEdit={handleEditLoad}
+                      isEditing={editingLoad === load.id}
+                      setIsEditing={(editing) => setEditingLoad(editing ? load.id : null)}
+                      estimatedMiles={estMiles}
+                    />
+                  </div>
+                );
+              })}
             </CardContent>
           </Card>
         )}

@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { Plus, Truck } from 'lucide-react';
+import { useSubscription } from '@/hooks/useSubscription';
+import { isBefore, startOfDay } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import AddLoadForm from './AddLoadForm';
 import LoadCard from './LoadCard';
@@ -12,9 +14,12 @@ import { useLoadReports } from '@/hooks/useLoadReports';
 import { useDeductionsManager } from '@/hooks/useDeductionsManager';
 import { useMileageManager } from '@/hooks/useMileageManager';
 import { calculateFixedDeductionsForWeek } from '@/lib/loadReportsUtils';
+import { getUserWeekStart } from '@/lib/weeklyPeriodUtils';
 import { LoadReportsProps, DeleteConfirmation } from '@/types/LoadReports';
+import WeeklyForecastCard from './WeeklyForecastCard';
 
-const LoadReports = ({ onBack, user, userProfile, deductions }: LoadReportsProps) => {
+const LoadReports = ({ onBack, user, userProfile, deductions, onUpgrade }: LoadReportsProps) => {
+  const { isFeatureAllowed } = useSubscription();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<DeleteConfirmation | null>(null);
   const [showAddExtraDeduction, setShowAddExtraDeduction] = useState(false);
   const [newExtraDeduction, setNewExtraDeduction] = useState({ name: '', amount: '', date: new Date().toISOString().split('T')[0] });
@@ -103,6 +108,28 @@ const LoadReports = ({ onBack, user, userProfile, deductions }: LoadReportsProps
     }
   };
 
+  // Paywall: gate prev-week navigation for free users
+  const handleNavigateWeek = (direction: 'prev' | 'next') => {
+    if (direction === 'prev') {
+      const currentWeekStartDay = startOfDay(weekStart);
+      const todayWeekStart = startOfDay(getUserWeekStart(new Date(), userProfile));
+      if (isBefore(currentWeekStartDay, todayWeekStart) && !isFeatureAllowed('fullHistory')) {
+        onUpgrade?.();
+        return;
+      }
+    }
+    navigateWeek(direction);
+  };
+
+  // Paywall: gate 6th load for free users
+  const handleShowAddForm = () => {
+    if (!isFeatureAllowed('fullHistory') && currentWeekLoads.length >= 5) {
+      onUpgrade?.();
+      return;
+    }
+    setShowAddForm(true);
+  };
+
   const totalGrossPay = currentWeekLoads.reduce((total, load) => total + (load.rate || 0), 0);
   const totalDriverPay = currentWeekLoads.reduce((total, load) => total + (load.driverPay || 0), 0);
   const totalFixedDeductions = calculateFixedDeductionsForWeek(deductions, weekStart);
@@ -111,12 +138,12 @@ const LoadReports = ({ onBack, user, userProfile, deductions }: LoadReportsProps
   return (
     <div className="min-h-screen bg-background brutal-grid p-6">
       <div className="max-w-4xl mx-auto space-y-6">
-        <LoadReportsHeader 
+        <LoadReportsHeader
           onBack={onBack}
           weekStart={weekStart}
           weekEnd={weekEnd}
           userProfile={userProfile}
-          onNavigateWeek={navigateWeek}
+          onNavigateWeek={handleNavigateWeek}
         />
 
         <LoadSummaryCards 
@@ -130,23 +157,34 @@ const LoadReports = ({ onBack, user, userProfile, deductions }: LoadReportsProps
           calculateRPM={() => calculateRPM(totalGrossPay)}
         />
 
+        <WeeklyForecastCard
+          user={user}
+          userProfile={userProfile}
+          weekStart={weekStart}
+          weekEnd={weekEnd}
+          currentGross={totalGrossPay}
+          currentDriverPay={totalDriverPay}
+          loadCount={currentWeekLoads.length}
+          fixedDeductionsWeeklyTotal={totalFixedDeductions}
+        />
+
         {/* Add New Load Button */}
-        <Button 
-          onClick={() => setShowAddForm(true)}
+        <Button
+          onClick={handleShowAddForm}
           className="w-full h-16 brutal-border-accent hover:brutal-border-info bg-accent hover:bg-accent text-accent-foreground brutal-hover brutal-active"
           size="lg"
         >
           <Plus className="w-8 h-8 mr-3" />
           <div className="text-left">
-            <p className="brutal-text text-xl">ADD_NEW_LOAD</p>
-            <p className="brutal-mono text-sm opacity-80">RECORD_LOAD_DATA</p>
+            <p className="brutal-text text-xl">Add Load</p>
+            <p className="brutal-mono text-sm opacity-80">Record this week's load</p>
           </div>
         </Button>
 
         {/* Add Load Form */}
         {showAddForm && (
           <div className="brutal-border-secondary bg-secondary p-6 brutal-shadow-lg">
-            <h3 className="brutal-text text-xl text-secondary-foreground mb-4">NEW_LOAD_ENTRY</h3>
+            <h3 className="brutal-text text-xl text-secondary-foreground mb-4">New Load</h3>
             <AddLoadForm 
               newLoad={newLoad}
               setNewLoad={setNewLoad}
@@ -162,15 +200,20 @@ const LoadReports = ({ onBack, user, userProfile, deductions }: LoadReportsProps
         {/* Load Cards */}
         {currentWeekLoads.length > 0 ? (
           <div className="space-y-4">
-            <h3 className="brutal-text text-xl text-foreground">WEEK_LOADS ({currentWeekLoads.length})</h3>
+            <h3 className="brutal-text text-xl text-foreground">This Week's Loads ({currentWeekLoads.length})</h3>
             {currentWeekLoads.map((load) => (
               <div key={load.id} className="brutal-border bg-card p-6 brutal-shadow">
-                <LoadCard 
-                  load={load} 
+                <LoadCard
+                  load={load}
                   onDelete={handleDeleteLoad}
                   onEdit={handleEditLoad}
                   isEditing={editingLoad === load.id}
                   setIsEditing={(editing) => setEditingLoad(editing ? load.id : null)}
+                  estimatedMiles={
+                    weeklyMileage.totalMiles > 0 && currentWeekLoads.length > 0
+                      ? weeklyMileage.totalMiles / currentWeekLoads.length
+                      : undefined
+                  }
                 />
               </div>
             ))}
@@ -178,8 +221,8 @@ const LoadReports = ({ onBack, user, userProfile, deductions }: LoadReportsProps
         ) : (
           <div className="brutal-border bg-muted p-8 brutal-shadow text-center">
             <Truck className="w-16 h-16 text-muted-foreground mx-auto mb-4 opacity-50" />
-            <p className="brutal-text text-xl text-muted-foreground">NO_LOADS_RECORDED</p>
-            <p className="brutal-mono text-sm text-muted-foreground">FOR_THIS_WEEK</p>
+            <p className="brutal-text text-xl text-muted-foreground">No loads recorded</p>
+            <p className="brutal-mono text-sm text-muted-foreground">for this week</p>
           </div>
         )}
 

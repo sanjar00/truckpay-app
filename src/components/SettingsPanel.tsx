@@ -20,6 +20,24 @@ const SettingsPanel = ({ userProfile, setUserProfile, onBack }) => {
   const { toast } = useToast();
   const { user, signOut } = useAuth();
 
+  const [annualGoal, setAnnualGoal] = useState(() => localStorage.getItem('truckpay_annual_goal') || '');
+  const [weeklyGoalSetting, setWeeklyGoalSetting] = useState(() => localStorage.getItem('truckpay_weekly_goal') || '');
+
+  const storageUsedMB = (() => {
+    try {
+      let total = 0;
+      for (const key in localStorage) {
+        if (localStorage.hasOwnProperty(key)) {
+          total += (localStorage.getItem(key) || '').length * 2;
+        }
+      }
+      return (total / 1024 / 1024).toFixed(2);
+    } catch {
+      return '0.00';
+    }
+  })();
+  const storagePercent = Math.min(100, Math.round((parseFloat(storageUsedMB) / 5) * 100));
+
   const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     setHasChanges(true);
@@ -109,7 +127,7 @@ const SettingsPanel = ({ userProfile, setUserProfile, onBack }) => {
       
       // Fetch all user data
       const [profileResponse, loadReportsResponse, deductionsResponse] = await Promise.all([
-        supabase.from('profiles').select('*').eq('id', user.id).single(),
+        supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
         supabase.from('load_reports').select('*').eq('user_id', user.id),
         supabase.from('deductions').select('*').eq('user_id', user.id)
       ]);
@@ -249,16 +267,11 @@ const SettingsPanel = ({ userProfile, setUserProfile, onBack }) => {
         // Delete profile first
         await supabase.from('profiles').delete().eq('id', user.id);
         
-        // Delete the actual user account from Supabase Auth
-        const { error: deleteError } = await supabase.auth.admin.deleteUser(user.id);
-        
-        if (deleteError) {
-          // If admin delete fails, try user delete (requires RLS policies)
-          const { error: userDeleteError } = await supabase.rpc('delete_user');
-          
-          if (userDeleteError) {
-            throw new Error('Failed to delete account. Please contact support.');
-          }
+        // Delete the actual user account via RPC (requires a delete_user function in Supabase)
+        const { error: userDeleteError } = await supabase.rpc('delete_user');
+
+        if (userDeleteError) {
+          throw new Error('Failed to delete account. Please contact support at dev@saaz.site.');
         }
         
         // Sign out after successful deletion
@@ -442,6 +455,73 @@ const SettingsPanel = ({ userProfile, setUserProfile, onBack }) => {
           </div>
         </div>
 
+        {/* Income Goals */}
+        <div className="brutal-border brutal-shadow-lg p-6 bg-success/5 mb-8">
+          <div className="flex items-center gap-3 mb-6">
+            <h2 className="text-xl brutal-text font-bold">INCOME GOALS</h2>
+          </div>
+          <div className="space-y-4">
+            <div>
+              <Label className="brutal-mono text-sm mb-2 block">ANNUAL INCOME GOAL ($)</Label>
+              <Input
+                type="number"
+                placeholder="e.g. 120000"
+                value={annualGoal}
+                onChange={e => {
+                  setAnnualGoal(e.target.value);
+                  localStorage.setItem('truckpay_annual_goal', e.target.value);
+                  // Auto-calculate weekly
+                  const weekly = e.target.value ? String(Math.round(parseFloat(e.target.value) / 52)) : '';
+                  setWeeklyGoalSetting(weekly);
+                  localStorage.setItem('truckpay_weekly_goal', weekly);
+                }}
+                className="brutal-border h-11"
+              />
+            </div>
+            <div>
+              <Label className="brutal-mono text-sm mb-2 block">WEEKLY INCOME GOAL ($)</Label>
+              <Input
+                type="number"
+                placeholder="Auto-calculated from annual"
+                value={weeklyGoalSetting}
+                onChange={e => {
+                  setWeeklyGoalSetting(e.target.value);
+                  localStorage.setItem('truckpay_weekly_goal', e.target.value);
+                }}
+                className="brutal-border h-11"
+              />
+              {annualGoal && (
+                <p className="brutal-mono text-xs text-muted-foreground mt-1">
+                  Auto-calculated: ${Math.round(parseFloat(annualGoal) / 52).toLocaleString()}/week
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+
+
+        {/* Storage Usage */}
+        <div className="brutal-border brutal-shadow-lg p-6 bg-muted/20 mb-8">
+          <h2 className="text-xl brutal-text font-bold mb-4">DATA MANAGEMENT</h2>
+          <div className="space-y-2">
+            <div className="flex justify-between brutal-mono text-sm">
+              <span>STORAGE USED</span>
+              <span>{storageUsedMB} MB / ~5 MB</span>
+            </div>
+            <div className="h-3 brutal-border bg-muted">
+              <div
+                className={`h-full transition-all ${storagePercent >= 80 ? 'bg-destructive' : 'bg-primary'}`}
+                style={{ width: `${storagePercent}%` }}
+              />
+            </div>
+            {storagePercent >= 80 && (
+              <p className="brutal-mono text-xs text-destructive font-bold">
+                ⚠ Storage almost full — export your data or clear old receipts
+              </p>
+            )}
+          </div>
+        </div>
+
         {/* Team Settings Card */}
         {formData.driverType === 'Team' && (
           <div className="brutal-border brutal-shadow-lg p-6 bg-info/5 mb-8">
@@ -508,11 +588,11 @@ const SettingsPanel = ({ userProfile, setUserProfile, onBack }) => {
           <div className="space-y-4 text-sm text-muted-foreground">
             <div className="flex justify-between items-center">
               <span className="font-medium">Version:</span>
-              <span>1.0.0</span>
+              <span>2.1.0</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="font-medium">Last Updated:</span>
-              <span>June 2025</span>
+              <span>March 2026</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="font-medium">Support:</span>
