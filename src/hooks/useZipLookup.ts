@@ -29,10 +29,13 @@ async function geocodeZip(zip: string): Promise<ZipInfo | null> {
   if (trimmed in zipCache) return zipCache[trimmed];
 
   try {
+    console.log('GOOGLE_MAPS_API_KEY:', GOOGLE_MAPS_API_KEY ? 'present' : 'MISSING');
     const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${trimmed}&components=country:US&language=en&key=${GOOGLE_MAPS_API_KEY}`;
+    console.log('Geocoding URL:', url);
     const res = await fetch(url);
     const data = await res.json();
 
+    console.log('Geocoding response:', data);
     if (data.status !== 'OK' || !data.results?.length) {
       zipCache[trimmed] = null;
       return null;
