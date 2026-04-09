@@ -158,14 +158,21 @@ export const useMileageManager = (user: any, weekStart: Date, userProfile?: any)
     try {
       const weekStartDate = weekStart.toISOString().split('T')[0];
 
-      // Calculate lease miles cost if user is a lease-operator
+      // Calculate lease miles cost ONLY for lease-operator drivers
       let leaseMilesCost = null;
-      if (userProfile?.driverType === 'lease-operator' && userProfile?.leaseRatePerMile && totalMiles > 0) {
-        leaseMilesCost = parseFloat((totalMiles * parseFloat(userProfile.leaseRatePerMile)).toFixed(2));
+      if (userProfile?.driverType === 'lease-operator') {
+        if (userProfile?.leaseRatePerMile && totalMiles > 0) {
+          leaseMilesCost = parseFloat((totalMiles * parseFloat(userProfile.leaseRatePerMile)).toFixed(2));
+        } else {
+          leaseMilesCost = 0; // Lease driver with no miles or no rate
+        }
       }
+      // For non-lease drivers, leaseMilesCost stays null
 
-      // Update local state immediately
-      setLeaseMilesCost(leaseMilesCost || 0);
+      // Update local state immediately (only for lease drivers)
+      if (userProfile?.driverType === 'lease-operator') {
+        setLeaseMilesCost(leaseMilesCost || 0);
+      }
 
       const { error } = await supabase
         .from('weekly_mileage')

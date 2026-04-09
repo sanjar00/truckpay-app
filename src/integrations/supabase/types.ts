@@ -207,6 +207,36 @@ export type Database = {
         }
         Relationships: []
       }
+      deductions: {
+        Row: {
+          id: string
+          user_id: string
+          type: string
+          amount: number
+          is_fixed: boolean
+          is_custom_type: boolean
+          date_added: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          type: string
+          amount: number
+          is_fixed?: boolean
+          is_custom_type?: boolean
+          date_added?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          type?: string
+          amount?: number
+          is_fixed?: boolean
+          is_custom_type?: boolean
+          date_added?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

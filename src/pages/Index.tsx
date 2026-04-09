@@ -141,20 +141,23 @@ const Index = () => {
         .eq('week_start', weekStartStr);
 
       let leaseMilesCost = 0;
-      try {
-        // Fetch lease miles cost from weekly_mileage table
-        const { data: mileageData, error } = await (supabase as any)
-          .from('weekly_mileage')
-          .select('lease_miles_cost')
-          .eq('user_id', user.id)
-          .eq('week_start', weekStartStr)
-          .maybeSingle();
+      // Only fetch lease miles cost for lease-operator drivers
+      if (userProfile?.driverType === 'lease-operator') {
+        try {
+          // Fetch lease miles cost from weekly_mileage table
+          const { data: mileageData, error } = await (supabase as any)
+            .from('weekly_mileage')
+            .select('lease_miles_cost')
+            .eq('user_id', user.id)
+            .eq('week_start', weekStartStr)
+            .maybeSingle();
 
-        if (!error && mileageData?.lease_miles_cost) {
-          leaseMilesCost = mileageData.lease_miles_cost;
+          if (!error && mileageData?.lease_miles_cost) {
+            leaseMilesCost = mileageData.lease_miles_cost;
+          }
+        } catch {
+          // If weekly_mileage query fails, just skip lease cost
         }
-      } catch {
-        // If weekly_mileage query fails, just skip lease cost
       }
 
       const gross = (loadsData || []).reduce((sum, l) => sum + (l.rate || 0), 0);
