@@ -136,7 +136,9 @@ const LoadReports = ({ onBack, user, userProfile, deductions, onUpgrade }: LoadR
   const totalDriverPay = currentWeekLoads.reduce((total, load) => total + (load.driverPay || 0), 0);
   const totalFixedDeductions = calculateFixedDeductionsForWeek(deductions, weekStart);
 
-  const netPay = totalDriverPay - totalWeeklyDeductions - totalExtraDeductions - totalFixedDeductions - leaseMilesCost;
+  // Only subtract lease miles cost for lease-operator drivers
+  const leaseCostDeduction = userProfile?.driverType === 'lease-operator' ? leaseMilesCost : 0;
+  const netPay = totalDriverPay - totalWeeklyDeductions - totalExtraDeductions - totalFixedDeductions - leaseCostDeduction;
 
   // Deadhead miles = total odometer miles − sum of Google Maps load miles
   const totalLoadMiles = currentWeekLoads.reduce((sum, load) => sum + (load.estimatedMiles || 0), 0);
@@ -252,7 +254,7 @@ const LoadReports = ({ onBack, user, userProfile, deductions, onUpgrade }: LoadR
             totalWeeklyDeductions={totalWeeklyDeductions}
             totalFixedDeductions={totalFixedDeductions}
             totalExtraDeductions={totalExtraDeductions}
-            leaseMilesCost={leaseMilesCost}
+            leaseMilesCost={leaseCostDeduction}
             netPay={netPay}
             extraDeductionTypes={extraDeductionTypes}
             onAddExtraDeduction={handleAddExtraDeduction}
