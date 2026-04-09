@@ -140,13 +140,31 @@ const Index = () => {
         .eq('user_id', user.id)
         .eq('week_start', weekStartStr);
 
+      let leaseMilesCost = 0;
+      try {
+        // Fetch lease miles cost from weekly_mileage table
+        const { data: mileageData, error } = await (supabase as any)
+          .from('weekly_mileage')
+          .select('lease_miles_cost')
+          .eq('user_id', user.id)
+          .eq('week_start', weekStartStr)
+          .maybeSingle();
+
+        if (!error && mileageData?.lease_miles_cost) {
+          leaseMilesCost = mileageData.lease_miles_cost;
+        }
+      } catch {
+        // If weekly_mileage query fails, just skip lease cost
+      }
+
       const gross = (loadsData || []).reduce((sum, l) => sum + (l.rate || 0), 0);
       const driverPay = (loadsData || []).reduce((sum, l) => sum + (l.driver_pay || 0), 0);
       const fixedTotal = calculateFixedDeductionsForWeek(fixedDeductions, weekStart);
       const expenses =
         (weeklyDeductionsData || []).reduce((sum, d) => sum + (d.amount || 0), 0) +
         (extraDeductionsData || []).reduce((sum, d) => sum + (d.amount || 0), 0) +
-        fixedTotal;
+        fixedTotal +
+        leaseMilesCost;
 
       setWeekSnapshot({
         loadCount: (loadsData || []).length,

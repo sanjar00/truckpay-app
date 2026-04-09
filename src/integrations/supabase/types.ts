@@ -54,6 +54,159 @@ export type Database = {
         }
         Relationships: []
       }
+      load_reports: {
+        Row: {
+          id: string
+          user_id: string
+          rate: number
+          company_deduction: number
+          driver_pay: number
+          location_from: string
+          location_to: string
+          pickup_date: string | null
+          delivery_date: string | null
+          date_added: string
+          week_period: string
+          deadhead_miles: number | null
+          dispatcher_name: string | null
+          dispatcher_company: string | null
+          dispatcher_phone: string | null
+          broker_name: string | null
+          broker_company: string | null
+          bol_number: string | null
+          notes: string | null
+          pickup_zip: string | null
+          delivery_zip: string | null
+          pickup_city_state: string | null
+          delivery_city_state: string | null
+          estimated_miles: number | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          rate: number
+          company_deduction: number
+          driver_pay: number
+          location_from: string
+          location_to: string
+          pickup_date?: string | null
+          delivery_date?: string | null
+          date_added: string
+          week_period: string
+          deadhead_miles?: number | null
+          dispatcher_name?: string | null
+          dispatcher_company?: string | null
+          dispatcher_phone?: string | null
+          broker_name?: string | null
+          broker_company?: string | null
+          bol_number?: string | null
+          notes?: string | null
+          pickup_zip?: string | null
+          delivery_zip?: string | null
+          pickup_city_state?: string | null
+          delivery_city_state?: string | null
+          estimated_miles?: number | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          rate?: number
+          company_deduction?: number
+          driver_pay?: number
+          location_from?: string
+          location_to?: string
+          pickup_date?: string | null
+          delivery_date?: string | null
+          date_added?: string
+          week_period?: string
+          deadhead_miles?: number | null
+          dispatcher_name?: string | null
+          dispatcher_company?: string | null
+          dispatcher_phone?: string | null
+          broker_name?: string | null
+          broker_company?: string | null
+          bol_number?: string | null
+          notes?: string | null
+          pickup_zip?: string | null
+          delivery_zip?: string | null
+          pickup_city_state?: string | null
+          delivery_city_state?: string | null
+          estimated_miles?: number | null
+        }
+        Relationships: []
+      }
+      weekly_deductions: {
+        Row: {
+          id: string
+          user_id: string
+          amount: number
+          week_start: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          amount: number
+          week_start: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          amount?: number
+          week_start?: string
+        }
+        Relationships: []
+      }
+      weekly_extra_deductions: {
+        Row: {
+          id: string
+          user_id: string
+          amount: number
+          week_start: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          amount: number
+          week_start: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          amount?: number
+          week_start?: string
+        }
+        Relationships: []
+      }
+      weekly_mileage: {
+        Row: {
+          id: string
+          user_id: string
+          week_start: string
+          start_mileage: number | null
+          end_mileage: number | null
+          lease_miles_cost: number | null
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          week_start: string
+          start_mileage?: number | null
+          end_mileage?: number | null
+          lease_miles_cost?: number | null
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          week_start?: string
+          start_mileage?: number | null
+          end_mileage?: number | null
+          lease_miles_cost?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
