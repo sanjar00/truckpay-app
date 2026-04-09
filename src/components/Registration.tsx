@@ -1,6 +1,6 @@
 
 import { useState } from 'react';
-import { User, Phone, Mail, Percent, Users, ArrowLeft, Calendar } from 'lucide-react';
+import { User, Phone, Mail, Percent, Users, ArrowLeft, Calendar, DollarSign } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -22,7 +22,10 @@ const Registration = ({ onComplete, onBackToLogin }: RegistrationProps) => {
     password: '',
     driverType: '',
     companyDeduction: '',
-    weeklyPeriod: 'sunday' // Default to Sunday-Saturday
+    weeklyPeriod: 'sunday',
+    leaseRatePerMile: '',
+    companyPayType: '',
+    companyPayRate: '',
   });
   const [loading, setLoading] = useState(false);
   const { signUp } = useAuth();
@@ -30,12 +33,25 @@ const Registration = ({ onComplete, onBackToLogin }: RegistrationProps) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.fullName || !formData.email || !formData.password || !formData.driverType || !formData.companyDeduction || !formData.weeklyPeriod) {
-      toast({
-        title: "Missing fields",
-        description: "Please fill in all required fields.",
-        variant: "destructive",
-      });
+
+    // Validate required base fields
+    if (!formData.fullName || !formData.email || !formData.password || !formData.driverType || !formData.weeklyPeriod) {
+      toast({ title: "Missing fields", description: "Please fill in all required fields.", variant: "destructive" });
+      return;
+    }
+    // Lease-operator: both deduction % and lease rate required
+    if (formData.driverType === 'lease-operator' && (!formData.companyDeduction || !formData.leaseRatePerMile)) {
+      toast({ title: "Missing fields", description: "Please enter your company deduction rate and lease rate per mile.", variant: "destructive" });
+      return;
+    }
+    // Company driver: pay type + rate required
+    if (formData.driverType === 'company-driver' && (!formData.companyPayType || !formData.companyPayRate)) {
+      toast({ title: "Missing fields", description: "Please select how you're paid and enter the rate.", variant: "destructive" });
+      return;
+    }
+    // Owner-operator: company deduction required
+    if (formData.driverType === 'owner-operator' && !formData.companyDeduction) {
+      toast({ title: "Missing fields", description: "Please enter your company deduction rate.", variant: "destructive" });
       return;
     }
 
@@ -44,8 +60,11 @@ const Registration = ({ onComplete, onBackToLogin }: RegistrationProps) => {
       full_name: formData.fullName,
       phone: formData.phone,
       driver_type: formData.driverType,
-      company_deduction: formData.companyDeduction,
-      weekly_period: formData.weeklyPeriod
+      company_deduction: formData.companyDeduction || '0',
+      weekly_period: formData.weeklyPeriod,
+      lease_rate_per_mile: formData.leaseRatePerMile || null,
+      company_pay_type: formData.companyPayType || null,
+      company_pay_rate: formData.companyPayRate || null,
     });
 
     if (error) {
@@ -162,31 +181,150 @@ const Registration = ({ onComplete, onBackToLogin }: RegistrationProps) => {
                   <SelectValue placeholder="Select driver type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Solo">Solo Driver</SelectItem>
-                  <SelectItem value="Team">Team Driver</SelectItem>
+                  <SelectItem value="owner-operator">Owner-Operator (own truck)</SelectItem>
+                  <SelectItem value="lease-operator">Lease-Operator (leasing company truck)</SelectItem>
+                  <SelectItem value="company-driver">Company Driver</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            {/* Company Deduction Rate */}
-            <div className="space-y-2">
-              <Label htmlFor="companyDeduction" className="flex items-center gap-2">
-                <Percent className="w-4 h-4" />
-                Company Deduction Rate (%) *
-              </Label>
-              <Input
-                id="companyDeduction"
-                type="number"
-                placeholder="25"
-                min="0"
-                max="100"
-                step="0.1"
-                value={formData.companyDeduction}
-                onChange={(e) => handleInputChange('companyDeduction', e.target.value)}
-                required
-                className="h-12"
-              />
-            </div>
+            {/* Owner-Operator: company deduction % */}
+            {formData.driverType === 'owner-operator' && (
+              <div className="space-y-2">
+                <Label htmlFor="companyDeduction" className="flex items-center gap-2">
+                  <Percent className="w-4 h-4" />
+                  Company Deduction Rate (%) *
+                </Label>
+                <Input
+                  id="companyDeduction"
+                  type="number"
+                  placeholder="e.g. 25"
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  value={formData.companyDeduction}
+                  onChange={(e) => handleInputChange('companyDeduction', e.target.value)}
+                  className="h-12"
+                />
+                <p className="text-xs text-gray-500">Percentage the company takes from each load.</p>
+              </div>
+            )}
+
+            {/* Lease-Operator: company deduction % + rate per mile */}
+            {formData.driverType === 'lease-operator' && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="companyDeductionLease" className="flex items-center gap-2">
+                    <Percent className="w-4 h-4" />
+                    Company Deduction Rate (%) *
+                  </Label>
+                  <Input
+                    id="companyDeductionLease"
+                    type="number"
+                    placeholder="e.g. 25"
+                    min="0"
+                    max="100"
+                    step="0.1"
+                    value={formData.companyDeduction}
+                    onChange={(e) => handleInputChange('companyDeduction', e.target.value)}
+                    className="h-12"
+                  />
+                  <p className="text-xs text-gray-500">Percentage the company takes from each load.</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="leaseRatePerMile" className="flex items-center gap-2">
+                    <DollarSign className="w-4 h-4" />
+                    Lease Rate Per Mile *
+                  </Label>
+                  <Input
+                    id="leaseRatePerMile"
+                    type="number"
+                    placeholder="e.g. 0.13"
+                    min="0"
+                    step="0.01"
+                    value={formData.leaseRatePerMile}
+                    onChange={(e) => handleInputChange('leaseRatePerMile', e.target.value)}
+                    className="h-12"
+                  />
+                  <p className="text-xs text-gray-500">Dollar amount you pay per mile driven (loaded or empty).</p>
+                </div>
+              </>
+            )}
+
+            {/* Company Driver: pay type + rate */}
+            {formData.driverType === 'company-driver' && (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <DollarSign className="w-4 h-4" />
+                    How are you paid? *
+                  </Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => handleInputChange('companyPayType', 'per_mile')}
+                      className={`h-12 brutal-border text-sm font-semibold transition-colors ${
+                        formData.companyPayType === 'per_mile'
+                          ? 'bg-accent text-accent-foreground'
+                          : 'bg-background text-foreground hover:bg-muted'
+                      }`}
+                    >
+                      $ per Mile
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleInputChange('companyPayType', 'percentage')}
+                      className={`h-12 brutal-border text-sm font-semibold transition-colors ${
+                        formData.companyPayType === 'percentage'
+                          ? 'bg-accent text-accent-foreground'
+                          : 'bg-background text-foreground hover:bg-muted'
+                      }`}
+                    >
+                      % of Gross
+                    </button>
+                  </div>
+                </div>
+
+                {formData.companyPayType === 'per_mile' && (
+                  <div className="space-y-2">
+                    <Label htmlFor="companyPayRate" className="flex items-center gap-2">
+                      <DollarSign className="w-4 h-4" />
+                      Rate Per Mile *
+                    </Label>
+                    <Input
+                      id="companyPayRate"
+                      type="number"
+                      placeholder="e.g. 0.55"
+                      min="0"
+                      step="0.01"
+                      value={formData.companyPayRate}
+                      onChange={(e) => handleInputChange('companyPayRate', e.target.value)}
+                      className="h-12"
+                    />
+                  </div>
+                )}
+
+                {formData.companyPayType === 'percentage' && (
+                  <div className="space-y-2">
+                    <Label htmlFor="companyPayRate" className="flex items-center gap-2">
+                      <Percent className="w-4 h-4" />
+                      Your Share of Gross (%) *
+                    </Label>
+                    <Input
+                      id="companyPayRate"
+                      type="number"
+                      placeholder="e.g. 30"
+                      min="0"
+                      max="100"
+                      step="0.1"
+                      value={formData.companyPayRate}
+                      onChange={(e) => handleInputChange('companyPayRate', e.target.value)}
+                      className="h-12"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Weekly Period Selection - Add this after Company Deduction Rate */}
             <div className="space-y-2">

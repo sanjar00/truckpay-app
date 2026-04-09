@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { format, addWeeks, subWeeks, isWithinInterval, parseISO } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { getUserWeekStart, getUserWeekEnd } from '@/lib/weeklyPeriodUtils';
+import { calculateDriverPay } from '@/lib/loadReportsUtils';
 import { Load, NewLoad, WeeklyMileage, ExtraDeduction } from '@/types/LoadReports';
 
 // Helper function to format dates without timezone issues
@@ -113,7 +114,7 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
 
       try {
         const companyDeduction = parseFloat(load.companyDeduction) || 0;
-        const driverPay = parseFloat(load.rate) * (1 - companyDeduction / 100);
+        const driverPay = calculateDriverPay(parseFloat(load.rate), userProfile, load.estimatedMiles);
         const weekPeriod = `${format(weekStart, 'MMM dd')} - ${format(weekEnd, 'MMM dd, yyyy')}`;
         const loadDate = weekStart.toISOString().split('T')[0];
 

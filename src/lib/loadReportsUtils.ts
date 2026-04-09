@@ -1,3 +1,44 @@
+/**
+ * Calculate driver pay for a single load based on driver type.
+ *
+ * owner-operator / lease-operator:
+ *   driverPay = rate * (1 - companyDeduction / 100)
+ *   (lease weekly mileage cost is deducted at the weekly level, not per-load)
+ *
+ * company-driver, per_mile:
+ *   driverPay = estimatedMiles * companyPayRate
+ *
+ * company-driver, percentage:
+ *   driverPay = rate * (companyPayRate / 100)
+ */
+export const calculateDriverPay = (
+  rate: number,
+  userProfile: {
+    driverType?: string;
+    companyDeduction?: number | string;
+    companyPayType?: string;
+    companyPayRate?: number | string;
+  },
+  estimatedMiles?: number
+): number => {
+  const driverType = userProfile?.driverType || 'owner-operator';
+
+  if (driverType === 'company-driver') {
+    const payType = userProfile?.companyPayType;
+    const payRate = parseFloat(String(userProfile?.companyPayRate || 0));
+
+    if (payType === 'per_mile') {
+      return (estimatedMiles || 0) * payRate;
+    }
+    // percentage of gross
+    return rate * (payRate / 100);
+  }
+
+  // owner-operator and lease-operator both use company deduction %
+  const deduction = parseFloat(String(userProfile?.companyDeduction || 0));
+  return rate * (1 - deduction / 100);
+};
+
 export const getWeeklyPeriodDisplay = (weeklyPeriod: string) => {
   const periodMap = {
     'sunday': 'SUNDAY_TO_SATURDAY',

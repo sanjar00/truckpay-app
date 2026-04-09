@@ -178,7 +178,10 @@ const Index = () => {
         driverType: data.driver_type,
         companyDeduction: data.company_deduction,
         weeklyPeriod: data.weekly_period || 'sunday',
-        weeklyPeriodUpdatedAt: data.weekly_period_updated_at
+        weeklyPeriodUpdatedAt: data.weekly_period_updated_at,
+        leaseRatePerMile: data.lease_rate_per_mile ?? null,
+        companyPayType: data.company_pay_type ?? null,
+        companyPayRate: data.company_pay_rate ?? null,
       });
     }
 

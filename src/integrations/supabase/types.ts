@@ -12,30 +12,45 @@ export type Database = {
       profiles: {
         Row: {
           company_deduction: number
+          company_pay_rate: number | null
+          company_pay_type: string | null
           created_at: string
           driver_type: string
           full_name: string
           id: string
+          lease_rate_per_mile: number | null
           phone: string | null
           updated_at: string
+          weekly_period: string | null
+          weekly_period_updated_at: string | null
         }
         Insert: {
           company_deduction: number
+          company_pay_rate?: number | null
+          company_pay_type?: string | null
           created_at?: string
           driver_type: string
           full_name: string
           id: string
+          lease_rate_per_mile?: number | null
           phone?: string | null
           updated_at?: string
+          weekly_period?: string | null
+          weekly_period_updated_at?: string | null
         }
         Update: {
           company_deduction?: number
+          company_pay_rate?: number | null
+          company_pay_type?: string | null
           created_at?: string
           driver_type?: string
           full_name?: string
           id?: string
+          lease_rate_per_mile?: number | null
           phone?: string | null
           updated_at?: string
+          weekly_period?: string | null
+          weekly_period_updated_at?: string | null
         }
         Relationships: []
       }

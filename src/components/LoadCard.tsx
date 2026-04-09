@@ -6,14 +6,15 @@ import { Card, CardContent } from '@/components/ui/card';
 import { MapPin, Calendar, Trash2, Edit, Save, X, MoreHorizontal, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { formatCurrency } from '@/lib/utils';
+import { calculateDriverPay } from '@/lib/loadReportsUtils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { useZipLookup } from '@/hooks/useZipLookup';
 
-function getProfitabilityGrade(driverPay: number, miles: number) {
+function getProfitabilityGrade(grossRate: number, miles: number) {
   if (!miles || miles <= 0) return null;
-  const rpm = driverPay / miles;
+  const rpm = grossRate / miles;
   if (rpm >= 2.50) return { score: 'A', label: 'EXCELLENT', color: 'bg-green-600 text-white', rpm };
   if (rpm >= 2.00) return { score: 'B', label: 'GOOD', color: 'bg-blue-600 text-white', rpm };
   if (rpm >= 1.50) return { score: 'C', label: 'AVERAGE', color: 'bg-yellow-500 text-black', rpm };
@@ -65,12 +66,15 @@ interface LoadCardProps {
   isEditing?: boolean;
   setIsEditing?: (editing: boolean) => void;
   estimatedMiles?: number;
+  userProfile?: any;
 }
 
-const LoadCard = ({ load, onDelete, onEdit, isEditing, setIsEditing, estimatedMiles }: LoadCardProps) => {
+const LoadCard = ({ load, onDelete, onEdit, isEditing, setIsEditing, estimatedMiles, userProfile }: LoadCardProps) => {
+  const isCompanyDriver = userProfile?.driverType === 'company-driver';
   // Use load's own estimatedMiles if available, fall back to prop
   const milesForGrade = load.estimatedMiles || estimatedMiles;
-  const grade = milesForGrade ? getProfitabilityGrade(load.driverPay, milesForGrade) : null;
+  // Grade is always based on gross rate per mile (load value, not driver cut)
+  const grade = milesForGrade ? getProfitabilityGrade(load.rate, milesForGrade) : null;
 
   const [editData, setEditData] = useState({
     rate: load.rate.toString(),
@@ -124,8 +128,8 @@ const LoadCard = ({ load, onDelete, onEdit, isEditing, setIsEditing, estimatedMi
 
   const handleSave = () => {
     if (onEdit) {
-      const driverPay = parseFloat(editData.rate) * (1 - parseFloat(editData.companyDeduction) / 100);
       const resolvedMiles = zip.estimatedMiles ?? (editData.estimatedMiles ? parseInt(editData.estimatedMiles) : undefined);
+      const driverPay = calculateDriverPay(parseFloat(editData.rate), userProfile, resolvedMiles);
       onEdit(load.id, {
         rate: parseFloat(editData.rate),
         companyDeduction: parseFloat(editData.companyDeduction),
@@ -309,7 +313,7 @@ const LoadCard = ({ load, onDelete, onEdit, isEditing, setIsEditing, estimatedMi
             </div>
 
             {/* Rate and Deduction */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className={`grid grid-cols-1 gap-4 ${!isCompanyDriver ? 'md:grid-cols-2' : ''}`}>
               <div>
                 <label className="text-sm font-medium mb-1 block">Load Rate ($)</label>
                 <Input
@@ -320,18 +324,20 @@ const LoadCard = ({ load, onDelete, onEdit, isEditing, setIsEditing, estimatedMi
                   placeholder="0.00"
                 />
               </div>
-              <div>
-                <label className="text-sm font-medium mb-1 block">Company Deduction (%)</label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  max="100"
-                  value={editData.companyDeduction}
-                  onChange={(e) => setEditData(prev => ({ ...prev, companyDeduction: e.target.value }))}
-                  placeholder="25.00"
-                />
-              </div>
+              {!isCompanyDriver && (
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Company Deduction (%)</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max="100"
+                    value={editData.companyDeduction}
+                    onChange={(e) => setEditData(prev => ({ ...prev, companyDeduction: e.target.value }))}
+                    placeholder="25.00"
+                  />
+                </div>
+              )}
             </div>
 
             {/* More Details Toggle */}
@@ -379,7 +385,7 @@ const LoadCard = ({ load, onDelete, onEdit, isEditing, setIsEditing, estimatedMi
                 onClick={handleSave}
                 size="sm"
                 className="bg-green-600 hover:bg-green-700"
-                disabled={!editData.rate || !editData.companyDeduction || !editData.pickupZip || !editData.deliveryZip}
+                disabled={!editData.rate || (!isCompanyDriver && !editData.companyDeduction) || !editData.pickupZip || !editData.deliveryZip}
               >
                 <Save className="w-4 h-4 mr-1" />
                 Save
@@ -446,10 +452,21 @@ const LoadCard = ({ load, onDelete, onEdit, isEditing, setIsEditing, estimatedMi
                 <p className="text-gray-600 text-xs">Load Rate</p>
                 <p className="font-semibold text-gray-600">${formatCurrency(load.rate)}</p>
               </div>
-              <div>
-                <p className="text-gray-600 text-xs">Co. Cut</p>
-                <p className="font-semibold text-red-500">{load.companyDeduction}%</p>
-              </div>
+              {!isCompanyDriver ? (
+                <div>
+                  <p className="text-gray-600 text-xs">Co. Cut</p>
+                  <p className="font-semibold text-red-500">{load.companyDeduction}%</p>
+                </div>
+              ) : (
+                <div>
+                  <p className="text-gray-600 text-xs">Pay Basis</p>
+                  <p className="font-semibold text-gray-600">
+                    {userProfile?.companyPayType === 'per_mile'
+                      ? `$${userProfile.companyPayRate}/mi`
+                      : `${userProfile?.companyPayRate}%`}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 

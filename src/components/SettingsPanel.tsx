@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, User, Phone, Mail, Users, Percent, Save, Download, Upload, Trash2 } from 'lucide-react';
+import { ArrowLeft, User, Phone, Mail, Users, Percent, Save, Download, Upload, Trash2, DollarSign } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -61,9 +61,12 @@ const SettingsPanel = ({ userProfile, setUserProfile, onBack }) => {
           full_name: formData.name,
           phone: formData.phone,
           driver_type: formData.driverType,
-          company_deduction: parseFloat(formData.companyDeduction),
+          company_deduction: parseFloat(formData.companyDeduction) || 0,
           weekly_period: formData.weeklyPeriod,
-          weekly_period_updated_at: weeklyPeriodChanged ? new Date().toISOString() : undefined
+          weekly_period_updated_at: weeklyPeriodChanged ? new Date().toISOString() : undefined,
+          lease_rate_per_mile: formData.leaseRatePerMile ? parseFloat(formData.leaseRatePerMile) : null,
+          company_pay_type: formData.companyPayType || null,
+          company_pay_rate: formData.companyPayRate ? parseFloat(formData.companyPayRate) : null,
         })
         .eq('id', user.id);
 
@@ -393,37 +396,156 @@ const SettingsPanel = ({ userProfile, setUserProfile, onBack }) => {
                 <Users className="h-4 w-4" />
                 Driver Type
               </Label>
-              <Select 
-                value={formData.driverType || ''} 
+              <Select
+                value={formData.driverType || ''}
                 onValueChange={(value) => handleInputChange('driverType', value)}
               >
                 <SelectTrigger className="h-12 brutal-border text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="brutal-border">
-                  <SelectItem value="Solo">Solo Driver</SelectItem>
-                  <SelectItem value="Team">Team Driver</SelectItem>
+                  <SelectItem value="owner-operator">Owner-Operator (own truck)</SelectItem>
+                  <SelectItem value="lease-operator">Lease-Operator (leasing company truck)</SelectItem>
+                  <SelectItem value="company-driver">Company Driver</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            {/* Company Deduction Rate */}
-            <div className="space-y-2">
-              <Label htmlFor="companyDeduction" className="flex items-center gap-2 text-sm brutal-text font-medium">
-                <Percent className="h-4 w-4" />
-                Company Deduction Rate (%)
-              </Label>
-              <Input
-                id="companyDeduction"
-                type="number"
-                min="0"
-                max="100"
-                step="0.1"
-                value={formData.companyDeduction || ''}
-                onChange={(e) => handleInputChange('companyDeduction', e.target.value)}
-                className="h-12 brutal-border text-sm"
-              />
-            </div>
+            {/* Owner-Operator: company deduction % */}
+            {formData.driverType === 'owner-operator' && (
+              <div className="space-y-2">
+                <Label htmlFor="companyDeduction" className="flex items-center gap-2 text-sm brutal-text font-medium">
+                  <Percent className="h-4 w-4" />
+                  Company Deduction Rate (%)
+                </Label>
+                <Input
+                  id="companyDeduction"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  value={formData.companyDeduction || ''}
+                  onChange={(e) => handleInputChange('companyDeduction', e.target.value)}
+                  className="h-12 brutal-border text-sm"
+                />
+                <p className="text-xs text-muted-foreground">Percentage the company takes from each load.</p>
+              </div>
+            )}
+
+            {/* Lease-Operator: company deduction % + rate per mile */}
+            {formData.driverType === 'lease-operator' && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="companyDeductionLease" className="flex items-center gap-2 text-sm brutal-text font-medium">
+                    <Percent className="h-4 w-4" />
+                    Company Deduction Rate (%)
+                  </Label>
+                  <Input
+                    id="companyDeductionLease"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.1"
+                    value={formData.companyDeduction || ''}
+                    onChange={(e) => handleInputChange('companyDeduction', e.target.value)}
+                    className="h-12 brutal-border text-sm"
+                  />
+                  <p className="text-xs text-muted-foreground">Percentage the company takes from each load.</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="leaseRatePerMile" className="flex items-center gap-2 text-sm brutal-text font-medium">
+                    <DollarSign className="h-4 w-4" />
+                    Lease Rate Per Mile
+                  </Label>
+                  <Input
+                    id="leaseRatePerMile"
+                    type="number"
+                    placeholder="e.g. 0.13"
+                    min="0"
+                    step="0.01"
+                    value={formData.leaseRatePerMile || ''}
+                    onChange={(e) => handleInputChange('leaseRatePerMile', e.target.value)}
+                    className="h-12 brutal-border text-sm"
+                  />
+                  <p className="text-xs text-muted-foreground">Dollar amount you pay per mile driven (loaded or empty).</p>
+                </div>
+              </>
+            )}
+
+            {/* Company Driver: pay type + rate */}
+            {formData.driverType === 'company-driver' && (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2 text-sm brutal-text font-medium">
+                    <DollarSign className="h-4 w-4" />
+                    How are you paid?
+                  </Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => handleInputChange('companyPayType', 'per_mile')}
+                      className={`h-12 brutal-border text-sm font-semibold transition-colors ${
+                        formData.companyPayType === 'per_mile'
+                          ? 'bg-accent text-accent-foreground'
+                          : 'bg-background text-foreground hover:bg-muted'
+                      }`}
+                    >
+                      $ per Mile
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleInputChange('companyPayType', 'percentage')}
+                      className={`h-12 brutal-border text-sm font-semibold transition-colors ${
+                        formData.companyPayType === 'percentage'
+                          ? 'bg-accent text-accent-foreground'
+                          : 'bg-background text-foreground hover:bg-muted'
+                      }`}
+                    >
+                      % of Gross
+                    </button>
+                  </div>
+                </div>
+
+                {formData.companyPayType === 'per_mile' && (
+                  <div className="space-y-2">
+                    <Label htmlFor="companyPayRate" className="flex items-center gap-2 text-sm brutal-text font-medium">
+                      <DollarSign className="h-4 w-4" />
+                      Rate Per Mile
+                    </Label>
+                    <Input
+                      id="companyPayRate"
+                      type="number"
+                      placeholder="e.g. 0.55"
+                      min="0"
+                      step="0.01"
+                      value={formData.companyPayRate || ''}
+                      onChange={(e) => handleInputChange('companyPayRate', e.target.value)}
+                      className="h-12 brutal-border text-sm"
+                    />
+                  </div>
+                )}
+
+                {formData.companyPayType === 'percentage' && (
+                  <div className="space-y-2">
+                    <Label htmlFor="companyPayRate" className="flex items-center gap-2 text-sm brutal-text font-medium">
+                      <Percent className="h-4 w-4" />
+                      Your Share of Gross (%)
+                    </Label>
+                    <Input
+                      id="companyPayRate"
+                      type="number"
+                      placeholder="e.g. 30"
+                      min="0"
+                      max="100"
+                      step="0.1"
+                      value={formData.companyPayRate || ''}
+                      onChange={(e) => handleInputChange('companyPayRate', e.target.value)}
+                      className="h-12 brutal-border text-sm"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Add Weekly Period Setting after Company Deduction Rate */}
             <div className="space-y-2">
@@ -521,42 +643,6 @@ const SettingsPanel = ({ userProfile, setUserProfile, onBack }) => {
             )}
           </div>
         </div>
-
-        {/* Team Settings Card */}
-        {formData.driverType === 'Team' && (
-          <div className="brutal-border brutal-shadow-lg p-6 bg-info/5 mb-8">
-            <div className="flex items-center gap-3 mb-6">
-              <Users className="h-5 w-5 text-info" />
-              <h2 className="text-xl brutal-text font-bold text-info">
-                TEAM SETTINGS
-              </h2>
-            </div>
-            
-            <div className="space-y-6">
-              <div className="brutal-border brutal-shadow p-4 bg-info/10">
-                <p className="text-info brutal-text font-medium mb-2 text-sm">
-                  🚧 Coming Soon: Team Connection
-                </p>
-                <p className="text-info text-xs">
-                  Connect with your driving partner to share load reports and track combined earnings.
-                </p>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="teammateId" className="text-sm text-info">
-                  Teammate Username/ID (Future Feature)
-                </Label>
-                <Input
-                  id="teammateId"
-                  type="text"
-                  placeholder="teammate_username"
-                  disabled
-                  className="h-12 brutal-border text-sm bg-info/5"
-                />
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Save/Reset Buttons */}
         {hasChanges && (

@@ -37,6 +37,7 @@ interface WeeklySummaryProps {
   totalWeeklyDeductions: number;
   totalExtraDeductions: number;
   totalFixedDeductions: number;
+  leaseMilesCost?: number;
   netPay: number;
   weeklyMileage?: { totalMiles: number };
 }
@@ -58,6 +59,7 @@ const WeeklySummary = ({
   totalWeeklyDeductions,
   totalExtraDeductions,
   totalFixedDeductions,
+  leaseMilesCost = 0,
   netPay,
   weeklyMileage,
   onEditExtraDeduction,
@@ -506,6 +508,12 @@ const WeeklySummary = ({
             <div className="flex justify-between">
               <span>Weekly Fixed Costs:</span>
               <span>-${formatCurrency(totalFixedDeductions)}</span>
+            </div>
+          )}
+          {leaseMilesCost > 0 && (
+            <div className="flex justify-between">
+              <span>Lease Miles Cost:</span>
+              <span>-${formatCurrency(leaseMilesCost)}</span>
             </div>
           )}
           <div className="flex justify-between border-t border-border pt-2 font-bold">

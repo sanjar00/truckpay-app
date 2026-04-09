@@ -134,7 +134,14 @@ const LoadReports = ({ onBack, user, userProfile, deductions, onUpgrade }: LoadR
   const totalGrossPay = currentWeekLoads.reduce((total, load) => total + (load.rate || 0), 0);
   const totalDriverPay = currentWeekLoads.reduce((total, load) => total + (load.driverPay || 0), 0);
   const totalFixedDeductions = calculateFixedDeductionsForWeek(deductions, weekStart);
-  const netPay = totalDriverPay - totalWeeklyDeductions - totalExtraDeductions - totalFixedDeductions;
+
+  // Lease-operators also pay per mile driven (total odometer miles × lease rate)
+  const leaseMilesCost =
+    userProfile?.driverType === 'lease-operator' && userProfile?.leaseRatePerMile && weeklyMileage.totalMiles > 0
+      ? weeklyMileage.totalMiles * parseFloat(userProfile.leaseRatePerMile)
+      : 0;
+
+  const netPay = totalDriverPay - totalWeeklyDeductions - totalExtraDeductions - totalFixedDeductions - leaseMilesCost;
 
   // Deadhead miles = total odometer miles − sum of Google Maps load miles
   const totalLoadMiles = currentWeekLoads.reduce((sum, load) => sum + (load.estimatedMiles || 0), 0);
@@ -196,7 +203,7 @@ const LoadReports = ({ onBack, user, userProfile, deductions, onUpgrade }: LoadR
         {showAddForm && (
           <div className="brutal-border-secondary bg-secondary p-6 brutal-shadow-lg">
             <h3 className="brutal-text text-xl text-secondary-foreground mb-4">New Load</h3>
-            <AddLoadForm 
+            <AddLoadForm
               newLoad={newLoad}
               setNewLoad={setNewLoad}
               onAddLoad={handleAddLoad}
@@ -204,6 +211,7 @@ const LoadReports = ({ onBack, user, userProfile, deductions, onUpgrade }: LoadR
               loading={loading}
               weekStart={weekStart}
               weekEnd={weekEnd}
+              userProfile={userProfile}
             />
           </div>
         )}
@@ -225,6 +233,7 @@ const LoadReports = ({ onBack, user, userProfile, deductions, onUpgrade }: LoadR
                       ? weeklyMileage.totalMiles / currentWeekLoads.length
                       : undefined
                   }
+                  userProfile={userProfile}
                 />
               </div>
             ))}
@@ -243,12 +252,12 @@ const LoadReports = ({ onBack, user, userProfile, deductions, onUpgrade }: LoadR
             weeklyDeductions={weeklyDeductions}
             onWeeklyDeductionChange={handleWeeklyDeductionChange}
             availableDeductionTypes={availableDeductionTypes}
-            fixedDeductions={deductions?.filter(d => d.isFixed) || []}
             totalGrossPay={totalGrossPay}
             totalDriverPay={totalDriverPay}
             totalWeeklyDeductions={totalWeeklyDeductions}
             totalFixedDeductions={totalFixedDeductions}
             totalExtraDeductions={totalExtraDeductions}
+            leaseMilesCost={leaseMilesCost}
             netPay={netPay}
             extraDeductionTypes={extraDeductionTypes}
             onAddExtraDeduction={handleAddExtraDeduction}

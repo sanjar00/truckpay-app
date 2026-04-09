@@ -10,7 +10,8 @@ import { Calendar } from '@/components/ui/calendar';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useZipLookup } from '@/hooks/useZipLookup';
-import { NewLoad } from '@/types/loadReports';
+import { NewLoad } from '@/types/LoadReports';
+import { calculateDriverPay } from '@/lib/loadReportsUtils';
 
 interface AddLoadFormProps {
   newLoad: NewLoad;
@@ -20,6 +21,7 @@ interface AddLoadFormProps {
   loading: boolean;
   weekStart: Date;
   weekEnd: Date;
+  userProfile?: any;
 }
 
 const AddLoadForm = ({
@@ -29,7 +31,8 @@ const AddLoadForm = ({
   onCancel,
   loading,
   weekStart,
-  weekEnd
+  weekEnd,
+  userProfile,
 }: AddLoadFormProps) => {
   const [pickupCalendarOpen, setPickupCalendarOpen] = useState(false);
   const [deliveryCalendarOpen, setDeliveryCalendarOpen] = useState(false);
@@ -37,8 +40,14 @@ const AddLoadForm = ({
 
   const zip = useZipLookup();
 
-  const driverPayPreview = newLoad.rate && newLoad.companyDeduction
-    ? (parseFloat(newLoad.rate) * (1 - parseFloat(newLoad.companyDeduction) / 100)).toFixed(2)
+  const isCompanyDriver = userProfile?.driverType === 'company-driver';
+
+  const driverPayPreview = newLoad.rate
+    ? calculateDriverPay(
+        parseFloat(newLoad.rate),
+        userProfile,
+        zip.estimatedMiles ?? newLoad.estimatedMiles
+      ).toFixed(2)
     : null;
 
   const handlePickupZipChange = (value: string) => {
@@ -266,24 +275,26 @@ const AddLoadForm = ({
 
         {showOptional && (
           <div className="space-y-4 border-t pt-4">
-            {/* Company Deduction */}
-            <div className="space-y-2">
-              <Label htmlFor="companyDeduction" className="flex items-center gap-2">
-                <Percent className="w-4 h-4" />
-                Company Deduction (%)
-              </Label>
-              <Input
-                id="companyDeduction"
-                type="number"
-                placeholder="25.00"
-                step="0.01"
-                min="0"
-                max="100"
-                value={newLoad.companyDeduction}
-                onChange={(e) => setNewLoad({ ...newLoad, companyDeduction: e.target.value })}
-                className="h-12"
-              />
-            </div>
+            {/* Company Deduction — hidden for company drivers (their pay is set in profile) */}
+            {!isCompanyDriver && (
+              <div className="space-y-2">
+                <Label htmlFor="companyDeduction" className="flex items-center gap-2">
+                  <Percent className="w-4 h-4" />
+                  Company Deduction (%)
+                </Label>
+                <Input
+                  id="companyDeduction"
+                  type="number"
+                  placeholder="25.00"
+                  step="0.01"
+                  min="0"
+                  max="100"
+                  value={newLoad.companyDeduction}
+                  onChange={(e) => setNewLoad({ ...newLoad, companyDeduction: e.target.value })}
+                  className="h-12"
+                />
+              </div>
+            )}
 
             {/* Dispatcher */}
             <div className="space-y-2">
