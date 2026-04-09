@@ -347,16 +347,6 @@ const LoadCard = ({ load, onDelete, onEdit, isEditing, setIsEditing, estimatedMi
             {showOptional && (
               <div className="space-y-4 border-t pt-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Deadhead Miles</label>
-                  <Input
-                    type="number"
-                    placeholder="e.g. 45"
-                    value={editData.deadheadMiles}
-                    onChange={(e) => setEditData(prev => ({ ...prev, deadheadMiles: e.target.value }))}
-                    className="h-10"
-                  />
-                </div>
-                <div className="space-y-2">
                   <label className="text-sm font-semibold">Dispatcher</label>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     <Input placeholder="Name" value={editData.dispatcherName} onChange={(e) => setEditData(prev => ({ ...prev, dispatcherName: e.target.value }))} className="h-10" />

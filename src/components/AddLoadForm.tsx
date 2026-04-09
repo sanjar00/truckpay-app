@@ -15,7 +15,7 @@ import { NewLoad } from '@/types/loadReports';
 interface AddLoadFormProps {
   newLoad: NewLoad;
   setNewLoad: (load: NewLoad) => void;
-  onAddLoad: () => void;
+  onAddLoad: (overrides: Partial<NewLoad>) => void;
   onCancel: () => void;
   loading: boolean;
   weekStart: Date;
@@ -44,39 +44,26 @@ const AddLoadForm = ({
   const handlePickupZipChange = (value: string) => {
     setNewLoad({ ...newLoad, pickupZip: value, pickupCityState: '', estimatedMiles: undefined });
     if (value.length === 5) {
-      zip.lookupPickupZip(value).then(info => {
-        if (info) {
-          setNewLoad({
-            ...newLoad,
-            pickupZip: value,
-            pickupCityState: info.cityState,
-            locationFrom: info.cityState,
-          });
-        }
-      });
+      zip.lookupPickupZip(value);
     }
   };
 
   const handleDeliveryZipChange = (value: string) => {
     setNewLoad({ ...newLoad, deliveryZip: value, deliveryCityState: '', estimatedMiles: undefined });
     if (value.length === 5) {
-      zip.lookupDeliveryZip(value).then(info => {
-        if (info) {
-          setNewLoad({
-            ...newLoad,
-            deliveryZip: value,
-            deliveryCityState: info.cityState,
-            locationTo: info.cityState,
-          });
-        }
-      });
+      zip.lookupDeliveryZip(value);
     }
   };
 
-  // Sync estimated miles into newLoad then submit
+  // Sync zip lookup results into newLoad then submit
   const handleAddLoad = () => {
-    setNewLoad({ ...newLoad, estimatedMiles: zip.estimatedMiles ?? newLoad.estimatedMiles });
-    onAddLoad();
+    onAddLoad({
+      pickupCityState: zip.pickupInfo?.cityState || newLoad.pickupCityState,
+      deliveryCityState: zip.deliveryInfo?.cityState || newLoad.deliveryCityState,
+      locationFrom: zip.pickupInfo?.cityState || newLoad.locationFrom,
+      locationTo: zip.deliveryInfo?.cityState || newLoad.locationTo,
+      estimatedMiles: zip.estimatedMiles ?? newLoad.estimatedMiles,
+    });
   };
 
   return (
@@ -295,18 +282,6 @@ const AddLoadForm = ({
                 value={newLoad.companyDeduction}
                 onChange={(e) => setNewLoad({ ...newLoad, companyDeduction: e.target.value })}
                 className="h-12"
-              />
-            </div>
-
-            {/* Deadhead Miles */}
-            <div className="space-y-2">
-              <Label className="text-sm">Deadhead Miles (empty miles to pickup)</Label>
-              <Input
-                type="number"
-                placeholder="e.g. 45"
-                value={newLoad.deadheadMiles || ''}
-                onChange={(e) => setNewLoad({ ...newLoad, deadheadMiles: e.target.value })}
-                className="h-10"
               />
             </div>
 

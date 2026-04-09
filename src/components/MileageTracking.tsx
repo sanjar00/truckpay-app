@@ -6,9 +6,10 @@ interface MileageTrackingProps {
   onMileageChange: (field: 'startMileage' | 'endMileage', value: string) => void;
   calculateRPM: () => number;
   autoFilledFields?: { startMileage?: boolean; endMileage?: boolean };
+  deadheadMiles?: number | null;
 }
 
-const MileageTracking = ({ weeklyMileage, onMileageChange, calculateRPM, autoFilledFields = {} }: MileageTrackingProps) => {
+const MileageTracking = ({ weeklyMileage, onMileageChange, calculateRPM, autoFilledFields = {}, deadheadMiles }: MileageTrackingProps) => {
   return (
     <div className="brutal-border-accent bg-accent/10 p-6 brutal-shadow">
       <div className="flex items-center gap-3 mb-4">
@@ -56,20 +57,31 @@ const MileageTracking = ({ weeklyMileage, onMileageChange, calculateRPM, autoFil
       
       {/* Only show Miles Driven and RPM when both start and end mileage are entered */}
       {weeklyMileage.startMileage && weeklyMileage.endMileage && weeklyMileage.totalMiles > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Miles Driven Display */}
-          <div className="brutal-border-success bg-success p-4 brutal-shadow text-center">
-            <p className="brutal-mono text-sm text-success-foreground mb-1">Miles Driven</p>
-            <p className="brutal-text text-2xl text-success-foreground">{weeklyMileage.totalMiles.toLocaleString()}</p>
-            <p className="brutal-mono text-xs text-success-foreground opacity-80">Total</p>
+        <div className="space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Miles Driven Display */}
+            <div className="brutal-border-success bg-success p-4 brutal-shadow text-center">
+              <p className="brutal-mono text-sm text-success-foreground mb-1">Miles Driven</p>
+              <p className="brutal-text text-2xl text-success-foreground">{weeklyMileage.totalMiles.toLocaleString()}</p>
+              <p className="brutal-mono text-xs text-success-foreground opacity-80">Total</p>
+            </div>
+
+            {/* Rate Per Mile Display */}
+            <div className="brutal-border-warning bg-warning p-4 brutal-shadow text-center">
+              <p className="brutal-mono text-sm text-warning-foreground mb-1">Rate Per Mile</p>
+              <p className="brutal-text text-2xl text-warning-foreground">${calculateRPM().toFixed(2)}</p>
+              <p className="brutal-mono text-xs text-warning-foreground opacity-80">per mile</p>
+            </div>
           </div>
 
-          {/* Rate Per Mile Display */}
-          <div className="brutal-border-warning bg-warning p-4 brutal-shadow text-center">
-            <p className="brutal-mono text-sm text-warning-foreground mb-1">Rate Per Mile</p>
-            <p className="brutal-text text-2xl text-warning-foreground">${calculateRPM().toFixed(2)}</p>
-            <p className="brutal-mono text-xs text-warning-foreground opacity-80">per mile</p>
-          </div>
+          {/* Deadhead Miles Display */}
+          {deadheadMiles != null && deadheadMiles >= 0 && (
+            <div className="brutal-border bg-card p-4 brutal-shadow text-center">
+              <p className="brutal-mono text-sm text-muted-foreground mb-1">Deadhead Miles</p>
+              <p className="brutal-text text-2xl text-foreground">{deadheadMiles.toLocaleString()}</p>
+              <p className="brutal-mono text-xs text-muted-foreground opacity-80">Empty miles (total − load miles)</p>
+            </div>
+          )}
         </div>
       )}
     </div>

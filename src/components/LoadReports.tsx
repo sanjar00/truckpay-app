@@ -136,6 +136,14 @@ const LoadReports = ({ onBack, user, userProfile, deductions, onUpgrade }: LoadR
   const totalFixedDeductions = calculateFixedDeductionsForWeek(deductions, weekStart);
   const netPay = totalDriverPay - totalWeeklyDeductions - totalExtraDeductions - totalFixedDeductions;
 
+  // Deadhead miles = total odometer miles − sum of Google Maps load miles
+  const totalLoadMiles = currentWeekLoads.reduce((sum, load) => sum + (load.estimatedMiles || 0), 0);
+  const loadsWithMiles = currentWeekLoads.filter(l => l.estimatedMiles && l.estimatedMiles > 0).length;
+  const deadheadMiles =
+    weeklyMileage.totalMiles > 0 && loadsWithMiles > 0
+      ? Math.max(0, weeklyMileage.totalMiles - totalLoadMiles)
+      : null;
+
   return (
     <div className="min-h-screen bg-background brutal-grid p-6">
       <div className="max-w-4xl mx-auto space-y-6">
@@ -157,6 +165,7 @@ const LoadReports = ({ onBack, user, userProfile, deductions, onUpgrade }: LoadR
           onMileageChange={handleMileageChange}
           calculateRPM={() => calculateRPM(totalGrossPay)}
           autoFilledFields={autoFilledFields}
+          deadheadMiles={deadheadMiles}
         />
 
         <WeeklyForecastCard

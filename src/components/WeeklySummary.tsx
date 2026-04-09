@@ -1,4 +1,11 @@
 import React, { useState } from 'react';
+
+const localDateStr = (date: Date): string => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -86,7 +93,7 @@ const WeeklySummary = ({
   const handleEditDeduction = (deduction: {id: string, name: string, amount: string, dateAdded?: string}) => {
     if (setEditingDeduction) {
       setEditingDeduction(deduction.id);
-      const dateStr = deduction.dateAdded ? new Date(deduction.dateAdded).toISOString().split('T')[0] : todayStr;
+      const dateStr = deduction.dateAdded ? (deduction.dateAdded.length === 10 ? deduction.dateAdded : localDateStr(new Date(deduction.dateAdded))) : todayStr;
       setEditingData({ name: deduction.name, amount: deduction.amount, date: dateStr });
     }
   };
@@ -187,7 +194,7 @@ const WeeklySummary = ({
                     selected={pendingDeductions[type]?.date ? new Date(pendingDeductions[type].date + 'T00:00:00') : new Date(todayStr + 'T00:00:00')}
                     onSelect={(date) => {
                       if (date) {
-                        const dateStr = date.toISOString().split('T')[0];
+                        const dateStr = localDateStr(date);
                         setPendingDeductions(prev => ({
                           ...prev,
                           [type]: { ...(prev[type] || { amount: '' }), date: dateStr }
@@ -266,7 +273,7 @@ const WeeklySummary = ({
                     selected={newExtraDeduction.date ? new Date(newExtraDeduction.date + 'T00:00:00') : undefined}
                     onSelect={(date) => {
                       if (date) {
-                        const dateStr = date.toISOString().split('T')[0];
+                        const dateStr = localDateStr(date);
                         setNewExtraDeduction(prev => ({ ...prev, date: dateStr }));
                         setNewExtraDeductionDateCalendarOpen(false);
                       }
@@ -339,7 +346,7 @@ const WeeklySummary = ({
                           selected={editingData.date ? new Date(editingData.date + 'T00:00:00') : undefined}
                           onSelect={(date) => {
                             if (date) {
-                              const dateStr = date.toISOString().split('T')[0];
+                              const dateStr = localDateStr(date);
                               setEditingData(prev => ({ ...prev, date: dateStr }));
                               setEditDateCalendarOpen(false);
                             }
@@ -369,7 +376,7 @@ const WeeklySummary = ({
                       <span className="brutal-mono text-sm text-foreground">{String(extra.name || "").toUpperCase()}</span>
                       <span className="brutal-text text-foreground">${formatCurrency(parseFloat(extra.amount))}</span>
                       <span className="brutal-mono text-xs text-muted-foreground">
-                        {extra.dateAdded ? new Date(extra.dateAdded).toLocaleDateString() : new Date().toLocaleDateString()}
+                        {extra.dateAdded ? format(new Date(extra.dateAdded.length === 10 ? extra.dateAdded + 'T00:00:00' : extra.dateAdded), 'MMM dd') : format(new Date(), 'MMM dd')}
                       </span>
                     </div>
                     

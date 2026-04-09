@@ -119,6 +119,7 @@ Components fetch data via Supabase client with proper error handling and real-ti
 **load_reports** — Truck loads with earnings data
 - id, user_id, origin, destination, pickupDate, deliveryDate, loadRate, deductionRate, weekId
 - deadheadMiles, loadMiles, estimatedMiles, driverPay
+- pickupZip, deliveryZip, pickupCityState, deliveryCityState (auto-populated via Google Maps lookup)
 - dispatcher, broker, bolNumber, notes
 - created_at, updated_at
 
@@ -336,6 +337,31 @@ Warn at 80% full. Add "Clear Old Receipt Photos" option.
 
 ---
 
+## ZIP-to-ZIP Mileage Tracking
+
+The Add Load form now auto-populates estimated mileage via Google Maps:
+
+1. **User enters pickup ZIP** → Lookup via Geocoding API (extracts city, state, lat/lng)
+2. **User enters delivery ZIP** → Same lookup process
+3. **When both ZIPs resolve** → Distance Matrix API calculates driving distance in miles
+4. **Form shows estimated miles** → Driver can edit if needed
+
+**Implementation:**
+- Frontend: `useZipLookup()` hook manages state and calls Supabase edge function
+- Edge function: `supabase/functions/driving-distance/` handles Google Maps API calls
+- Database: `load_reports` includes `pickup_zip`, `delivery_zip`, `pickup_city_state`, `delivery_city_state`, `estimated_miles`
+- Validation: ZIP inputs require exactly 5 digits (regex: `^\d{5}$`)
+- Timeout: 10-second AbortController on edge function calls
+- Error handling: Clear error messages when ZIP lookup fails, prevents form submission until both ZIPs resolve successfully
+
+**Key files:**
+- `src/hooks/useZipLookup.ts` — State management and Google Maps calls
+- `supabase/functions/driving-distance/index.ts` — Edge function server
+- `src/components/AddLoadForm.tsx` — Form integration with ZIP inputs and estimated miles display
+- Database migration: `20260409000000_add_zip_and_miles_to_loads.sql`
+
+---
+
 ## Load Profitability Score
 
 Grade each load by Rate Per Mile (driver pay ÷ estimated miles):
@@ -452,12 +478,14 @@ parked at a truck stop?"* If no, simplify it.
 - Made Driver Pay the hero number on load cards
 - Added editable optional fields in Load card edit mode (deadhead, dispatcher, broker, BOL, notes)
 - Converted all date input fields to calendar picker dropdowns (LoadCard, WeeklySummary, PersonalExpenses, ReceiptScanner)
+- ZIP-to-ZIP auto-mileage tracking via Google Maps (Geocoding + Distance Matrix APIs)
 
 ### 🔄 In Progress / Next Up
 - Bottom tab bar navigation (highest UX priority)
 - Load Profitability grade badges on load cards
 - Lane Performance RPM column
 - Annual Income Goal (Settings + YTD progress bar)
+- Multi-load mileage estimation (when 6+ loads entered)
 
 ### 📋 Backlog
 - Stripe payment integration (replace localStorage simulation)

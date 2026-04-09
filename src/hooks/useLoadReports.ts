@@ -106,41 +106,43 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
     }
   };
 
-  const handleAddLoad = async () => {
-    if (newLoad.rate && newLoad.companyDeduction && newLoad.locationFrom && newLoad.locationTo && user) {
+  const handleAddLoad = async (overrides: Partial<NewLoad> = {}) => {
+    const load = { ...newLoad, ...overrides };
+    if (load.rate && load.pickupZip && load.deliveryZip && user) {
       setLoading(true);
-      
+
       try {
-        const driverPay = parseFloat(newLoad.rate) * (1 - parseFloat(newLoad.companyDeduction) / 100);
+        const companyDeduction = parseFloat(load.companyDeduction) || 0;
+        const driverPay = parseFloat(load.rate) * (1 - companyDeduction / 100);
         const weekPeriod = `${format(weekStart, 'MMM dd')} - ${format(weekEnd, 'MMM dd, yyyy')}`;
         const loadDate = weekStart.toISOString().split('T')[0];
-        
+
         const { data, error } = await supabase
           .from('load_reports')
           .insert({
             user_id: user.id,
-            rate: parseFloat(newLoad.rate),
-            company_deduction: parseFloat(newLoad.companyDeduction),
+            rate: parseFloat(load.rate),
+            company_deduction: companyDeduction,
             driver_pay: driverPay,
-            location_from: newLoad.locationFrom || newLoad.pickupCityState || newLoad.pickupZip || '',
-            location_to: newLoad.locationTo || newLoad.deliveryCityState || newLoad.deliveryZip || '',
-            pickup_date: newLoad.pickupDate ? formatDateForDB(newLoad.pickupDate) : null,
-            delivery_date: newLoad.deliveryDate ? formatDateForDB(newLoad.deliveryDate) : null,
+            location_from: load.locationFrom || load.pickupCityState || load.pickupZip || '',
+            location_to: load.locationTo || load.deliveryCityState || load.deliveryZip || '',
+            pickup_date: load.pickupDate ? formatDateForDB(load.pickupDate) : null,
+            delivery_date: load.deliveryDate ? formatDateForDB(load.deliveryDate) : null,
             date_added: loadDate,
             week_period: weekPeriod,
-            deadhead_miles: newLoad.deadheadMiles ? parseInt(newLoad.deadheadMiles) : null,
-            dispatcher_name: newLoad.dispatcherName || null,
-            dispatcher_company: newLoad.dispatcherCompany || null,
-            dispatcher_phone: newLoad.dispatcherPhone || null,
-            broker_name: newLoad.brokerName || null,
-            broker_company: newLoad.brokerCompany || null,
-            bol_number: newLoad.bolNumber || null,
-            notes: newLoad.notes || null,
-            pickup_zip: newLoad.pickupZip || null,
-            delivery_zip: newLoad.deliveryZip || null,
-            pickup_city_state: newLoad.pickupCityState || null,
-            delivery_city_state: newLoad.deliveryCityState || null,
-            estimated_miles: newLoad.estimatedMiles ?? null,
+            deadhead_miles: null,
+            dispatcher_name: load.dispatcherName || null,
+            dispatcher_company: load.dispatcherCompany || null,
+            dispatcher_phone: load.dispatcherPhone || null,
+            broker_name: load.brokerName || null,
+            broker_company: load.brokerCompany || null,
+            bol_number: load.bolNumber || null,
+            notes: load.notes || null,
+            pickup_zip: load.pickupZip || null,
+            delivery_zip: load.deliveryZip || null,
+            pickup_city_state: load.pickupCityState || null,
+            delivery_city_state: load.deliveryCityState || null,
+            estimated_miles: load.estimatedMiles ?? null,
           })
           .select()
           .single();
