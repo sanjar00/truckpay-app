@@ -2,12 +2,13 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { WeeklyMileage } from '@/types/LoadReports';
 
-export const useMileageManager = (user: any, weekStart: Date) => {
+export const useMileageManager = (user: any, weekStart: Date, userProfile?: any) => {
   const [weeklyMileage, setWeeklyMileage] = useState<WeeklyMileage>({
     startMileage: '',
     endMileage: '',
     totalMiles: 0
   });
+  const [leaseMilesCost, setLeaseMilesCost] = useState<number>(0);
   const [autoFilledFields, setAutoFilledFields] = useState({ startMileage: false, endMileage: false });
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isUserInputRef = useRef(false);
@@ -88,6 +89,7 @@ export const useMileageManager = (user: any, weekStart: Date) => {
           endMileage: endMileage,
           totalMiles: safeTotalMiles
         });
+        setLeaseMilesCost(data.lease_miles_cost || 0);
         setAutoFilledFields({
           startMileage: startAutoFilled,
           endMileage: endAutoFilled
@@ -125,6 +127,7 @@ export const useMileageManager = (user: any, weekStart: Date) => {
             endMileage: autoFilledEnd,
             totalMiles: 0
           });
+          setLeaseMilesCost(0);
           setAutoFilledFields({
             startMileage: !!autoFilledStart,
             endMileage: !!autoFilledEnd
@@ -135,6 +138,7 @@ export const useMileageManager = (user: any, weekStart: Date) => {
             endMileage: '',
             totalMiles: 0
           });
+          setLeaseMilesCost(0);
           setAutoFilledFields({
             startMileage: false,
             endMileage: false
@@ -148,12 +152,18 @@ export const useMileageManager = (user: any, weekStart: Date) => {
     }
   };
 
-  const saveWeeklyMileage = async (startMileage: string, endMileage: string, totalMiles: number) => {
+  const saveWeeklyMileage = async (startMileage: string, endMileage: string, totalMiles: number, userProfile?: any) => {
     if (!user) return;
-    
+
     try {
       const weekStartDate = weekStart.toISOString().split('T')[0];
-      
+
+      // Calculate lease miles cost if user is a lease-operator
+      let leaseMilesCost = null;
+      if (userProfile?.driverType === 'lease-operator' && userProfile?.leaseRatePerMile && totalMiles > 0) {
+        leaseMilesCost = parseFloat((totalMiles * parseFloat(userProfile.leaseRatePerMile)).toFixed(2));
+      }
+
       const { error } = await supabase
         .from('weekly_mileage')
         .upsert({
@@ -161,12 +171,13 @@ export const useMileageManager = (user: any, weekStart: Date) => {
           week_start: weekStartDate,
           start_mileage: startMileage ? parseInt(startMileage) : null,
           end_mileage: endMileage ? parseInt(endMileage) : null,
+          lease_miles_cost: leaseMilesCost,
           // Remove total_miles since it's a generated column
           updated_at: new Date().toISOString()
         }, {
           onConflict: 'user_id,week_start'
         });
-  
+
       if (error) {
         console.error('Error saving weekly mileage:', error);
       }
@@ -196,7 +207,7 @@ export const useMileageManager = (user: any, weekStart: Date) => {
     
     // Set new timeout
     saveTimeoutRef.current = setTimeout(() => {
-      saveWeeklyMileage(newMileage.startMileage, newMileage.endMileage, newMileage.totalMiles);
+      saveWeeklyMileage(newMileage.startMileage, newMileage.endMileage, newMileage.totalMiles, userProfile);
     }, 1000);
   };
 
@@ -211,19 +222,19 @@ export const useMileageManager = (user: any, weekStart: Date) => {
       if (fetchTimeoutRef.current) {
         clearTimeout(fetchTimeoutRef.current);
       }
-      
+
       // Debounce the fetch request
       fetchTimeoutRef.current = setTimeout(() => {
         fetchWeeklyMileage();
       }, 300);
     }
-    
+
     return () => {
       if (fetchTimeoutRef.current) {
         clearTimeout(fetchTimeoutRef.current);
       }
     };
-  }, [user, weekStart]);
+  }, [user, weekStart, userProfile]);
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -239,6 +250,7 @@ export const useMileageManager = (user: any, weekStart: Date) => {
     setWeeklyMileage,
     handleMileageChange,
     calculateRPM,
-    autoFilledFields
+    autoFilledFields,
+    leaseMilesCost
   };
 };

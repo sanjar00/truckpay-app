@@ -62,8 +62,9 @@ const LoadReports = ({ onBack, user, userProfile, deductions, onUpgrade }: LoadR
     weeklyMileage,
     handleMileageChange,
     calculateRPM,
-    autoFilledFields
-  } = useMileageManager(user, weekStart);
+    autoFilledFields,
+    leaseMilesCost
+  } = useMileageManager(user, weekStart, userProfile);
 
   const handleDeleteLoad = async (id: string) => {
     if (!showDeleteConfirm) {
@@ -134,12 +135,6 @@ const LoadReports = ({ onBack, user, userProfile, deductions, onUpgrade }: LoadR
   const totalGrossPay = currentWeekLoads.reduce((total, load) => total + (load.rate || 0), 0);
   const totalDriverPay = currentWeekLoads.reduce((total, load) => total + (load.driverPay || 0), 0);
   const totalFixedDeductions = calculateFixedDeductionsForWeek(deductions, weekStart);
-
-  // Lease-operators also pay per mile driven (total odometer miles × lease rate)
-  const leaseMilesCost =
-    userProfile?.driverType === 'lease-operator' && userProfile?.leaseRatePerMile && weeklyMileage.totalMiles > 0
-      ? weeklyMileage.totalMiles * parseFloat(userProfile.leaseRatePerMile)
-      : 0;
 
   const netPay = totalDriverPay - totalWeeklyDeductions - totalExtraDeductions - totalFixedDeductions - leaseMilesCost;
 
