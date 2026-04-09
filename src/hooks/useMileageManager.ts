@@ -164,6 +164,9 @@ export const useMileageManager = (user: any, weekStart: Date, userProfile?: any)
         leaseMilesCost = parseFloat((totalMiles * parseFloat(userProfile.leaseRatePerMile)).toFixed(2));
       }
 
+      // Update local state immediately
+      setLeaseMilesCost(leaseMilesCost || 0);
+
       const { error } = await supabase
         .from('weekly_mileage')
         .upsert({
