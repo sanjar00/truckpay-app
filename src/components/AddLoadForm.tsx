@@ -46,7 +46,8 @@ const AddLoadForm = ({
     ? calculateDriverPay(
         parseFloat(newLoad.rate),
         userProfile,
-        zip.estimatedMiles ?? newLoad.estimatedMiles
+        zip.estimatedMiles ?? newLoad.estimatedMiles,
+        newLoad.detentionAmount ? parseFloat(newLoad.detentionAmount) : undefined
       ).toFixed(2)
     : null;
 
@@ -296,35 +297,35 @@ const AddLoadForm = ({
               </div>
             )}
 
-            {/* Dispatcher */}
+            {/* Detention Amount */}
             <div className="space-y-2">
-              <Label className="text-sm font-semibold">Dispatcher</Label>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                <Input placeholder="Name" value={newLoad.dispatcherName || ''} onChange={(e) => setNewLoad({ ...newLoad, dispatcherName: e.target.value })} className="h-10" />
-                <Input placeholder="Company" value={newLoad.dispatcherCompany || ''} onChange={(e) => setNewLoad({ ...newLoad, dispatcherCompany: e.target.value })} className="h-10" />
-                <Input placeholder="Phone" type="tel" value={newLoad.dispatcherPhone || ''} onChange={(e) => setNewLoad({ ...newLoad, dispatcherPhone: e.target.value })} className="h-10" />
-              </div>
+              <Label htmlFor="detentionAmount" className="flex items-center gap-2">
+                <DollarSign className="w-4 h-4" />
+                Detention Pay
+              </Label>
+              <Input
+                id="detentionAmount"
+                type="number"
+                placeholder="$0.00"
+                step="0.01"
+                min="0"
+                value={newLoad.detentionAmount || ''}
+                onChange={(e) => setNewLoad({ ...newLoad, detentionAmount: e.target.value })}
+                className="h-12"
+              />
+              <p className="text-xs text-muted-foreground">Added when you wait more than 2 hours at pickup/dropoff</p>
             </div>
 
-            {/* Broker */}
+            {/* Notes */}
             <div className="space-y-2">
-              <Label className="text-sm font-semibold">Broker</Label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <Input placeholder="Broker Name" value={newLoad.brokerName || ''} onChange={(e) => setNewLoad({ ...newLoad, brokerName: e.target.value })} className="h-10" />
-                <Input placeholder="Broker Company" value={newLoad.brokerCompany || ''} onChange={(e) => setNewLoad({ ...newLoad, brokerCompany: e.target.value })} className="h-10" />
-              </div>
-            </div>
-
-            {/* BOL & Notes */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <div className="space-y-1">
-                <Label className="text-sm">BOL Number</Label>
-                <Input placeholder="Bill of Lading #" value={newLoad.bolNumber || ''} onChange={(e) => setNewLoad({ ...newLoad, bolNumber: e.target.value })} className="h-10" />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-sm">Notes</Label>
-                <Input placeholder="Notes..." value={newLoad.notes || ''} onChange={(e) => setNewLoad({ ...newLoad, notes: e.target.value })} className="h-10" />
-              </div>
+              <Label htmlFor="notes" className="text-sm">Notes</Label>
+              <Input
+                id="notes"
+                placeholder="Any additional notes..."
+                value={newLoad.notes || ''}
+                onChange={(e) => setNewLoad({ ...newLoad, notes: e.target.value })}
+                className="h-12"
+              />
             </div>
           </div>
         )}

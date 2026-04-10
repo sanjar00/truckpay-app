@@ -132,7 +132,7 @@ const LoadReports = ({ onBack, user, userProfile, deductions, onUpgrade }: LoadR
     setShowAddForm(true);
   };
 
-  const totalGrossPay = currentWeekLoads.reduce((total, load) => total + (load.rate || 0), 0);
+  const totalGrossPay = currentWeekLoads.reduce((total, load) => total + ((load.rate || 0) + (load.detentionAmount || 0)), 0);
   const totalDriverPay = currentWeekLoads.reduce((total, load) => total + (load.driverPay || 0), 0);
   const totalFixedDeductions = calculateFixedDeductionsForWeek(deductions, weekStart);
 

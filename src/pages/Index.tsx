@@ -123,7 +123,7 @@ const Index = () => {
     try {
       const { data: loadsData } = await supabase
         .from('load_reports')
-        .select('rate, company_deduction, driver_pay')
+        .select('rate, company_deduction, driver_pay, detention_amount')
         .eq('user_id', user.id)
         .gte('date_added', weekStartStr)
         .lte('date_added', weekEndStr);
@@ -160,7 +160,7 @@ const Index = () => {
         }
       }
 
-      const gross = (loadsData || []).reduce((sum, l) => sum + (l.rate || 0), 0);
+      const gross = (loadsData || []).reduce((sum, l) => sum + ((l.rate || 0) + (l.detention_amount || 0)), 0);
       const driverPay = (loadsData || []).reduce((sum, l) => sum + (l.driver_pay || 0), 0);
       const fixedTotal = calculateFixedDeductionsForWeek(fixedDeductions, weekStart);
       const expenses =

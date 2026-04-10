@@ -23,6 +23,7 @@ interface Load {
   deliveryDate?: string;
   dateAdded: string;
   weekPeriod: string;
+  detentionAmount?: number;
 }
 
 interface Deduction {
@@ -136,7 +137,8 @@ const ForecastSummary = ({ onBack, deductions, userProfile }: ForecastSummaryPro
           pickupDate: load.pickup_date,
           deliveryDate: load.delivery_date,
           dateAdded: load.date_added,
-          weekPeriod: load.week_period
+          weekPeriod: load.week_period,
+          detentionAmount: load.detention_amount
         }));
         
         setLoads(formattedLoads);
@@ -242,7 +244,8 @@ const ForecastSummary = ({ onBack, deductions, userProfile }: ForecastSummaryPro
   // Calculate totals with safety checks
   const totalGrossPay = filteredLoads.reduce((total, load) => {
     const rate = load.rate || 0;
-    return total + (isNaN(rate) ? 0 : rate);
+    const detention = load.detentionAmount || 0;
+    return total + (isNaN(rate) ? 0 : rate) + (isNaN(detention) ? 0 : detention);
   }, 0);
   
   const totalDriverPay = filteredLoads.reduce((total, load) => {
@@ -364,7 +367,7 @@ const ForecastSummary = ({ onBack, deductions, userProfile }: ForecastSummaryPro
       if (!load.dateAdded) return;
       const m = getMonth(parseISO(load.dateAdded));
       if (!map[m]) map[m] = { gross: 0, net: 0, count: 0 };
-      map[m].gross += load.rate || 0;
+      map[m].gross += (load.rate || 0) + (load.detentionAmount || 0);
       map[m].net += load.driverPay || 0;
       map[m].count += 1;
     });

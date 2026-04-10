@@ -11,7 +11,7 @@ TruckPay (truckpay.app) is a Progressive Web App (PWA) for truck drivers to trac
 their weekly earnings, deductions, and expenses. It is built and maintained by
 Sanjar Azizov. The app is currently in active use by real truck drivers.
 
-Current live version: **V2.1**
+Current live version: **V2.2**
 
 ---
 
@@ -114,13 +114,19 @@ Components fetch data via Supabase client with proper error handling and real-ti
 ### Key Tables
 
 **profiles** — User profile settings
-- name, email, phone, driverType, companyDeduction, weeklyPeriod, annualGoal, weeklyGoal
+- name, email, phone, weeklyPeriod, annualGoal, weeklyGoal
+- driverType: `'owner-operator'` | `'lease-operator'` | `'company-driver'`
+- companyDeduction (% deducted for owner-operator and lease-operator)
+- companyPayType: `'per_mile'` | `'percentage'` (company-driver only)
+- companyPayRate: $/mile or % value depending on companyPayType
+- leaseRatePerMile: cost per mile for lease-operator (deducted from net weekly)
 
 **load_reports** — Truck loads with earnings data
 - id, user_id, origin, destination, pickupDate, deliveryDate, loadRate, deductionRate, weekId
 - deadheadMiles, loadMiles, estimatedMiles, driverPay
 - pickupZip, deliveryZip, pickupCityState, deliveryCityState (auto-populated via Google Maps lookup)
-- dispatcher, broker, bolNumber, notes
+- detentionAmount (added when driver waits >2 hours at pickup/dropoff — adds to gross before deductions)
+- notes
 - created_at, updated_at
 
 **weekly_deductions** — Fixed weekly expense categories (FUEL, TOLL, MAINTENANCE, etc.)
@@ -135,7 +141,7 @@ Components fetch data via Supabase client with proper error handling and real-ti
 - id, user_id, name, amount, effectiveFrom
 
 **weekly_mileage** — Odometer readings per week
-- id, user_id, weekId, startMileage, endMileage
+- id, user_id, weekId, startMileage, endMileage, leaseMilesCost (only populated for lease-operator drivers)
 
 **subscriptions** — User subscription tier and status
 - id, user_id, tier, startDate, endDate, trialUsed, earlyAdopter
@@ -263,7 +269,7 @@ feature:
 | `ADDED_DEDUCTIONS` | `Fuel & Expenses` |
 | `FIXED_DEDUCTIONS` | `Weekly Fixed Costs` |
 | `ADD_CUSTOM_DEDUCTION` | `+ Add Expense` |
-| `SHOW OPTIONAL FIELDS (deadhead, dispatcher, BOL...)` | `+ More Details` |
+| `SHOW OPTIONAL FIELDS (deadhead, detention...)` | `+ More Details` |
 
 ---
 
@@ -362,6 +368,33 @@ The Add Load form now auto-populates estimated mileage via Google Maps:
 
 ---
 
+## Driver Types & Pay Calculations
+
+Three driver types are supported. Pay logic is in `src/lib/loadReportsUtils.ts → calculateDriverPay()`.
+
+| Driver Type | Pay Formula | Notes |
+|-------------|-------------|-------|
+| `owner-operator` | `(rate + detention) × (1 - companyDeduction%)` | Company takes a % cut of gross |
+| `lease-operator` | Same as owner-operator, PLUS `leaseMilesCost` deducted from weekly net | Lease cost = totalWeeklyMiles × leaseRatePerMile |
+| `company-driver` (per_mile) | `estimatedMiles × companyPayRate` | Fixed $/mile; detention does NOT affect pay |
+| `company-driver` (percentage) | `(rate + detention) × companyPayRate%` | Percentage of gross including detention |
+
+**Detention Pay rules:**
+- Detention is additional pay when driver waits >2 hours at pickup or dropoff
+- Stored as `detention_amount` on each load
+- Added to the load rate BEFORE applying percentage deductions for owner-op, lease-op, and company-driver (percentage) types
+- Included in all gross pay totals across LoadReports, ForecastSummary, and Index home snapshot
+- Displayed on load cards as "+ $X detention"
+
+**Lease Miles Cost rules:**
+- Only applies to `lease-operator` driver type
+- Calculated weekly: `totalOdometerMiles × leaseRatePerMile`
+- Stored in `weekly_mileage.lease_miles_cost`
+- Deducted from net pay AFTER all other deductions (shown as a separate line in WeeklySummary)
+- Does NOT affect individual load driver pay — deducted at the weekly level
+
+---
+
 ## Load Profitability Score
 
 Grade each load by Rate Per Mile (driver pay ÷ estimated miles):
@@ -425,8 +458,9 @@ const IFTA_DIESEL_RATES = {
 | Version | Key Changes |
 |---------|-------------|
 | V1.2 | Original — basic loads, deductions, summary |
-| V2.0 | Added Per Diem, IFTA, Weekly Forecast, Deadhead, Dispatcher fields, Monthly chart, Lane Performance, State dropdowns |
-| V2.1 | Mileage bug fix, Load Profitability grades, Lane RPM, AI Receipt Scanner, Subscription/Paywall, Annual Goal, Edit on Summary loads, Plain English labels |
+| V2.0 | Added Per Diem, IFTA, Weekly Forecast, Deadhead, Monthly chart, Lane Performance, State dropdowns |
+| V2.1 | Mileage bug fix, Load Profitability grades (A/B/C/D), AI Receipt Scanner, Subscription/Paywall, Plain English labels, ZIP-to-ZIP auto-mileage, Weekly mileage auto-fill, WeeklyForecastCard with goal tracking |
+| V2.2 | Replaced dispatcher/broker/BOL with Detention Pay, Three driver types (owner-op/lease-op/company), Lease Miles Cost weekly deduction, Company-driver per-mile and percentage pay types, Detention included in all gross totals |
 
 ---
 
@@ -467,7 +501,6 @@ parked at a truck stop?"* If no, simplify it.
 - IFTA Report page
 - Weekly Pay Forecast ("AT THIS PACE")
 - State dropdowns on Add Load form
-- Optional fields: deadhead, dispatcher, broker, BOL (now fully editable in Load card edit mode)
 - Early Adopter Pro bonus
 - Version V2.1
 - Fixed blank space on Home screen
@@ -476,20 +509,26 @@ parked at a truck stop?"* If no, simplify it.
 - Added info icons with tooltips on snapshot stats explaining calculations
 - Simplified Add Load form (placeholder $0.00, pre-fill dates, company deduction moved to optional)
 - Made Driver Pay the hero number on load cards
-- Added editable optional fields in Load card edit mode (deadhead, dispatcher, broker, BOL, notes)
 - Converted all date input fields to calendar picker dropdowns (LoadCard, WeeklySummary, PersonalExpenses, ReceiptScanner)
 - ZIP-to-ZIP auto-mileage tracking via Google Maps (Geocoding + Distance Matrix APIs)
+- **Load Profitability grade badges (A/B/C/D)** on load cards — based on RPM, color-coded with RPM value shown
+- **Deadhead miles calculation** — total odometer miles minus sum of load estimated miles (shown in MileageTracking)
+- **Weekly mileage auto-fill** — start mileage pre-fills from previous week's end; end mileage pre-fills from next week's start
+- **Three driver types** — owner-operator, lease-operator, company-driver — with correct pay formulas for each
+- **Lease Miles Cost** — weekly cost (miles × leaseRatePerMile) deducted from net pay for lease-operator drivers only; stored in weekly_mileage table
+- **Company-driver pay types** — per-mile (fixed $/mile rate) and percentage (% of gross); configured in profile settings
+- **Detention Pay field** — replaces dispatcher/broker/BOL fields; added to gross before deductions; shown on load cards and included in all gross totals (LoadReports, ForecastSummary, home snapshot)
+- **WeeklyForecastCard** — projects weekly gross/net with confidence level (LOW/MODERATE/HIGH), progress bar toward weekly goal, loads needed to hit goal, comparison vs. historical average
+- Version V2.2
 
 ### 🔄 In Progress / Next Up
 - Bottom tab bar navigation (highest UX priority)
-- Load Profitability grade badges on load cards
 - Lane Performance RPM column
 - Annual Income Goal (Settings + YTD progress bar)
 - Multi-load mileage estimation (when 6+ loads entered)
 
 ### 📋 Backlog
 - Stripe payment integration (replace localStorage simulation)
-- OpenRouteService API for auto-filling load miles
 - PDF export for weekly reports and IFTA
 - Push notifications for end-of-week reminders
 - App Store / Google Play native wrapper

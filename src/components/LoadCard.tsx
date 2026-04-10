@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
-import { MapPin, Calendar, Trash2, Edit, Save, X, MoreHorizontal, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
+import { MapPin, Calendar, Trash2, Edit, Save, X, MoreHorizontal, ChevronDown, ChevronUp, Loader2, DollarSign } from 'lucide-react';
 import { format } from 'date-fns';
 import { formatCurrency } from '@/lib/utils';
 import { calculateDriverPay } from '@/lib/loadReportsUtils';
@@ -45,12 +45,7 @@ interface Load {
   dateAdded: string;
   weekPeriod: string;
   deadheadMiles?: number;
-  dispatcherName?: string;
-  dispatcherCompany?: string;
-  dispatcherPhone?: string;
-  brokerName?: string;
-  brokerCompany?: string;
-  bolNumber?: string;
+  detentionAmount?: number;
   notes?: string;
   pickupZip?: string;
   deliveryZip?: string;
@@ -82,12 +77,7 @@ const LoadCard = ({ load, onDelete, onEdit, isEditing, setIsEditing, estimatedMi
     pickupDate: load.pickupDate ? parseDateFromDB(load.pickupDate) : undefined as Date | undefined,
     deliveryDate: load.deliveryDate ? parseDateFromDB(load.deliveryDate) : undefined as Date | undefined,
     deadheadMiles: load.deadheadMiles?.toString() || '',
-    dispatcherName: load.dispatcherName || '',
-    dispatcherCompany: load.dispatcherCompany || '',
-    dispatcherPhone: load.dispatcherPhone || '',
-    brokerName: load.brokerName || '',
-    brokerCompany: load.brokerCompany || '',
-    bolNumber: load.bolNumber || '',
+    detentionAmount: load.detentionAmount?.toString() || '',
     notes: load.notes || '',
     pickupZip: load.pickupZip || '',
     deliveryZip: load.deliveryZip || '',
@@ -129,7 +119,8 @@ const LoadCard = ({ load, onDelete, onEdit, isEditing, setIsEditing, estimatedMi
   const handleSave = () => {
     if (onEdit) {
       const resolvedMiles = zip.estimatedMiles ?? (editData.estimatedMiles ? parseInt(editData.estimatedMiles) : undefined);
-      const driverPay = calculateDriverPay(parseFloat(editData.rate), userProfile, resolvedMiles);
+      const detentionAmount = editData.detentionAmount ? parseFloat(editData.detentionAmount) : undefined;
+      const driverPay = calculateDriverPay(parseFloat(editData.rate), userProfile, resolvedMiles, detentionAmount);
       onEdit(load.id, {
         rate: parseFloat(editData.rate),
         companyDeduction: parseFloat(editData.companyDeduction),
@@ -139,12 +130,7 @@ const LoadCard = ({ load, onDelete, onEdit, isEditing, setIsEditing, estimatedMi
         pickupDate: editData.pickupDate ? formatDateForDB(editData.pickupDate) : undefined,
         deliveryDate: editData.deliveryDate ? formatDateForDB(editData.deliveryDate) : undefined,
         deadheadMiles: editData.deadheadMiles ? parseFloat(editData.deadheadMiles) : undefined,
-        dispatcherName: editData.dispatcherName || undefined,
-        dispatcherCompany: editData.dispatcherCompany || undefined,
-        dispatcherPhone: editData.dispatcherPhone || undefined,
-        brokerName: editData.brokerName || undefined,
-        brokerCompany: editData.brokerCompany || undefined,
-        bolNumber: editData.bolNumber || undefined,
+        detentionAmount: editData.detentionAmount ? parseFloat(editData.detentionAmount) : undefined,
         notes: editData.notes || undefined,
         pickupZip: editData.pickupZip || undefined,
         deliveryZip: editData.deliveryZip || undefined,
@@ -162,12 +148,7 @@ const LoadCard = ({ load, onDelete, onEdit, isEditing, setIsEditing, estimatedMi
       pickupDate: load.pickupDate ? parseDateFromDB(load.pickupDate) : undefined,
       deliveryDate: load.deliveryDate ? parseDateFromDB(load.deliveryDate) : undefined,
       deadheadMiles: load.deadheadMiles?.toString() || '',
-      dispatcherName: load.dispatcherName || '',
-      dispatcherCompany: load.dispatcherCompany || '',
-      dispatcherPhone: load.dispatcherPhone || '',
-      brokerName: load.brokerName || '',
-      brokerCompany: load.brokerCompany || '',
-      bolNumber: load.bolNumber || '',
+      detentionAmount: load.detentionAmount?.toString() || '',
       notes: load.notes || '',
       pickupZip: load.pickupZip || '',
       deliveryZip: load.deliveryZip || '',
@@ -353,29 +334,26 @@ const LoadCard = ({ load, onDelete, onEdit, isEditing, setIsEditing, estimatedMi
             {showOptional && (
               <div className="space-y-4 border-t pt-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-semibold">Dispatcher</label>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    <Input placeholder="Name" value={editData.dispatcherName} onChange={(e) => setEditData(prev => ({ ...prev, dispatcherName: e.target.value }))} className="h-10" />
-                    <Input placeholder="Company" value={editData.dispatcherCompany} onChange={(e) => setEditData(prev => ({ ...prev, dispatcherCompany: e.target.value }))} className="h-10" />
-                    <Input placeholder="Phone" type="tel" value={editData.dispatcherPhone} onChange={(e) => setEditData(prev => ({ ...prev, dispatcherPhone: e.target.value }))} className="h-10" />
-                  </div>
+                  <label className="text-sm font-medium">Detention Pay ($)</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={editData.detentionAmount}
+                    onChange={(e) => setEditData(prev => ({ ...prev, detentionAmount: e.target.value }))}
+                    placeholder="0.00"
+                    className="h-10"
+                  />
+                  <p className="text-xs text-muted-foreground">Added when you wait more than 2 hours at pickup/dropoff</p>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-semibold">Broker</label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <Input placeholder="Broker Name" value={editData.brokerName} onChange={(e) => setEditData(prev => ({ ...prev, brokerName: e.target.value }))} className="h-10" />
-                    <Input placeholder="Broker Company" value={editData.brokerCompany} onChange={(e) => setEditData(prev => ({ ...prev, brokerCompany: e.target.value }))} className="h-10" />
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <div className="space-y-1">
-                    <label className="text-sm font-medium">BOL Number</label>
-                    <Input placeholder="Bill of Lading #" value={editData.bolNumber} onChange={(e) => setEditData(prev => ({ ...prev, bolNumber: e.target.value }))} className="h-10" />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-sm font-medium">Notes</label>
-                    <Input placeholder="Notes..." value={editData.notes} onChange={(e) => setEditData(prev => ({ ...prev, notes: e.target.value }))} className="h-10" />
-                  </div>
+                  <label className="text-sm font-medium">Notes</label>
+                  <Input
+                    placeholder="Any additional notes..."
+                    value={editData.notes}
+                    onChange={(e) => setEditData(prev => ({ ...prev, notes: e.target.value }))}
+                    className="h-10"
+                  />
                 </div>
               </div>
             )}
@@ -451,6 +429,9 @@ const LoadCard = ({ load, onDelete, onEdit, isEditing, setIsEditing, estimatedMi
               <div>
                 <p className="text-gray-600 text-xs">Load Rate</p>
                 <p className="font-semibold text-gray-600">${formatCurrency(load.rate)}</p>
+                {load.detentionAmount && (
+                  <p className="text-gray-500 text-xs mt-1">+ ${formatCurrency(load.detentionAmount)} detention</p>
+                )}
               </div>
               {!isCompanyDriver ? (
                 <div>

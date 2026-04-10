@@ -10,12 +10,7 @@ export interface Load {
   dateAdded: string;
   weekPeriod: string;
   deadheadMiles?: number;
-  dispatcherName?: string;
-  dispatcherCompany?: string;
-  dispatcherPhone?: string;
-  brokerName?: string;
-  brokerCompany?: string;
-  bolNumber?: string;
+  detentionAmount?: number;
   notes?: string;
   pickupZip?: string;
   deliveryZip?: string;
@@ -53,12 +48,7 @@ export interface NewLoad {
   pickupDate: Date | undefined;
   deliveryDate: Date | undefined;
   deadheadMiles?: string;
-  dispatcherName?: string;
-  dispatcherCompany?: string;
-  dispatcherPhone?: string;
-  brokerName?: string;
-  brokerCompany?: string;
-  bolNumber?: string;
+  detentionAmount?: string;
   notes?: string;
   pickupZip?: string;
   deliveryZip?: string;

@@ -2,14 +2,14 @@
  * Calculate driver pay for a single load based on driver type.
  *
  * owner-operator / lease-operator:
- *   driverPay = rate * (1 - companyDeduction / 100)
+ *   driverPay = (rate + detention) * (1 - companyDeduction / 100)
  *   (lease weekly mileage cost is deducted at the weekly level, not per-load)
  *
  * company-driver, per_mile:
  *   driverPay = estimatedMiles * companyPayRate
  *
  * company-driver, percentage:
- *   driverPay = rate * (companyPayRate / 100)
+ *   driverPay = (rate + detention) * (companyPayRate / 100)
  */
 export const calculateDriverPay = (
   rate: number,
@@ -19,9 +19,11 @@ export const calculateDriverPay = (
     companyPayType?: string;
     companyPayRate?: number | string;
   },
-  estimatedMiles?: number
+  estimatedMiles?: number,
+  detentionAmount?: number
 ): number => {
   const driverType = userProfile?.driverType || 'owner-operator';
+  const grossRate = rate + (detentionAmount || 0);
 
   if (driverType === 'company-driver') {
     const payType = userProfile?.companyPayType;
@@ -30,13 +32,13 @@ export const calculateDriverPay = (
     if (payType === 'per_mile') {
       return (estimatedMiles || 0) * payRate;
     }
-    // percentage of gross
-    return rate * (payRate / 100);
+    // percentage of gross (including detention)
+    return grossRate * (payRate / 100);
   }
 
-  // owner-operator and lease-operator both use company deduction %
+  // owner-operator and lease-operator both use company deduction % (applied to gross + detention)
   const deduction = parseFloat(String(userProfile?.companyDeduction || 0));
-  return rate * (1 - deduction / 100);
+  return grossRate * (1 - deduction / 100);
 };
 
 export const getWeeklyPeriodDisplay = (weeklyPeriod: string) => {
