@@ -31,7 +31,7 @@ const WeeklyForecastCard = ({
   totalWeeklyDeductions = 0,
   totalExtraDeductions = 0,
 }: WeeklyForecastCardProps) => {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
   const [weeklyGoal, setWeeklyGoal] = useState<string>(() => {
     return localStorage.getItem('truckpay_weekly_goal') || '';
   });
