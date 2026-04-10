@@ -15,6 +15,8 @@ interface WeeklyForecastCardProps {
   currentDriverPay: number;
   loadCount: number;
   fixedDeductionsWeeklyTotal: number;
+  totalWeeklyDeductions?: number;
+  totalExtraDeductions?: number;
 }
 
 const WeeklyForecastCard = ({
@@ -26,12 +28,15 @@ const WeeklyForecastCard = ({
   currentDriverPay,
   loadCount,
   fixedDeductionsWeeklyTotal,
+  totalWeeklyDeductions = 0,
+  totalExtraDeductions = 0,
 }: WeeklyForecastCardProps) => {
   const [collapsed, setCollapsed] = useState(false);
   const [weeklyGoal, setWeeklyGoal] = useState<string>(() => {
     return localStorage.getItem('truckpay_weekly_goal') || '';
   });
   const [historicalAvg, setHistoricalAvg] = useState<number | null>(null);
+  const [variableExpenseRatio, setVariableExpenseRatio] = useState<number>(0);
 
   const today = new Date();
   const daysElapsed = Math.max(1, differenceInCalendarDays(today, weekStart) + 1);
@@ -39,9 +44,17 @@ const WeeklyForecastCard = ({
   const dailyRate = currentGross / daysElapsed;
   const projectedGross = currentGross + dailyRate * daysRemaining;
 
+  // Current week variable expenses (fuel, tolls, maintenance, etc.)
+  const currentWeekVariableExpenses = totalWeeklyDeductions + totalExtraDeductions;
+
+  // Estimate remaining variable expenses based on historical ratio
+  const projectedVariableExpenses = projectedGross > 0
+    ? currentWeekVariableExpenses + (projectedGross - currentGross) * variableExpenseRatio
+    : currentWeekVariableExpenses;
+
   const companyDeduction = (userProfile?.companyDeduction || 0) / 100;
   const projectedDriverPay = projectedGross * (1 - companyDeduction);
-  const projectedNet = projectedDriverPay - fixedDeductionsWeeklyTotal;
+  const projectedNet = projectedDriverPay - fixedDeductionsWeeklyTotal - projectedVariableExpenses;
 
   const confidence = daysElapsed >= 5 ? 'HIGH' : daysElapsed >= 3 ? 'MODERATE' : 'LOW';
   const confidenceColor =
@@ -64,23 +77,72 @@ const WeeklyForecastCard = ({
   useEffect(() => {
     if (!user) return;
     const fetchHistorical = async () => {
-      const { data } = await supabase
+      // Fetch all loads before this week
+      const { data: loadData } = await supabase
         .from('load_reports')
         .select('rate, date_added')
         .eq('user_id', user.id)
         .lt('date_added', weekStart.toISOString());
-      if (!data || data.length === 0) return;
-      // Group by week and average
+
+      if (!loadData || loadData.length === 0) return;
+
+      // Group loads by week and calculate gross per week
       const weekMap: Record<string, number> = {};
-      data.forEach((load) => {
+      loadData.forEach((load) => {
         const d = new Date(load.date_added);
         const ws = startOfWeek(d, { weekStartsOn: 0 });
         const wk = ws.toISOString().split('T')[0];
         weekMap[wk] = (weekMap[wk] || 0) + load.rate;
       });
-      const weeks = Object.values(weekMap);
+
+      const weeks = Object.keys(weekMap);
       if (weeks.length > 0) {
-        setHistoricalAvg(weeks.reduce((a, b) => a + b, 0) / weeks.length);
+        const weeksArray = Object.values(weekMap);
+        setHistoricalAvg(weeksArray.reduce((a, b) => a + b, 0) / weeksArray.length);
+
+        // Fetch variable expenses for the same weeks to learn the ratio
+        const { data: expenseData } = await supabase
+          .from('weekly_deductions')
+          .select('week_start, amount')
+          .eq('user_id', user.id)
+          .in('week_start', weeks);
+
+        const { data: extraExpenseData } = await supabase
+          .from('weekly_extra_deductions')
+          .select('week_start, amount')
+          .eq('user_id', user.id)
+          .in('week_start', weeks);
+
+        // Sum expenses per week
+        const weekExpenses: Record<string, number> = {};
+        if (expenseData) {
+          expenseData.forEach(exp => {
+            weekExpenses[exp.week_start] = (weekExpenses[exp.week_start] || 0) + exp.amount;
+          });
+        }
+        if (extraExpenseData) {
+          extraExpenseData.forEach(exp => {
+            weekExpenses[exp.week_start] = (weekExpenses[exp.week_start] || 0) + exp.amount;
+          });
+        }
+
+        // Calculate average expense-to-gross ratio (only from weeks with data)
+        let totalExpenses = 0;
+        let totalGrossWithExpenses = 0;
+        weeks.forEach(week => {
+          const expenses = weekExpenses[week] || 0;
+          const gross = weekMap[week];
+          if (gross > 0) {
+            totalExpenses += expenses;
+            totalGrossWithExpenses += gross;
+          }
+        });
+
+        if (totalGrossWithExpenses > 0) {
+          const ratio = totalExpenses / totalGrossWithExpenses;
+          // Cap ratio at reasonable max (e.g., 50% — expenses shouldn't exceed half of gross)
+          setVariableExpenseRatio(Math.min(ratio, 0.5));
+        }
       }
     };
     fetchHistorical();
@@ -97,10 +159,10 @@ const WeeklyForecastCard = ({
         <CardTitle className="mobile-text-xl brutal-text font-bold flex items-center justify-between gap-2">
           <span className="flex items-center gap-2">
             <TrendingUp className="mobile-icon text-primary" />
-            AT THIS PACE...
+            This Week's Forecast
           </span>
           <span className="flex items-center gap-2">
-            <span className={`brutal-mono text-xs ${confidenceColor}`}>{confidence} CONFIDENCE</span>
+            <span className={`brutal-mono text-xs ${confidenceColor}`}>{confidence}</span>
             {collapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
           </span>
         </CardTitle>
@@ -110,17 +172,24 @@ const WeeklyForecastCard = ({
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             <div className="brutal-border p-3 bg-primary/5">
-              <p className="brutal-mono text-xs text-muted-foreground">PROJ. GROSS</p>
+              <p className="brutal-mono text-xs text-muted-foreground">Projected Gross</p>
               <p className="brutal-text text-lg font-bold text-primary">${formatCurrency(projectedGross)}</p>
             </div>
             <div className="brutal-border p-3 bg-success/5">
-              <p className="brutal-mono text-xs text-muted-foreground">PROJ. NET</p>
-              <p className="brutal-text text-lg font-bold text-green-700">${formatCurrency(projectedNet)}</p>
+              <p className="brutal-mono text-xs text-muted-foreground">Projected Take-Home</p>
+              <p className="brutal-text text-lg font-bold text-green-700">${formatCurrency(Math.max(0, projectedNet))}</p>
             </div>
             <div className="brutal-border p-3 bg-accent/10 col-span-2 sm:col-span-1">
-              <p className="brutal-mono text-xs text-muted-foreground">DAYS LEFT</p>
+              <p className="brutal-mono text-xs text-muted-foreground">Days Left</p>
               <p className="brutal-text text-lg font-bold">{daysRemaining}</p>
             </div>
+          </div>
+
+          {/* Expense breakdown */}
+          <div className="text-xs brutal-mono text-muted-foreground space-y-1">
+            <p>• Fixed costs: ${formatCurrency(fixedDeductionsWeeklyTotal)}</p>
+            <p>• Variable expenses: ${formatCurrency(Math.round(projectedVariableExpenses * 100) / 100)}</p>
+            <p className="text-foreground font-semibold">Total deductions: ${formatCurrency(fixedDeductionsWeeklyTotal + Math.round(projectedVariableExpenses * 100) / 100)}</p>
           </div>
 
           {vsAvg !== null && (
@@ -131,13 +200,13 @@ const WeeklyForecastCard = ({
                 <TrendingDown className="w-4 h-4 text-red-600" />
               )}
               <span className="brutal-mono text-sm">
-                {vsAvg >= 0 ? '+' : ''}{vsAvg.toFixed(1)}% vs YOUR WEEKLY AVERAGE
+                {vsAvg >= 0 ? '+' : ''}{vsAvg.toFixed(1)}% vs your average week
               </span>
             </div>
           )}
 
           <div className="space-y-2">
-            <label className="brutal-mono text-xs text-muted-foreground">WEEKLY GOAL ($)</label>
+            <label className="brutal-mono text-xs text-muted-foreground">Weekly Take-Home Goal</label>
             <div className="flex items-center gap-2">
               <Target className="w-4 h-4 text-accent" />
               <Input

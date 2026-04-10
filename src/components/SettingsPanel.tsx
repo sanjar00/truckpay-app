@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, User, Phone, Mail, Users, Percent, Save, Download, Upload, Trash2, DollarSign } from 'lucide-react';
+import { ArrowLeft, User, Phone, Mail, Users, Percent, Save, Download, Upload, Trash2, DollarSign, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,7 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Calendar } from 'lucide-react';
 
-const SettingsPanel = ({ userProfile, setUserProfile, onBack }) => {
+const SettingsPanel = ({ userProfile, setUserProfile, onBack, onLogout }) => {
   const [formData, setFormData] = useState({ ...userProfile });
   const [hasChanges, setHasChanges] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -674,11 +674,11 @@ const SettingsPanel = ({ userProfile, setUserProfile, onBack }) => {
           <div className="space-y-4 text-sm text-muted-foreground">
             <div className="flex justify-between items-center">
               <span className="font-medium">Version:</span>
-              <span>2.1.0</span>
+              <span>2.2.0</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="font-medium">Last Updated:</span>
-              <span>March 2026</span>
+              <span>April 2026</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="font-medium">Support:</span>
@@ -719,7 +719,7 @@ const SettingsPanel = ({ userProfile, setUserProfile, onBack }) => {
               <Upload className="h-4 w-4 mr-2" />
               Import Data
             </Button>
-            <Button 
+            <Button
               onClick={handleClearData}
               disabled={isLoading}
               className="w-full h-12 brutal-border brutal-shadow text-destructive border-destructive hover:bg-destructive/10 text-sm font-bold"
@@ -729,6 +729,17 @@ const SettingsPanel = ({ userProfile, setUserProfile, onBack }) => {
               Clear All Data
             </Button>
           </div>
+        </div>
+
+        {/* Logout */}
+        <div className="brutal-border brutal-shadow-lg p-6 bg-background mb-8">
+          <Button
+            onClick={onLogout}
+            className="w-full h-12 brutal-border brutal-shadow bg-destructive hover:bg-destructive/90 text-destructive-foreground text-sm font-bold"
+          >
+            <LogOut className="h-4 w-4 mr-2" />
+            Log Out
+          </Button>
         </div>
       </div>
 

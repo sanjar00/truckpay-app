@@ -451,35 +451,6 @@ const WeeklySummary = ({
         </div>
       )}
 
-      {/* Summary Section */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Gross Pay Tab */}
-        <div className="brutal-border-info bg-info p-6 brutal-shadow">
-          <h3 className="brutal-text text-lg text-info-foreground mb-2">Total Earned</h3>
-          <p className="brutal-text text-3xl text-info-foreground">${formatCurrency(totalGrossPay)}</p>
-          <p className="brutal-mono text-xs text-info-foreground opacity-80 mt-2">Load rates this week</p>
-        </div>
-
-        {/* Net Pay Tab */}
-        <div className="brutal-border-success bg-success p-6 brutal-shadow">
-          <h3 className="brutal-text text-lg text-success-foreground mb-2">Take-Home</h3>
-          <p className="brutal-text text-3xl text-success-foreground">${formatCurrency(netPay)}</p>
-          <p className="brutal-mono text-xs text-success-foreground opacity-80 mt-2">After all deductions</p>
-        </div>
-
-        {/* Mileage Tab */}
-        {weeklyMileage && (
-          <div className="brutal-border-accent bg-accent p-6 brutal-shadow">
-            <div className="flex items-center gap-2 mb-2">
-              <Navigation className="w-5 h-5 text-accent-foreground" />
-              <h3 className="brutal-text text-lg text-accent-foreground">Miles This Week</h3>
-            </div>
-            <p className="brutal-text text-3xl text-accent-foreground">{weeklyMileage.totalMiles.toLocaleString()}</p>
-            <p className="brutal-mono text-xs text-accent-foreground opacity-80 mt-2">Total miles</p>
-          </div>
-        )}
-      </div>
-
       {/* Payment Breakdown */}
       <div className="brutal-border bg-background p-4 brutal-shadow mt-6">
         <h4 className="brutal-text text-lg text-foreground mb-4">Pay Breakdown</h4>

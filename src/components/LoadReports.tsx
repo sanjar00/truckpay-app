@@ -3,6 +3,7 @@ import { Plus, Truck } from 'lucide-react';
 import { useSubscription } from '@/hooks/useSubscription';
 import { isBefore, startOfDay } from 'date-fns';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import AddLoadForm from './AddLoadForm';
 import LoadCard from './LoadCard';
 import WeeklySummary from './WeeklySummary';
@@ -159,10 +160,25 @@ const LoadReports = ({ onBack, user, userProfile, deductions, onUpgrade }: LoadR
           onNavigateWeek={handleNavigateWeek}
         />
 
-        <LoadSummaryCards 
+        <LoadSummaryCards
           currentWeekLoads={currentWeekLoads}
           totalGrossPay={totalGrossPay}
+          netPay={netPay}
+          weeklyMileage={weeklyMileage}
         />
+
+        {/* Add Load Button */}
+        <Button
+          onClick={handleShowAddForm}
+          className="w-full h-16 brutal-border-accent hover:brutal-border-info bg-accent hover:bg-accent text-accent-foreground brutal-hover brutal-active"
+          size="lg"
+        >
+          <Plus className="w-8 h-8 mr-3" />
+          <div className="text-left">
+            <p className="brutal-text text-xl">Add Load</p>
+            <p className="brutal-mono text-sm opacity-80">Record this week's load</p>
+          </div>
+        </Button>
 
         <MileageTracking
           weeklyMileage={weeklyMileage}
@@ -181,25 +197,18 @@ const LoadReports = ({ onBack, user, userProfile, deductions, onUpgrade }: LoadR
           currentDriverPay={totalDriverPay}
           loadCount={currentWeekLoads.length}
           fixedDeductionsWeeklyTotal={totalFixedDeductions}
+          totalWeeklyDeductions={totalWeeklyDeductions}
+          totalExtraDeductions={totalExtraDeductions}
         />
 
-        {/* Add New Load Button */}
-        <Button
-          onClick={handleShowAddForm}
-          className="w-full h-16 brutal-border-accent hover:brutal-border-info bg-accent hover:bg-accent text-accent-foreground brutal-hover brutal-active"
-          size="lg"
-        >
-          <Plus className="w-8 h-8 mr-3" />
-          <div className="text-left">
-            <p className="brutal-text text-xl">Add Load</p>
-            <p className="brutal-mono text-sm opacity-80">Record this week's load</p>
-          </div>
-        </Button>
-
-        {/* Add Load Form */}
-        {showAddForm && (
-          <div className="brutal-border-secondary bg-secondary p-6 brutal-shadow-lg">
-            <h3 className="brutal-text text-xl text-secondary-foreground mb-4">New Load</h3>
+        {/* Add/Edit Load Modal */}
+        <Dialog open={showAddForm} onOpenChange={setShowAddForm}>
+          <DialogContent className="max-h-[90vh] overflow-y-auto brutal-border brutal-shadow-lg">
+            <DialogHeader>
+              <DialogTitle className="brutal-text text-2xl">
+                {editingLoad ? 'Edit Load' : 'New Load'}
+              </DialogTitle>
+            </DialogHeader>
             <AddLoadForm
               newLoad={newLoad}
               setNewLoad={setNewLoad}
@@ -210,8 +219,8 @@ const LoadReports = ({ onBack, user, userProfile, deductions, onUpgrade }: LoadR
               weekEnd={weekEnd}
               userProfile={userProfile}
             />
-          </div>
-        )}
+          </DialogContent>
+        </Dialog>
 
         {/* Load Cards */}
         {currentWeekLoads.length > 0 ? (
@@ -222,9 +231,26 @@ const LoadReports = ({ onBack, user, userProfile, deductions, onUpgrade }: LoadR
                 <LoadCard
                   load={load}
                   onDelete={handleDeleteLoad}
-                  onEdit={handleEditLoad}
-                  isEditing={editingLoad === load.id}
-                  setIsEditing={(editing) => setEditingLoad(editing ? load.id : null)}
+                  onEdit={() => {
+                    setNewLoad({
+                      rate: load.rate.toString(),
+                      companyDeduction: load.companyDeduction?.toString() || '',
+                      pickupDate: load.pickupDate,
+                      deliveryDate: load.deliveryDate,
+                      deadheadMiles: load.deadheadMiles?.toString() || '',
+                      detentionAmount: load.detentionAmount?.toString() || '',
+                      notes: load.notes || '',
+                      pickupZip: load.pickupZip || '',
+                      deliveryZip: load.deliveryZip || '',
+                      pickupCityState: load.pickupCityState || '',
+                      deliveryCityState: load.deliveryCityState || '',
+                      locationFrom: load.locationFrom || '',
+                      locationTo: load.locationTo || '',
+                      estimatedMiles: load.estimatedMiles,
+                    });
+                    setEditingLoad(load.id);
+                    setShowAddForm(true);
+                  }}
                   estimatedMiles={
                     weeklyMileage.totalMiles > 0 && currentWeekLoads.length > 0
                       ? weeklyMileage.totalMiles / currentWeekLoads.length

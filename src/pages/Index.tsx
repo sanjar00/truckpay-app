@@ -1,6 +1,6 @@
 
 import { useState, useEffect, useRef } from 'react';
-import { Truck, Calculator, Settings, DollarSign, FileText, LogOut, Receipt, Calendar, Map, Lock, Info } from 'lucide-react';
+import { Truck, Calculator, Settings, DollarSign, FileText, Receipt, Calendar, Map, Lock, Info, MoreHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useSubscription } from '@/hooks/useSubscription';
@@ -67,6 +67,7 @@ const Index = () => {
     () => localStorage.getItem('truckpay_ea_banner_dismissed') === 'true'
   );
   const [weekSnapshot, setWeekSnapshot] = useState<{ loadCount: number; gross: number; expenses: number; net: number; weekStart: Date; weekEnd: Date } | null>(null);
+  const [showMoreSheet, setShowMoreSheet] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -325,10 +326,11 @@ const Index = () => {
         );
       case 'settings':
         return (
-          <SettingsPanel 
+          <SettingsPanel
             userProfile={userProfile}
             setUserProfile={setUserProfile}
             onBack={() => setCurrentView('dashboard')}
+            onLogout={handleLogout}
           />
         );
       default:
@@ -358,22 +360,8 @@ const Index = () => {
                     >
                       <Settings className="w-4 h-4 sm:w-5 sm:h-5" />
                     </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleLogout}
-                      className="brutal-border-destructive bg-destructive hover:bg-destructive text-destructive-foreground brutal-shadow brutal-hover brutal-active brutal-text text-xs sm:text-sm"
-                    >
-                      <LogOut className="w-4 h-4 sm:w-5 sm:h-5 mr-1" />
-                      <span className="hidden sm:inline">LOGOUT</span>
-                      <span className="sm:hidden">OUT</span>
-                    </Button>
                   </div>
                 </div>
-
-                <p className="brutal-text text-sm text-foreground mb-3">
-                  WELCOME, {(userProfile?.name || 'DRIVER').toUpperCase()}!
-                </p>
 
                 {/* Weekly Snapshot */}
                 {weekSnapshot ? (
@@ -413,6 +401,40 @@ const Index = () => {
                         </p>
                       </div>
                     </div>
+                    {/* Weekly goal progress bar */}
+                    {(() => {
+                      const weeklyGoal = parseFloat(localStorage.getItem('truckpay_weekly_goal') || '0');
+                      if (weeklyGoal > 0) {
+                        const pct = Math.min(100, Math.round((weekSnapshot.net / weeklyGoal) * 100));
+                        return (
+                          <div className="mt-3 pt-3 border-t border-accent-foreground/20">
+                            <div className="flex justify-between items-center mb-1">
+                              <p className="brutal-mono text-xs text-accent-foreground opacity-75">Weekly Goal</p>
+                              <p className="brutal-mono text-xs text-accent-foreground font-bold">{pct}%</p>
+                            </div>
+                            <div className="h-2 bg-accent-foreground/20 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-all ${pct >= 100 ? 'bg-green-400' : 'bg-amber-400'}`}
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                            <p className="brutal-mono text-xs text-accent-foreground opacity-60 mt-1">
+                              ${weekSnapshot.net.toLocaleString('en-US', { maximumFractionDigits: 0 })} of ${weeklyGoal.toLocaleString('en-US', { maximumFractionDigits: 0 })} goal
+                            </p>
+                          </div>
+                        );
+                      }
+                      return (
+                        <div className="mt-3 pt-3 border-t border-accent-foreground/20">
+                          <button
+                            onClick={() => setCurrentView('settings')}
+                            className="brutal-mono text-xs text-accent-foreground opacity-60 hover:opacity-100 transition-opacity underline"
+                          >
+                            Set a weekly goal →
+                          </button>
+                        </div>
+                      );
+                    })()}
                   </div>
                 ) : userProfile && (
                   <div className="brutal-border-info bg-accent p-3 brutal-shadow">
@@ -518,7 +540,7 @@ const Index = () => {
               {/* Footer */}
               <div className="brutal-border bg-muted p-3 sm:p-6 brutal-shadow text-center">
                 <p className="brutal-mono text-xs sm:text-sm text-muted-foreground mobile-text-wrap">
-                  TRUCKPAY V2.1
+                  TRUCKPAY V2.2
                 </p>
               </div>
             </div>
@@ -527,9 +549,115 @@ const Index = () => {
     }
   };
 
+  const TAB_VIEWS = ['dashboard', 'loads', 'deductions', 'forecast', 'expenses', 'perdiem', 'ifta', 'settings'];
+  const showTabBar = TAB_VIEWS.includes(currentView);
+
+  const moreItems = [
+    { label: 'Personal Expenses', icon: Receipt, view: 'expenses', feature: null },
+    { label: 'Per Diem', icon: Calendar, view: 'perdiem', feature: 'perdiem' as const },
+    { label: 'IFTA Report', icon: Map, view: 'ifta', feature: 'ifta' as const },
+    { label: 'Settings', icon: Settings, view: 'settings', feature: null },
+  ];
+
+  const moreActive = ['expenses', 'perdiem', 'ifta', 'settings'].includes(currentView);
+
   return (
     <div className="min-h-screen bg-background">
-      {renderCurrentView()}
+      {/* Page content — add bottom padding when tab bar is visible */}
+      <div className={showTabBar ? 'md:pb-0 pb-20' : ''}>
+        {renderCurrentView()}
+      </div>
+
+      {/* Bottom Tab Bar — mobile only */}
+      {showTabBar && (
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-card border-t-2 border-foreground brutal-shadow-lg flex items-stretch h-16">
+          {/* Loads */}
+          <button
+            onClick={() => { setShowMoreSheet(false); setCurrentView('loads'); }}
+            className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors ${
+              currentView === 'loads' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <FileText className="w-5 h-5" />
+            <span className="brutal-mono text-xs">Loads</span>
+          </button>
+
+          {/* Expenses (Deductions) */}
+          <button
+            onClick={() => { setShowMoreSheet(false); setCurrentView('deductions'); }}
+            className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors ${
+              currentView === 'deductions' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Calculator className="w-5 h-5" />
+            <span className="brutal-mono text-xs">Expenses</span>
+          </button>
+
+          {/* Summary */}
+          <button
+            onClick={() => {
+              setShowMoreSheet(false);
+              if (!isFeatureAllowed('forecast')) {
+                setUpgradeModal({ feature: 'Earnings Summary', tier: 'pro' });
+                return;
+              }
+              setCurrentView('forecast');
+            }}
+            className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors ${
+              currentView === 'forecast' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <DollarSign className="w-5 h-5" />
+            <span className="brutal-mono text-xs">Summary</span>
+          </button>
+
+          {/* More */}
+          <button
+            onClick={() => setShowMoreSheet(v => !v)}
+            className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors ${
+              moreActive || showMoreSheet ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <MoreHorizontal className="w-5 h-5" />
+            <span className="brutal-mono text-xs">More</span>
+          </button>
+        </nav>
+      )}
+
+      {/* More Sheet — mobile only */}
+      {showMoreSheet && (
+        <>
+          <div
+            className="md:hidden fixed inset-0 z-30 bg-black/40"
+            onClick={() => setShowMoreSheet(false)}
+          />
+          <div className="md:hidden fixed bottom-16 left-0 right-0 z-40 bg-card border-t-2 border-foreground brutal-shadow-lg p-4 space-y-2">
+            {moreItems.map(({ label, icon: Icon, view, feature }) => (
+              <button
+                key={view}
+                onClick={() => {
+                  setShowMoreSheet(false);
+                  if (feature && !isFeatureAllowed(feature)) {
+                    setUpgradeModal({ feature: label, tier: 'pro' });
+                    return;
+                  }
+                  setCurrentView(view);
+                }}
+                className={`w-full flex items-center gap-3 p-3 brutal-border brutal-shadow text-left transition-colors ${
+                  currentView === view ? 'bg-accent text-accent-foreground' : 'bg-background hover:bg-muted text-foreground'
+                }`}
+              >
+                <Icon className="w-5 h-5 flex-shrink-0" />
+                <span className="brutal-text text-sm">{label}</span>
+                {feature && !isFeatureAllowed(feature) && (
+                  <Lock className="w-3.5 h-3.5 ml-auto opacity-50" />
+                )}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
       {upgradeModal && (
         <UpgradeModal
           featureName={upgradeModal.feature}

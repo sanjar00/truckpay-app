@@ -99,6 +99,7 @@ Grid texture pattern on all page backgrounds (existing CSS class — reuse it).
 
 ### Money Format
 Always display as `$X,XXX.XX` — use `.toLocaleString('en-US', {style:'currency', currency:'USD'})` or equivalent.
+Always use a comma as the thousands separator — never a space (e.g. `5,059` not `5 059`).
 
 ### Dates
 Display format: `Mon DD, YYYY` (e.g. `Apr 06, 2026`)
@@ -120,6 +121,7 @@ Components fetch data via Supabase client with proper error handling and real-ti
 - companyPayType: `'per_mile'` | `'percentage'` (company-driver only)
 - companyPayRate: $/mile or % value depending on companyPayType
 - leaseRatePerMile: cost per mile for lease-operator (deducted from net weekly)
+- earlyAdopterBannerDismissed: boolean — persist banner dismissal so it doesn't reappear
 
 **load_reports** — Truck loads with earnings data
 - id, user_id, origin, destination, pickupDate, deliveryDate, loadRate, deductionRate, weekId
@@ -245,14 +247,29 @@ The app uses hash-based routing. All sections on one page, shown/hidden by JS.
 
 ## Language Rules — Plain English Only
 
-The app was using developer-style labels. All text must be plain English
-that a non-technical truck driver understands. Enforce this on every new
-feature:
+The app must never show developer-style variable names or code strings to the user.
+All text must be plain English that a non-technical truck driver understands.
+Enforce this on every new feature — no exceptions.
 
 | ❌ Never use | ✅ Use instead |
 |-------------|---------------|
 | `WEEK_MANAGEMENT_SYSTEM` | Remove — don't show at all |
+| `EXPENSE_MANAGEMENT_SYSTEM` | Remove — don't show at all |
+| `DEDUCTION_TYPES` | `Deduction Types` |
+| `SET_RECURRING_WEEKLY_AMOUNTS` | `Set recurring weekly amounts` |
+| `CURRENT_FIXED_DEDUCTIONS` | `Current Fixed Deductions` |
+| `ADD_NEW_DEDUCTION_TYPE` | `Add New Deduction Type` |
+| `ENTER_NAME` | `Enter name` (or use a descriptive placeholder) |
+| `ADD_TYPE` | `+ Add Type` |
+| `WEEKLY_AMOUNT_($)` | `Weekly Amount ($)` |
+| `FIXED_AT_$X.XX/WEEK` | `Fixed at $X.XX/week` |
+| `EFFECTIVE_FROM_MMM_D,_YYYY` | `Effective from MMM D, YYYY` |
+| `ADMIN_FEE` (as a label) | `Admin Fee` |
+| `WEEKLY__INSURANCE` (double underscore) | `Weekly Insurance` |
 | `PREV_WEEK` / `NEXT_WEEK` | `← Last Week` / `Next Week →` |
+| `CURRENT_WEEK` | Remove — the date range below already says it |
+| `MONDAY_TO_SUNDAY` | `Mon – Sun` or remove |
+| `Apr_06 - Apr_12,_2026` (underscores) | `Apr 06 – Apr 12, 2026` |
 | `TOTAL_LOADS` | `Loads This Week` |
 | `GROSS_PAY` | `Total Earned` |
 | `WEEKLY_MILEAGE` | `Miles This Week` |
@@ -270,6 +287,8 @@ feature:
 | `FIXED_DEDUCTIONS` | `Weekly Fixed Costs` |
 | `ADD_CUSTOM_DEDUCTION` | `+ Add Expense` |
 | `SHOW OPTIONAL FIELDS (deadhead, detention...)` | `+ More Details` |
+| `FIX` (checkbox label on deductions) | `Recurring` |
+| `Enter expense type nam` (truncated) | `Enter expense type name` |
 
 ---
 
@@ -287,15 +306,188 @@ feature:
 
 ---
 
+## UI/UX Improvement Backlog
+> Sourced from a full audit of the live app (April 2026). Implement these as
+> part of V2.3 and beyond. Do not deviate from the design system when fixing these.
+
+### 🔴 P0 — Critical (fix before next release)
+
+**1. Code labels still visible in production**
+Despite the Language Rules above, several raw code strings are still rendering
+in the live app. Audit every component and ensure none of the ❌ strings from
+the Language Rules table appear anywhere in the UI. Specific confirmed locations:
+- `WEEK_MANAGEMENT_SYSTEM` — Load Reports page subtitle
+- `EXPENSE_MANAGEMENT_SYSTEM` — Deductions page subtitle
+- `DEDUCTION_TYPES` / `SET_RECURRING_WEEKLY_AMOUNTS` — Deductions section headers
+- `CURRENT_WEEK` / `PREV_WEEK` / `NEXT_WEEK` — week navigation buttons
+- `MONDAY_TO_SUNDAY` — week range label
+- `Apr_06 - Apr_12,_2026` — date with underscores instead of spaces
+- `FIXED_AT_$X.XX/WEEK` / `EFFECTIVE_FROM_...` — deduction confirmation messages
+- `WEEKLY_AMOUNT_($)` — deduction input label
+- `ENTER_NAME` / `ADD_TYPE` — Deductions form placeholder and button
+- `CURRENT_FIXED_DEDUCTIONS` / `ADMIN_FEE` / `WEEKLY__INSURANCE` — deduction items
+- `ADD_NEW_DEDUCTION_TYPE` — section heading
+- `Enter expense type nam` — truncated placeholder on Personal Expenses
+
+**2. Logout button is a top-level red CTA**
+The OUT (logout) button is bright red and sits prominently in the top-right
+header next to the Settings gear icon. A driver could accidentally log out.
+Move logout inside the Settings page. The header should only show the Settings
+icon (⚙️). No logout button visible on any page except inside Settings.
+
+**3. Version tag shows wrong version**
+Footer reads "TRUCKPAY V2.1" — update to "TRUCKPAY V2.2".
+
+---
+
+### 🟠 P1 — High Priority
+
+**4. Bottom tab bar navigation**
+This is the #1 UX priority. The current home-screen tile navigation requires
+going back to home between every section. Replace with a persistent bottom tab
+bar fixed to the bottom of all screens:
+
+```
+[ 🚚 Loads ] [ 💸 Expenses ] [ 📊 Summary ] [ ⚙️ More ]
+```
+
+- Loads → Load Reports (#loads)
+- Expenses → Deductions (#deductions)
+- Summary → Earnings Summary (#summary)
+- More → opens a sheet with: Personal Expenses, Per Diem, IFTA, Settings, Logout
+- Active tab highlighted in amber
+- Tab bar always visible — no page should require going "back to home" to navigate
+
+**5. Add Load button not accessible enough**
+Adding a load is the most frequent driver action. Currently requires navigating
+to Load Reports and scrolling to find the amber ADD LOAD button. Fix:
+- Add a floating action button (FAB) on the Load Reports page, fixed to the
+  bottom-right above the tab bar: large amber `+` button, always visible
+- Optionally add a quick "Add Load" shortcut card on the Home screen below
+  the weekly snapshot
+
+**6. Personal Expenses — all forms expanded by default**
+Every expense category (Mechanic, Tires, Truck Wash, Parts, etc.) shows its
+full "Add New Expense" form (Amount, Date, Note, ADD button) at all times.
+With 4+ categories this creates a wall of identical forms.
+Fix: collapse all forms by default. Show only the category header with total
+amount and expense count. Expand the form on tap. Use an accordion pattern.
+
+**7. IFTA page — no export button**
+Per Diem has an EXPORT button but IFTA does not. IFTA's entire purpose is to
+produce a report for filing. Add an "Export IFTA Report" button (same style as
+Per Diem's export) at the bottom of the IFTA page.
+
+---
+
+### 🟠 P2 — Medium Priority
+
+**8. "Recurring" checkbox label on Deductions**
+The checkbox next to each deduction type is labeled "FIX" — this is unclear.
+Replace with "Recurring" as a toggle label. The meaning should be obvious:
+toggle on = this deduction repeats every week automatically.
+
+**9. Fuel tracked in two places — clarify or consolidate**
+Fuel expenses appear both in Load Reports (as weekly Fuel & Expenses entries)
+and in Deductions (as a FUEL deduction type). This confuses drivers — they
+don't know which one to use. Either:
+- Consolidate both into one place with a clear label, OR
+- Add a small tooltip/note: "Fuel entered here applies to this week's loads.
+  For recurring fixed fuel costs, use Deductions."
+
+**10. AI Receipt Scanner — add context label**
+The "SCAN RECEIPT WITH AI / AI-POWERED" button in Deductions appears mid-page
+with no explanation of what it does or what type of receipt to scan.
+Add a brief descriptor below the button: "Take a photo of a fuel, toll, or
+expense receipt — Claude will read the amount and date automatically."
+
+**11. Odometer fields interrupt Load Reports flow**
+The ODOMETER MONDAY / ODOMETER SUNDAY fields sit between the weekly stats cards
+and the forecast card in Load Reports. This breaks the reading flow. Options:
+- Move them into a collapsible "Miles This Week" section that is closed by
+  default and expands on tap
+- Or move them to a dedicated Mileage tab within Load Reports
+
+**12. Lane names truncated throughout Summary and IFTA**
+Lane names are cut off everywhere: `MISSISSIPPI → FLO...`, `FOUNTAIN HILL, PA ...`,
+`JACKSON, TN → WA...`. Full route names are important — drivers need to
+recognize their lanes at a glance. Fix by allowing text to wrap to a second
+line instead of truncating with `...`.
+
+**13. Early Adopter banner persists after dismissal**
+The "🎉 Early Adopter Bonus: Pro free until 07.07.2026" banner reappears on
+every app load even after the driver taps ✕. Persist the dismissal:
+store `earlyAdopterBannerDismissed: true` in the `profiles` table and check
+it on load. Once dismissed, never show it again.
+
+**14. IFTA empty state — add first-use guidance**
+All loads on the IFTA page show "No state miles entered" with just an EDIT
+button and no explanation. A first-time user has no idea what to do.
+Add a prominent info banner at the top of the load list when no state miles
+have been entered:
+"Tap EDIT on each load to add the miles you drove per state. This is required
+for your quarterly IFTA filing."
+
+---
+
+### 🟡 P3 — Polish
+
+**15. Remove "WELCOME, [NAME]!" from Home screen**
+The greeting "WELCOME, AKROM ARIPOV!" takes up space without adding value.
+Drivers know their own name. Remove it. The weekly snapshot card is a
+sufficient and more useful greeting.
+
+**16. Pay Breakdown — differentiate income vs. deduction rows**
+In the Pay Breakdown section at the bottom of Load Reports, all rows render
+with the same visual weight (plain text, same size). Make the breakdown
+scannable:
+- Income rows (Total Earned, After Company Cut): normal or slightly positive styling
+- Deduction rows (Other Expenses, Weekly Fixed Costs): red text or a minus prefix
+- Take-Home: largest, boldest number in the breakdown — green, hero size
+
+**17. "AVG DRIVER PAY" label repeats on every lane row**
+In the Lane Performance section of Earnings Summary, every row ends with
+`· AVG DRIVER PAY`. Since every row is a driver pay figure, this label adds
+clutter without adding meaning. Remove it — the column is self-explanatory.
+
+**18. RPM missing on some lane rows — improve display**
+Some lane rows in Lane Performance show `--` for RPM because mileage data is
+missing. Instead of a plain dash, show a small amber indicator: `⚠ No miles`
+so the driver knows why RPM is unavailable and what to fix.
+
+**19. "AT THIS PACE..." forecast label**
+Replace "AT THIS PACE..." with "This Week's Forecast" — clearer and consistent
+with the Language Rules table above. The confidence level (HIGH/MODERATE/LOW)
+can stay as a badge.
+
+**20. Per Diem — tax bracket is hardcoded at 25%**
+The "EST. TAX SAVINGS (25% BRACKET)" label assumes all drivers are in the 25%
+bracket. Add a tax bracket selector to the Settings page (options: 10%, 12%,
+22%, 24%, 32%) and use `profile.taxBracket` to calculate the savings estimate.
+Default to 22% if not set. Show the selected bracket in the label.
+
+**21. Home screen nav tiles have no visual hierarchy**
+All 6 nav tiles (Load Reports, Deductions, Summary, Personal Expenses, Per Diem,
+IFTA) look identical. Daily-use sections should feel more prominent than
+quarterly ones. Consider:
+- Making the Load Reports tile taller or distinctly styled (most-used feature)
+- Grouping tiles: "Weekly" (Loads, Deductions) vs. "Reports" (Summary,
+  Per Diem, IFTA) with a small section label between groups
+
+**22. Home screen weekly goal progress**
+The home snapshot shows what the driver earned but not how it compares to
+their goal. Add a small progress bar below the Take-Home number:
+`$2,456 of $5,000 goal ████░░░░ 49%`
+Only show if `profile.weeklyGoal` is set. If not set, show a subtle prompt:
+"Set a weekly goal →"
+
+---
+
 ## Known Issues (Do Not Re-introduce)
 
-1. **Giant blank space on Home screen** — there is extra whitespace between the
-   profile card and the navigation tiles. The cause is likely a min-height or
-   padding on a container div. Fix by removing excessive spacing.
+1. **Mileage bug** — described above in Mileage Calculation section. Fixed in V2.1. Do not revert.
 
-2. **Mileage bug** — described above. Fixed in V2.1. Do not revert.
-
-3. **Desktop layout breaks** — the app renders wide blank columns on desktop.
+2. **Desktop layout breaks** — the app renders wide blank columns on desktop.
    This is acceptable for now — the app is mobile-only. Do not attempt a
    desktop redesign unless asked.
 
@@ -488,6 +680,12 @@ parked at a truck stop?"* If no, simplify it.
 - Do NOT implement Stripe payments directly — add a TODO comment and simulate with Supabase for now
 - Do NOT introduce new date input fields without using calendar picker Popover pattern
 - Do NOT break existing component patterns or styling conventions
+- Do NOT show the logout button as a top-level CTA in the header — it belongs inside Settings
+- Do NOT show the "WELCOME, [NAME]" greeting on the Home screen — it wastes space
+- Do NOT allow any raw code variable names (`SNAKE_CASE`, underscores, ALL_CAPS system strings) to render as user-facing text
+- Do NOT use a space as a thousands separator in numbers — always use a comma (`5,059` not `5 059`)
+- Do NOT expand all Personal Expense category forms by default — collapse them, expand on tap
+- Do NOT truncate lane names in Lane Performance or IFTA — allow text to wrap
 
 ---
 
@@ -522,13 +720,21 @@ parked at a truck stop?"* If no, simplify it.
 - Version V2.2
 
 ### 🔄 In Progress / Next Up
-- Bottom tab bar navigation (highest UX priority)
+- **Bottom tab bar navigation** (highest UX priority — see UI/UX Improvement Backlog #4)
+- Fix remaining code label strings in production (see UI/UX Improvement Backlog #1)
+- Move logout out of header into Settings (see UI/UX Improvement Backlog #2)
 - Lane Performance RPM column
 - Annual Income Goal (Settings + YTD progress bar)
 - Multi-load mileage estimation (when 6+ loads entered)
 
 ### 📋 Backlog
 - Stripe payment integration (replace localStorage simulation)
-- PDF export for weekly reports and IFTA
+- PDF export for weekly reports and IFTA (see also UI/UX Improvement Backlog #7)
 - Push notifications for end-of-week reminders
-- App Store / Google Play native wrapper
+- App Store / Google Play native wrapper (Capacitor recommended)
+- Personal Expenses accordion collapse (UI/UX Improvement Backlog #6)
+- IFTA export button (UI/UX Improvement Backlog #7)
+- Per Diem configurable tax bracket (UI/UX Improvement Backlog #20)
+- Home screen weekly goal progress bar (UI/UX Improvement Backlog #22)
+- Persist Early Adopter banner dismissal (UI/UX Improvement Backlog #13)
+- Pay Breakdown visual hierarchy (UI/UX Improvement Backlog #16)

@@ -388,7 +388,7 @@ const Deductions = ({ onBack, deductions, setDeductions, onUpgrade }: Deductions
             </Button>
             <div>
               <h1 className="brutal-text text-3xl text-foreground">DEDUCTIONS</h1>
-              <p className="brutal-mono text-sm text-muted-foreground">EXPENSE_MANAGEMENT_SYSTEM</p>
+              <p className="brutal-mono text-sm text-muted-foreground">Manage your truck expenses</p>
             </div>
           </div>
         </div>
@@ -400,10 +400,10 @@ const Deductions = ({ onBack, deductions, setDeductions, onUpgrade }: Deductions
           <div className="brutal-border-warning bg-warning p-6 brutal-shadow-lg">
             <div className="mb-6">
               <h2 className="brutal-text text-2xl text-info-foreground mb-2">
-                DEDUCTION_TYPES
+                Expense Types
               </h2>
               <p className="brutal-mono text-sm text-info-foreground opacity-80">
-                SET_RECURRING_WEEKLY_AMOUNTS
+                Set recurring weekly amounts
               </p>
             </div>
             
@@ -427,7 +427,7 @@ const Deductions = ({ onBack, deductions, setDeductions, onUpgrade }: Deductions
                         <AlertDialog open={pendingFixAction?.type === type} onOpenChange={(open) => !open && setPendingFixAction(null)}>
                           <div className="flex items-center gap-2">
                             <Label htmlFor={`fix-${type}`} className="brutal-mono text-sm font-medium">
-                              FIX
+                              Recurring
                             </Label>
                             <Checkbox
                               id={`fix-${type}`}
@@ -439,7 +439,7 @@ const Deductions = ({ onBack, deductions, setDeductions, onUpgrade }: Deductions
                           <AlertDialogContent className="brutal-border bg-card brutal-shadow-lg">
                             <AlertDialogHeader>
                               <AlertDialogTitle className="brutal-text text-xl text-foreground">
-                                CONFIRM_FIXED_DEDUCTION
+                                Set as Recurring?
                               </AlertDialogTitle>
                               <AlertDialogDescription className="brutal-mono text-sm text-muted-foreground">
                                 This function implements this deduction type to each week with the inputted amount. 
@@ -475,11 +475,11 @@ const Deductions = ({ onBack, deductions, setDeductions, onUpgrade }: Deductions
                     
                     {(isFixed || existingDeduction) && (
                       <div className="space-y-3">
-                        <Label 
+                        <Label
                           htmlFor={`amount-${type}`}
                           className="brutal-mono text-sm font-medium"
                         >
-                          WEEKLY_AMOUNT_($)
+                          Weekly Amount ($)
                         </Label>
                         <div className="flex gap-3">
                           <Input
@@ -503,14 +503,14 @@ const Deductions = ({ onBack, deductions, setDeductions, onUpgrade }: Deductions
                         {existingDeduction && (
                           <div className="brutal-border-success bg-success/10 p-3 brutal-shadow">
                             <p className="brutal-mono text-sm text-success font-bold">
-                              ✓ FIXED_AT_${existingDeduction.amount.toFixed(2)}/WEEK
+                              ✓ ${existingDeduction.amount.toFixed(2)} / week
                             </p>
                             <p className="brutal-mono text-xs text-success opacity-80">
-                              EFFECTIVE_FROM_{existingDeduction.dateAdded ? new Date(existingDeduction.dateAdded).toLocaleDateString('en-US', { 
-                                year: 'numeric', 
-                                month: 'short', 
-                                day: 'numeric' 
-                              }).replace(/\s/g, '_').toUpperCase() : 'CURRENT_WEEK'}
+                              Effective from {existingDeduction.dateAdded ? new Date(existingDeduction.dateAdded).toLocaleDateString('en-US', {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric'
+                              }) : 'this week'}
                             </p>
                           </div>
                         )}
@@ -531,8 +531,8 @@ const Deductions = ({ onBack, deductions, setDeductions, onUpgrade }: Deductions
           >
             <ScanLine className="w-6 h-6 mr-3" />
             <div className="text-left">
-              <p className="brutal-text text-base">SCAN RECEIPT WITH AI</p>
-              <p className="brutal-mono text-xs opacity-80">AI-POWERED</p>
+              <p className="brutal-text text-base">📷 Scan Receipt with AI</p>
+              <p className="brutal-mono text-xs opacity-80">Auto-reads amount, date & merchant</p>
             </div>
           </Button>
         </div>
@@ -540,12 +540,12 @@ const Deductions = ({ onBack, deductions, setDeductions, onUpgrade }: Deductions
         {/* Add Custom Deduction Type */}
         <div className="brutal-border-accent bg-accent p-6 brutal-shadow-lg">
           <h2 className="brutal-text text-2xl text-accent-foreground mb-4">
-            ADD_NEW_DEDUCTION_TYPE
+            Add Expense Type
           </h2>
           <div className="flex gap-4">
             <Input
               type="text"
-              placeholder="ENTER_NAME"
+              placeholder="Enter expense type name"
               value={newDeductionType}
               onChange={(e) => setNewDeductionType(e.target.value)}
               className="brutal-border bg-background text-lg font-bold flex-1"
@@ -556,7 +556,7 @@ const Deductions = ({ onBack, deductions, setDeductions, onUpgrade }: Deductions
               className="brutal-border-primary bg-primary text-primary-foreground brutal-shadow-lg brutal-hover"
             >
               <Plus className="w-6 h-6 mr-2" />
-              <span className="brutal-text">ADD_TYPE</span>
+              <span className="brutal-text">Add</span>
             </Button>
           </div>
         </div>
@@ -565,14 +565,14 @@ const Deductions = ({ onBack, deductions, setDeductions, onUpgrade }: Deductions
         {deductions.filter(d => d.isFixed).length > 0 && (
           <div className="brutal-border-success bg-success p-6 brutal-shadow-lg">
             <h2 className="brutal-text text-2xl text-success-foreground mb-4">
-              CURRENT_FIXED_DEDUCTIONS
+              Weekly Fixed Costs
             </h2>
             <div className="space-y-4">
               {deductions.filter(d => d.isFixed).map((deduction) => (
                 <div key={deduction.id} className="brutal-border bg-success/10 p-4 brutal-shadow flex items-center justify-between">
                   <div>
-                    <p className="brutal-mono text-sm text-success-foreground">{deduction.type.toUpperCase().replace(/ /g, '_')}</p>
-                    <p className="brutal-text text-lg text-success-foreground">✓ FIXED_AT_${formatCurrency(deduction.amount)}/WEEK</p>
+                    <p className="brutal-mono text-sm text-success-foreground">{deduction.type.toUpperCase()}</p>
+                    <p className="brutal-text text-lg text-success-foreground">✓ ${formatCurrency(deduction.amount)} / week</p>
                   </div>
                   <Button
                     variant="ghost"
