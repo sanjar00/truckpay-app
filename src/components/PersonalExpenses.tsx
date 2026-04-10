@@ -4,8 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Trash2, Edit, Save, X, DollarSign, Calendar, Filter, Calculator, ArrowLeft, Calendar as CalendarIcon, Camera, Loader2 } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Plus, Trash2, Edit, Save, X, DollarSign, Calendar, Filter, Calculator, ArrowLeft, Calendar as CalendarIcon } from 'lucide-react';
+import ReceiptScanner from './ReceiptScanner';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
@@ -56,10 +56,8 @@ const PersonalExpenses: React.FC<PersonalExpensesProps> = ({ onBack, userProfile
   const [newExpenses, setNewExpenses] = useState<{ [key: string]: { amount: string; note: string; date: string } }>({});
   const [dateCalendarOpen, setDateCalendarOpen] = useState<string | null>(null);
 
-  // Receipt scanner states
+  // Receipt scanner state
   const [showReceiptScanner, setShowReceiptScanner] = useState(false);
-  const [scanningReceipt, setScanningReceipt] = useState(false);
-  const [scannedReceipt, setScannedReceipt] = useState<{ merchant: string; category: string; amount: number | null; date: string | null; notes: string } | null>(null);
 
   // Calculate date range based on period filter
   const getDateRange = () => {
@@ -438,185 +436,63 @@ const PersonalExpenses: React.FC<PersonalExpensesProps> = ({ onBack, userProfile
     }
   };
 
-  // Handle receipt image upload and scanning
-  const handleReceiptUpload = async (file: File) => {
-    if (!file) return;
+  // Handle confirmed receipts from ReceiptScanner
+  const handleReceiptScanConfirm = async (scannedReceipts: any[]) => {
+    for (const receipt of scannedReceipts) {
+      // Ensure category exists or create it
+      let categoryId = expenseTypes.find(t => t.name.toLowerCase() === receipt.category.toLowerCase())?.id;
 
-    setScanningReceipt(true);
-    try {
-      // Compress image before sending
-      const compressed = await compressImage(file);
-      const reader = new FileReader();
-
-      reader.onload = async (e) => {
-        const base64 = (e.target?.result as string).split(',')[1];
-
+      if (!categoryId) {
+        // Create new expense type
         try {
-          const response = await supabase.functions.invoke('scan-receipt', {
-            body: { imageBase64: base64 }
-          });
+          const { data, error } = await supabase
+            .from('expense_types')
+            .insert([{ name: receipt.category, user_id: user?.id }])
+            .select()
+            .single();
 
-          if (response.error) {
-            toast({
-              title: "Error",
-              description: response.error.message || "Failed to scan receipt",
-              variant: "destructive"
-            });
-            setScanningReceipt(false);
-            return;
+          if (error) {
+            console.error('Error creating expense type:', error);
+            continue;
           }
 
-          setScannedReceipt(response.data);
-          setScanningReceipt(false);
+          categoryId = data.id;
+          setExpenseTypes(prev => [...prev, data]);
         } catch (error) {
-          console.error('Error scanning receipt:', error);
-          toast({
-            title: "Error",
-            description: "Failed to scan receipt",
-            variant: "destructive"
-          });
-          setScanningReceipt(false);
+          console.error('Error creating expense type:', error);
+          continue;
         }
-      };
+      }
 
-      reader.readAsDataURL(compressed);
-    } catch (error) {
-      console.error('Error processing receipt:', error);
-      toast({
-        title: "Error",
-        description: "Failed to process receipt image",
-        variant: "destructive"
-      });
-      setScanningReceipt(false);
-    }
-  };
+      // Add expense
+      if (categoryId && receipt.amount) {
+        try {
+          const { data, error } = await supabase
+            .from('expenses')
+            .insert([{
+              expense_type_id: categoryId,
+              amount: parseFloat(receipt.amount),
+              note: `${receipt.merchant}${receipt.notes ? ': ' + receipt.notes : ''}`,
+              date: receipt.date,
+              user_id: user?.id
+            }])
+            .select()
+            .single();
 
-  // Compress image for API submission
-  const compressImage = (file: File): Promise<File> => {
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = (event) => {
-        const img = new Image();
-        img.src = event.target?.result as string;
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const maxWidth = 1024;
-          const maxHeight = 1024;
-          let width = img.width;
-          let height = img.height;
-
-          if (width > height) {
-            if (width > maxWidth) {
-              height *= maxWidth / width;
-              width = maxWidth;
-            }
-          } else {
-            if (height > maxHeight) {
-              width *= maxHeight / height;
-              height = maxHeight;
-            }
+          if (!error && data) {
+            setExpenses(prev => [data, ...prev]);
           }
-
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          ctx?.drawImage(img, 0, 0, width, height);
-
-          canvas.toBlob((blob) => {
-            resolve(new File([blob!], file.name, { type: 'image/jpeg' }));
-          }, 'image/jpeg', 0.8);
-        };
-      };
-    });
-  };
-
-  // Handle adding scanned receipt as expense
-  const handleAddScannedReceipt = async () => {
-    if (!scannedReceipt) return;
-
-    // Ensure category exists or create it
-    let categoryId = expenseTypes.find(t => t.name.toLowerCase() === scannedReceipt.category.toLowerCase())?.id;
-
-    if (!categoryId) {
-      // Create new expense type
-      try {
-        const { data, error } = await supabase
-          .from('expense_types')
-          .insert([{ name: scannedReceipt.category, user_id: user?.id }])
-          .select()
-          .single();
-
-        if (error) {
-          toast({
-            title: "Error",
-            description: "Failed to create expense category",
-            variant: "destructive"
-          });
-          return;
+        } catch (error) {
+          console.error('Error adding scanned expense:', error);
         }
-
-        categoryId = data.id;
-        setExpenseTypes(prev => [...prev, data]);
-      } catch (error) {
-        console.error('Error creating expense type:', error);
-        toast({
-          title: "Error",
-          description: "Failed to create expense category",
-          variant: "destructive"
-        });
-        return;
       }
     }
 
-    // Add expense with scanned data
-    if (!categoryId || !scannedReceipt.amount || !scannedReceipt.date) {
-      toast({
-        title: "Error",
-        description: "Missing required information from receipt scan",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    try {
-      const { data, error } = await supabase
-        .from('expenses')
-        .insert([{
-          expense_type_id: categoryId,
-          amount: scannedReceipt.amount,
-          note: `${scannedReceipt.merchant}${scannedReceipt.notes ? ': ' + scannedReceipt.notes : ''}`,
-          date: scannedReceipt.date,
-          user_id: user?.id
-        }])
-        .select()
-        .single();
-
-      if (error) {
-        console.error('Error adding scanned expense:', error);
-        toast({
-          title: "Error",
-          description: "Failed to add scanned expense",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      setExpenses(prev => [data, ...prev]);
-      setScannedReceipt(null);
-      setShowReceiptScanner(false);
-      toast({
-        title: "Success",
-        description: "Receipt scanned and expense added successfully"
-      });
-    } catch (error) {
-      console.error('Error adding scanned expense:', error);
-      toast({
-        title: "Error",
-        description: "Failed to add scanned expense",
-        variant: "destructive"
-      });
-    }
+    setShowReceiptScanner(false);
+    toast({
+      title: "Success",
+      description: `${scannedReceipts.length} receipt${scannedReceipts.length !== 1 ? 's' : ''} processed and added`
+    });
   };
 
   if (loading) {
@@ -1009,87 +885,13 @@ const PersonalExpenses: React.FC<PersonalExpensesProps> = ({ onBack, userProfile
           )}
         </div>
 
-        {/* Receipt Scanner Modal */}
-        <Dialog open={showReceiptScanner} onOpenChange={setShowReceiptScanner}>
-          <DialogContent className="brutal-border brutal-shadow-lg max-w-md">
-            <DialogHeader>
-              <DialogTitle className="brutal-text text-2xl">Scan Receipt</DialogTitle>
-            </DialogHeader>
-
-            {!scannedReceipt ? (
-              <div className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  Take a photo or upload an image of your receipt. The AI will extract the merchant, category, amount, and date.
-                </p>
-
-                <input
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      handleReceiptUpload(file);
-                    }
-                  }}
-                  className="w-full"
-                  disabled={scanningReceipt}
-                />
-
-                {scanningReceipt && (
-                  <div className="flex items-center justify-center gap-2 py-4">
-                    <Loader2 className="w-5 h-5 animate-spin text-accent" />
-                    <span className="text-sm text-muted-foreground">Processing receipt...</span>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="brutal-border bg-muted p-4 space-y-3">
-                  <div>
-                    <p className="brutal-mono text-xs text-muted-foreground mb-1">MERCHANT</p>
-                    <p className="brutal-text text-foreground">{scannedReceipt.merchant || 'Unknown'}</p>
-                  </div>
-                  <div>
-                    <p className="brutal-mono text-xs text-muted-foreground mb-1">CATEGORY</p>
-                    <p className="brutal-text text-foreground">{scannedReceipt.category}</p>
-                  </div>
-                  <div>
-                    <p className="brutal-mono text-xs text-muted-foreground mb-1">AMOUNT</p>
-                    <p className="brutal-text text-foreground">${scannedReceipt.amount?.toFixed(2) || 'Not detected'}</p>
-                  </div>
-                  <div>
-                    <p className="brutal-mono text-xs text-muted-foreground mb-1">DATE</p>
-                    <p className="brutal-text text-foreground">{scannedReceipt.date || 'Not detected'}</p>
-                  </div>
-                  {scannedReceipt.notes && (
-                    <div>
-                      <p className="brutal-mono text-xs text-muted-foreground mb-1">NOTES</p>
-                      <p className="brutal-text text-sm text-foreground">{scannedReceipt.notes}</p>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex gap-2">
-                  <Button
-                    onClick={() => setScannedReceipt(null)}
-                    variant="outline"
-                    className="flex-1 brutal-border"
-                  >
-                    SCAN AGAIN
-                  </Button>
-                  <Button
-                    onClick={handleAddScannedReceipt}
-                    className="flex-1 brutal-border brutal-shadow brutal-hover"
-                    disabled={!scannedReceipt.amount || !scannedReceipt.date}
-                  >
-                    ADD EXPENSE
-                  </Button>
-                </div>
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
+        {/* Receipt Scanner */}
+        {showReceiptScanner && (
+          <ReceiptScanner
+            onClose={() => setShowReceiptScanner(false)}
+            onConfirm={handleReceiptScanConfirm}
+          />
+        )}
       </div>
     </div>
   );
