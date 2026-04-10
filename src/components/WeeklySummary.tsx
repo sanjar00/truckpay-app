@@ -451,48 +451,6 @@ const WeeklySummary = ({
         </div>
       )}
 
-      {/* Payment Breakdown */}
-      <div className="brutal-border bg-background p-4 brutal-shadow mt-6">
-        <h4 className="brutal-text text-lg text-foreground mb-4">Pay Breakdown</h4>
-        <div className="space-y-2 brutal-mono text-sm text-foreground">
-          <div className="flex justify-between">
-            <span>Total Earned:</span>
-            <span>${formatCurrency(totalGrossPay)}</span>
-          </div>
-          <div className="flex justify-between">
-            <span>After Company Cut:</span>
-            <span>${formatCurrency(totalDriverPay)}</span>
-          </div>
-          {totalWeeklyDeductions > 0 && (
-            <div className="flex justify-between">
-              <span>Fuel & Expenses:</span>
-              <span>-${formatCurrency(totalWeeklyDeductions)}</span>
-            </div>
-          )}
-          {totalExtraDeductions > 0 && (
-            <div className="flex justify-between">
-              <span>Other Expenses:</span>
-              <span>-${formatCurrency(totalExtraDeductions)}</span>
-            </div>
-          )}
-          {totalFixedDeductions > 0 && (
-            <div className="flex justify-between">
-              <span>Weekly Fixed Costs:</span>
-              <span>-${formatCurrency(totalFixedDeductions)}</span>
-            </div>
-          )}
-          {leaseMilesCost > 0 && (
-            <div className="flex justify-between">
-              <span>Lease Miles Cost:</span>
-              <span>-${formatCurrency(leaseMilesCost)}</span>
-            </div>
-          )}
-          <div className="flex justify-between border-t border-border pt-2 font-bold">
-            <span>Take-Home:</span>
-            <span>${formatCurrency(netPay)}</span>
-          </div>
-        </div>
-      </div>
     </div>
   );
 };

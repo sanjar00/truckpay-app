@@ -164,6 +164,11 @@ const LoadReports = ({ onBack, user, userProfile, deductions, onUpgrade }: LoadR
           currentWeekLoads={currentWeekLoads}
           totalGrossPay={totalGrossPay}
           netPay={netPay}
+          totalDriverPay={totalDriverPay}
+          totalWeeklyDeductions={totalWeeklyDeductions}
+          totalExtraDeductions={totalExtraDeductions}
+          totalFixedDeductions={totalFixedDeductions}
+          leaseMilesCost={leaseCostDeduction}
         />
 
         {/* Add Load Button */}
