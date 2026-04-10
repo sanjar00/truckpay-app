@@ -155,7 +155,7 @@ const WeeklyForecastCard = ({
 
   return (
     <Card className="brutal-border brutal-shadow bg-background">
-      <CardHeader className="pb-2 cursor-pointer" onClick={() => setCollapsed(!collapsed)}>
+      <CardHeader className="cursor-pointer" onClick={() => setCollapsed(!collapsed)}>
         <CardTitle className="mobile-text-xl brutal-text font-bold flex items-center justify-between gap-2">
           <span className="flex items-center gap-2">
             <TrendingUp className="mobile-icon text-primary" />
