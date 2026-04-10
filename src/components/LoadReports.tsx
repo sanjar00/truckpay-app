@@ -164,7 +164,6 @@ const LoadReports = ({ onBack, user, userProfile, deductions, onUpgrade }: LoadR
           currentWeekLoads={currentWeekLoads}
           totalGrossPay={totalGrossPay}
           netPay={netPay}
-          weeklyMileage={weeklyMileage}
         />
 
         {/* Add Load Button */}

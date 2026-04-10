@@ -1,4 +1,4 @@
-import { Truck, DollarSign, Navigation } from 'lucide-react';
+import { Truck, DollarSign } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { Load } from '@/types/LoadReports';
 
@@ -6,10 +6,9 @@ interface LoadSummaryCardsProps {
   currentWeekLoads: Load[];
   totalGrossPay: number;
   netPay?: number;
-  weeklyMileage?: { totalMiles: number };
 }
 
-const LoadSummaryCards = ({ currentWeekLoads, totalGrossPay, netPay = 0, weeklyMileage }: LoadSummaryCardsProps) => {
+const LoadSummaryCards = ({ currentWeekLoads, totalGrossPay, netPay = 0 }: LoadSummaryCardsProps) => {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
       <div className="brutal-border-info bg-info p-6 brutal-shadow text-center">
@@ -32,15 +31,6 @@ const LoadSummaryCards = ({ currentWeekLoads, totalGrossPay, netPay = 0, weeklyM
         <p className="brutal-text text-3xl text-success-foreground">${formatCurrency(netPay)}</p>
         <p className="brutal-mono text-xs text-success-foreground mt-2">After all deductions</p>
       </div>
-
-      {weeklyMileage && (
-        <div className="brutal-border-accent bg-accent p-6 brutal-shadow text-center">
-          <Navigation className="w-12 h-12 text-accent-foreground mx-auto mb-4" />
-          <p className="brutal-mono text-sm text-accent-foreground mb-2">Miles This Week</p>
-          <p className="brutal-text text-3xl text-accent-foreground">{weeklyMileage.totalMiles.toLocaleString()}</p>
-          <p className="brutal-mono text-xs text-accent-foreground mt-2">Total miles</p>
-        </div>
-      )}
     </div>
   );
 };
