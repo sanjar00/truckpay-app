@@ -115,11 +115,10 @@ const WeeklySummary = ({
 
   return (
     <div className="brutal-border bg-card p-6 brutal-shadow-lg">
-      <h2 className="brutal-text text-2xl text-foreground mb-6">Pay Breakdown</h2>
+      <h2 className="brutal-text text-2xl text-foreground mb-6">Fuel & Expenses</h2>
 
       {/* Weekly Deductions */}
       <div className="space-y-4 mb-6">
-        <h3 className="brutal-text text-lg text-foreground">Fuel & Expenses</h3>
         {/* Display existing weekly deductions */}
         {Object.entries(weeklyDeductions).filter(([type, amount]) => amount && parseFloat(amount) > 0).length > 0 && (
           <div className="space-y-4 mb-6">
