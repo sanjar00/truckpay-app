@@ -1,6 +1,8 @@
 
 import { useState, useEffect, useRef } from 'react';
-import { Truck, Calculator, Settings, DollarSign, FileText, Receipt, Calendar, Map, Lock, Info, MoreHorizontal } from 'lucide-react';
+import { Truck, Calculator, Settings, DollarSign, FileText, Receipt, Calendar, Map, Lock, Info, MoreHorizontal, Plus } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import AddLoadForm from '@/components/AddLoadForm';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useSubscription } from '@/hooks/useSubscription';
@@ -68,6 +70,9 @@ const Index = () => {
   );
   const [weekSnapshot, setWeekSnapshot] = useState<{ loadCount: number; gross: number; expenses: number; net: number; weekStart: Date; weekEnd: Date } | null>(null);
   const [showMoreSheet, setShowMoreSheet] = useState(false);
+  const [showAddLoadModal, setShowAddLoadModal] = useState(false);
+  const [newLoad, setNewLoad] = useState({ rate: '', companyDeduction: '', pickupDate: new Date().toISOString().split('T')[0], deliveryDate: new Date().toISOString().split('T')[0], deadheadMiles: '', detentionAmount: '', notes: '', pickupZip: '', deliveryZip: '', pickupCityState: '', deliveryCityState: '', locationFrom: '', locationTo: '', estimatedMiles: undefined as any });
+  const [loadingAddLoad, setLoadingAddLoad] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -248,6 +253,72 @@ const Index = () => {
     setUserProfile(null);
     setLoads([]);
     setDeductions([]);
+  };
+
+  const handleAddLoadFromHome = async () => {
+    setLoadingAddLoad(true);
+    try {
+      // Validate minimum required fields
+      const rate = parseFloat(newLoad.rate);
+      if (!newLoad.rate || isNaN(rate) || rate <= 0) {
+        alert('Please enter a valid load rate');
+        setLoadingAddLoad(false);
+        return;
+      }
+
+      if (!userProfile) {
+        setLoadingAddLoad(false);
+        return;
+      }
+
+      const companyDed = newLoad.companyDeduction ? parseFloat(newLoad.companyDeduction) : 0;
+      const driverPayAmount = rate * (1 - companyDed / 100) + (parseFloat(newLoad.detentionAmount) || 0);
+
+      const weekStart = getUserWeekStart(new Date(), userProfile);
+      const weekEnd = getUserWeekEnd(new Date(), userProfile);
+      const weekStartStr = weekStart.toISOString().split('T')[0];
+
+      const { error } = await supabase
+        .from('load_reports')
+        .insert([
+          {
+            user_id: user?.id,
+            rate: rate,
+            company_deduction: companyDed,
+            driver_pay: driverPayAmount,
+            location_from: newLoad.locationFrom || '',
+            location_to: newLoad.locationTo || '',
+            pickup_date: newLoad.pickupDate,
+            delivery_date: newLoad.deliveryDate,
+            date_added: weekStartStr,
+            week_period: weekStartStr,
+            deadhead_miles: newLoad.deadheadMiles ? parseInt(newLoad.deadheadMiles) : null,
+            detention_amount: newLoad.detentionAmount ? parseFloat(newLoad.detentionAmount) : 0,
+            notes: newLoad.notes || '',
+            pickup_zip: newLoad.pickupZip || '',
+            delivery_zip: newLoad.deliveryZip || '',
+            pickup_city_state: newLoad.pickupCityState || '',
+            delivery_city_state: newLoad.deliveryCityState || '',
+            estimated_miles: newLoad.estimatedMiles || null,
+          }
+        ]);
+
+      if (error) {
+        alert('Error adding load. Please try again.');
+        console.error('Error:', error);
+      } else {
+        // Reset form and close modal
+        setNewLoad({ rate: '', companyDeduction: '', pickupDate: new Date().toISOString().split('T')[0], deliveryDate: new Date().toISOString().split('T')[0], deadheadMiles: '', detentionAmount: '', notes: '', pickupZip: '', deliveryZip: '', pickupCityState: '', deliveryCityState: '', locationFrom: '', locationTo: '', estimatedMiles: undefined });
+        setShowAddLoadModal(false);
+        // Refresh week snapshot
+        fetchWeekSnapshot(deductions);
+      }
+    } catch (error) {
+      console.error('Error adding load:', error);
+      alert('Error adding load. Please try again.');
+    } finally {
+      setLoadingAddLoad(false);
+    }
   };
 
   if (loading) {
@@ -593,6 +664,15 @@ const Index = () => {
             <span className="brutal-mono text-xs">Expenses</span>
           </button>
 
+          {/* Add Load — Center */}
+          <button
+            onClick={() => setShowAddLoadModal(true)}
+            className="flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors bg-accent text-accent-foreground hover:bg-accent/90"
+          >
+            <Plus className="w-6 h-6" />
+            <span className="brutal-mono text-xs">Add Load</span>
+          </button>
+
           {/* Summary */}
           <button
             onClick={() => {
@@ -665,6 +745,25 @@ const Index = () => {
           onClose={() => setUpgradeModal(null)}
         />
       )}
+
+      {/* Add Load Modal */}
+      <Dialog open={showAddLoadModal} onOpenChange={setShowAddLoadModal}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto brutal-border brutal-shadow-lg">
+          <DialogHeader>
+            <DialogTitle className="brutal-text text-2xl">New Load</DialogTitle>
+          </DialogHeader>
+          <AddLoadForm
+            newLoad={newLoad}
+            setNewLoad={setNewLoad}
+            onAddLoad={handleAddLoadFromHome}
+            onCancel={() => setShowAddLoadModal(false)}
+            loading={loadingAddLoad}
+            weekStart={new Date()}
+            weekEnd={new Date()}
+            userProfile={userProfile}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
