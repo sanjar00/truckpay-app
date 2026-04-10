@@ -22,8 +22,8 @@ Current live version: **V2.2**
 - **Styling:** Tailwind CSS + custom brutal design system classes
 - **Database:** Supabase (PostgreSQL)
 - **Authentication:** Supabase Auth
-- **AI integration:** Anthropic Claude API (claude-sonnet-4-20250514) for
-  receipt scanning via vision — called directly from client-side fetch()
+- **AI integration:** OpenAI ChatGPT API (gpt-4-vision) for
+  receipt scanning via vision — called via Supabase Edge Function
 - **Utilities:** date-fns for date manipulation, lucide-react for icons
 - **PWA:** Service worker and manifest.json for installability
 - **Hosting:** Netlify (or similar)
@@ -497,31 +497,21 @@ Only show if `profile.weeklyGoal` is set. If not set, show a subtle prompt:
 
 Located in Deductions page. Button: "📷 Scan Receipt with AI"
 
-```javascript
-// API call — client side, no API key needed (handled by proxy or env)
-const response = await fetch("https://api.anthropic.com/v1/messages", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 500,
-    messages: [{
-      role: "user",
-      content: [
-        {
-          type: "image",
-          source: { type: "base64", media_type: "image/jpeg", data: base64Image }
-        },
-        {
-          type: "text",
-          text: `Analyze this receipt for a truck driver. Return ONLY valid JSON:
-{"merchant":"name","category":"FUEL|TOLL|MAINTENANCE|PARTS|FOOD|LODGING|OTHER","amount":0.00,"date":"YYYY-MM-DD","notes":"brief description"}
-If date unclear use null. If amount unclear use null.`
-        }
-      ]
-    }]
-  })
-});
+**API:** OpenAI ChatGPT (gpt-4-vision) via Supabase Edge Function
+
+**Frontend flow:**
+1. User selects/takes receipt image
+2. Compress image: max 1024px, JPEG quality 0.80
+3. Call edge function: `supabase/functions/scan-receipt/`
+4. Pass base64 image and receive parsed JSON response
+5. Auto-fill deduction form with extracted data
+
+**Edge function (`supabase/functions/scan-receipt/index.ts`):**
+```typescript
+// Receives: { image: base64String }
+// Returns: { merchant, category, amount, date, notes }
+// Uses OpenAI gpt-4-vision model via OPENAI_API_KEY env variable
+// API key stored securely in Supabase secrets, never exposed to frontend
 ```
 
 **Image handling:**
@@ -532,6 +522,11 @@ If date unclear use null. If amount unclear use null.`
 
 **Storage warning:** localStorage is ~5MB. Show usage bar in Settings.
 Warn at 80% full. Add "Clear Old Receipt Photos" option.
+
+**Environment setup:**
+- Add `OPENAI_API_KEY` to Supabase project secrets
+- Edge function handles authentication securely server-side
+- No API keys exposed in frontend code
 
 ---
 
