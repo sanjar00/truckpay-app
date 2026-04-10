@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ScannedReceipt {
   id: string;
@@ -65,54 +66,23 @@ async function analyzeReceiptWithOpenAI(base64Image: string): Promise<{
   date: string | null;
   notes: string;
 }> {
-  const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
-  if (!apiKey) throw new Error('VITE_OPENAI_API_KEY not set in .env');
-
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: 'gpt-4o',
-      max_tokens: 500,
-      messages: [{
-        role: 'user',
-        content: [
-          {
-            type: 'image_url',
-            image_url: { url: `data:image/jpeg;base64,${base64Image}` },
-          },
-          {
-            type: 'text',
-            text: `Analyze this receipt or invoice for a truck driver.
-Return ONLY a valid JSON object, no markdown, no explanation:
-{
-  "merchant": "name of business or service provider",
-  "category": "FUEL or TOLL or MAINTENANCE or PARTS or FOOD or LODGING or OTHER",
-  "amount": 123.45,
-  "date": "YYYY-MM-DD",
-  "notes": "brief description of what was purchased"
-}
-Rules:
-- category must be exactly one of the listed options
-- amount must be a number (the total paid, not subtotal)
-- If date is not visible, use null
-- If amount is not clear, use null
-- merchant should be the business name only, not address`,
-          },
-        ],
-      }],
-    }),
+  // Call Supabase Edge Function instead of OpenAI directly
+  const { data, error } = await supabase.functions.invoke('scan-receipt', {
+    body: { imageBase64: base64Image }
   });
 
-  if (!response.ok) throw new Error(`OpenAI error: ${response.status}`);
+  if (error) {
+    throw new Error(error.message || 'Failed to scan receipt');
+  }
 
-  const data = await response.json();
-  const text = data.choices?.[0]?.message?.content || '';
-  const cleaned = text.replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/i, '').trim();
-  return JSON.parse(cleaned);
+  // Edge function returns the parsed result directly
+  return {
+    merchant: data.merchant || '',
+    category: data.category || 'OTHER',
+    amount: data.amount || null,
+    date: data.date || null,
+    notes: data.notes || '',
+  };
 }
 
 interface ReceiptScannerProps {
