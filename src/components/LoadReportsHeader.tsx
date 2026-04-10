@@ -1,4 +1,4 @@
-import { ArrowLeft, Calendar } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import { getWeeklyPeriodDisplay } from '@/lib/loadReportsUtils';
@@ -11,21 +11,21 @@ interface LoadReportsHeaderProps {
   onNavigateWeek: (direction: 'prev' | 'next') => void;
 }
 
-const LoadReportsHeader = ({ 
-  onBack, 
-  weekStart, 
-  weekEnd, 
-  userProfile, 
-  onNavigateWeek 
+const LoadReportsHeader = ({
+  onBack,
+  weekStart,
+  weekEnd,
+  userProfile,
+  onNavigateWeek
 }: LoadReportsHeaderProps) => {
   return (
     <>
       {/* Header */}
       <div className="brutal-border bg-card p-6 brutal-shadow-lg">
         <div className="flex items-center gap-4 mb-4">
-          <Button 
-            variant="ghost" 
-            size="sm" 
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={onBack}
             className="brutal-border brutal-shadow mobile-h mobile-w brutal-hover"
           >
@@ -40,12 +40,45 @@ const LoadReportsHeader = ({
 
       {/* Week Navigation */}
       <div className="brutal-border-info bg-info p-4 sm:p-6 brutal-shadow">
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+        {/* Mobile: Horizontal layout with arrows only */}
+        <div className="sm:hidden flex items-center justify-between gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onNavigateWeek('prev')}
+            className="text-info-foreground hover:bg-info-foreground/20 p-1 h-auto"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </Button>
+          <div className="text-center flex-1">
+            <div className="flex items-center gap-2 justify-center mb-1">
+              <Calendar className="w-5 h-5 text-info-foreground" />
+              <span className="brutal-text text-base text-info-foreground">This Week</span>
+            </div>
+            <p className="brutal-mono text-xs text-info-foreground">
+              {format(weekStart, 'MMM d')} – {format(weekEnd, 'MMM d, yyyy')}
+            </p>
+            <p className="brutal-mono text-xs text-info-foreground opacity-80">
+              ({getWeeklyPeriodDisplay(userProfile?.weeklyPeriod || 'sunday')})
+            </p>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onNavigateWeek('next')}
+            className="text-info-foreground hover:bg-info-foreground/20 p-1 h-auto"
+          >
+            <ChevronRight className="w-5 h-5" />
+          </Button>
+        </div>
+
+        {/* Desktop: Full layout with text buttons */}
+        <div className="hidden sm:flex items-center justify-between gap-4">
           <Button
             variant="outline"
             size="sm"
             onClick={() => onNavigateWeek('prev')}
-            className="brutal-border bg-background text-foreground w-full sm:w-auto"
+            className="brutal-border bg-background text-foreground"
           >
             ← Last Week
           </Button>
@@ -65,7 +98,7 @@ const LoadReportsHeader = ({
             variant="outline"
             size="sm"
             onClick={() => onNavigateWeek('next')}
-            className="brutal-border bg-background text-foreground w-full sm:w-auto"
+            className="brutal-border bg-background text-foreground"
           >
             Next Week →
           </Button>
