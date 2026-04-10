@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Truck, DollarSign, Info } from 'lucide-react';
+import { DollarSign, Info } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { Load } from '@/types/LoadReports';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -29,14 +29,7 @@ const LoadSummaryCards = ({
 
   return (
     <>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div className="brutal-border-info bg-info p-6 brutal-shadow text-center">
-          <Truck className="w-10 h-10 text-info-foreground mx-auto mb-3" />
-          <p className="brutal-mono text-sm text-info-foreground">Loads This Week</p>
-          <p className="brutal-text text-3xl text-info-foreground">{currentWeekLoads.length}</p>
-          <p className="brutal-mono text-xs text-info-foreground opacity-80">THIS WEEK</p>
-        </div>
-
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
         <div className="brutal-border-info bg-info p-6 brutal-shadow text-center">
           <DollarSign className="w-12 h-12 text-info-foreground mx-auto mb-4" />
           <p className="brutal-mono text-sm text-info-foreground mb-2">Total Earned</p>
