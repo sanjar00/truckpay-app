@@ -46,7 +46,7 @@ const LoadReportsHeader = ({
             variant="ghost"
             size="sm"
             onClick={() => onNavigateWeek('prev')}
-            className="text-info-foreground hover:bg-info-foreground/20 p-1 h-auto"
+            className="bg-accent text-accent-foreground hover:bg-accent/90 p-2 h-auto brutal-border brutal-shadow"
           >
             <ChevronLeft className="w-5 h-5" />
           </Button>
@@ -66,7 +66,7 @@ const LoadReportsHeader = ({
             variant="ghost"
             size="sm"
             onClick={() => onNavigateWeek('next')}
-            className="text-info-foreground hover:bg-info-foreground/20 p-1 h-auto"
+            className="bg-accent text-accent-foreground hover:bg-accent/90 p-2 h-auto brutal-border brutal-shadow"
           >
             <ChevronRight className="w-5 h-5" />
           </Button>
