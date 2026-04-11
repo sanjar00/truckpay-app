@@ -84,8 +84,10 @@ serve(async (req) => {
     const directions = await directionsRes.json();
 
     if (directions.status !== 'OK' || !directions.routes?.length) {
+      // Log the full Google response to Supabase edge function logs for easier debugging
+      console.error('Directions API error:', JSON.stringify({ status: directions.status, error_message: directions.error_message }));
       return new Response(
-        JSON.stringify({ error: 'Could not get route: ' + (directions.status || 'unknown') }),
+        JSON.stringify({ error: 'Could not get route: ' + (directions.status || 'unknown'), detail: directions.error_message || null }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }

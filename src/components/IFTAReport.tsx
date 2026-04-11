@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
 import { formatCurrency } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
+import { useToast } from '@/hooks/use-toast';
 import { format, getQuarter, getYear, startOfQuarter, endOfQuarter, parseISO, isWithinInterval } from 'date-fns';
 
 // Hardcoded 2025 rates kept as fallback if the DB table is unavailable
@@ -91,6 +92,7 @@ async function compressImage(file: File, maxPx: number, quality: number): Promis
 
 const IFTAReport = ({ onBack }: IFTAReportProps) => {
   const { user } = useAuth();
+  const { toast } = useToast();
   const today = new Date();
 
   const [selectedYear, setSelectedYear] = useState(String(getYear(today)));
@@ -272,12 +274,18 @@ const IFTAReport = ({ onBack }: IFTAReportProps) => {
       const { data, error } = await supabase.functions.invoke('calculate-ifta-miles', {
         body: { pickupZip: load.pickupZip, deliveryZip: load.deliveryZip },
       });
-      if (error) throw error;
+      if (error) throw new Error(error.message || String(error));
+      // Edge function returns { error } with HTTP 200 when a Google API call fails
+      if (data?.error) throw new Error(data.error + (data.detail ? ` — ${data.detail}` : ''));
       if (data?.stateMiles?.length) {
         setEditStatesMiles(data.stateMiles);
+        toast({ title: `${data.stateMiles.length} states calculated`, description: data.stateMiles.map((s: any) => `${s.state}: ${s.miles}mi`).join(' · ') });
+      } else {
+        toast({ title: 'No route data returned', description: 'Could not determine state miles for this route.', variant: 'destructive' });
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error('calculate-ifta-miles error:', e);
+      toast({ title: 'Auto-calculate failed', description: e?.message || 'Unknown error. Check Supabase edge function logs.', variant: 'destructive' });
     } finally {
       setCalculatingMiles(false);
     }
