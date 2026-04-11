@@ -177,36 +177,6 @@ Use `profile.weeklyPeriod` ('monday' or 'sunday') as the weekStart parameter.
 
 ---
 
-## Mileage Calculation — CRITICAL BUG CONTEXT
-
-**The bug:** Multi-week mileage totals showed large negative numbers (e.g. -998,600).
-
-**Root cause:** Code was doing `lastWeekEnd - firstWeekStart` across the full
-period instead of summing per-week deltas. When any week has `endMileage = 0`
-(not yet entered), the result goes massively negative.
-
-**Correct approach — always use this:**
-```javascript
-function getTotalMilesForPeriod(weekIds) {
-  let total = 0;
-  weekIds.forEach(weekId => {
-    const m = mileageData[weekId];
-    if (m && m.startMileage > 0 && m.endMileage > 0) {
-      const diff = m.endMileage - m.startMileage;
-      if (diff > 0 && diff < 15000) { // sanity check
-        total += diff;
-      }
-    }
-  });
-  return total;
-}
-```
-
-**Also:** If `endMileage` is 0 or missing for a week, show `--` for that
-week's miles and RPM. Never show a negative number or calculate with 0.
-
----
-
 ## Subscription Tiers
 
 | Tier | Price | Gated Features |
@@ -495,38 +465,49 @@ Only show if `profile.weeklyGoal` is set. If not set, show a subtle prompt:
 
 ## AI Receipt Scanner — Implementation Notes
 
-Located in Deductions page. Button: "📷 Scan Receipt with AI"
+**Location:** Personal Expenses page. Button: "SCAN RECEIPT WITH AI"
 
-**API:** OpenAI ChatGPT (gpt-4-vision) via Supabase Edge Function
+**Purpose:** Auto-extract merchant, category, amount, and date from receipt images to quickly add personal expenses.
+
+**API:** OpenAI ChatGPT (gpt-4o) via Supabase Edge Function
 
 **Frontend flow:**
-1. User selects/takes receipt image
-2. Compress image: max 1024px, JPEG quality 0.80
-3. Call edge function: `supabase/functions/scan-receipt/`
-4. Pass base64 image and receive parsed JSON response
-5. Auto-fill deduction form with extracted data
+1. User clicks "SCAN RECEIPT WITH AI" button in Personal Expenses
+2. Choose "TAKE PHOTO" (mobile) or "UPLOAD FILES" (desktop)
+3. Images compressed: max 1024px, JPEG quality 0.80
+4. Call edge function: `supabase/functions/scan-receipt/` with base64 image
+5. Receive parsed JSON: `{ merchant, category, amount, date, notes }`
+6. Review extracted data in modal
+7. Auto-create expense category if doesn't exist
+8. Add expense under that category
 
 **Edge function (`supabase/functions/scan-receipt/index.ts`):**
-```typescript
-// Receives: { image: base64String }
-// Returns: { merchant, category, amount, date, notes }
-// Uses OpenAI gpt-4-vision model via OPENAI_API_KEY env variable
-// API key stored securely in Supabase secrets, never exposed to frontend
-```
+- Receives: `{ imageBase64: base64String }`
+- Returns: `{ merchant, category, amount, date, notes }`
+- Uses OpenAI gpt-4o model via `OPENAI_API_KEY` environment variable
+- API key stored securely in Supabase secrets, never exposed in frontend
 
 **Image handling:**
 - Compress before API: max 1024px, JPEG quality 0.80
-- Compress before storage: max 800px, JPEG quality 0.65
-- Process multiple images sequentially, not in parallel
+- Process multiple images sequentially (not in parallel)
 - Show progress: "Processing 2 of 4 receipts..."
+- Display receipt image thumbnail in review modal
 
-**Storage warning:** localStorage is ~5MB. Show usage bar in Settings.
-Warn at 80% full. Add "Clear Old Receipt Photos" option.
+**Categories auto-created:**
+Supported receipt categories: FUEL, TOLL, MAINTENANCE, PARTS, FOOD, LODGING, OTHER
+If category doesn't exist in Personal Expenses, it's created automatically on confirmation.
 
 **Environment setup:**
-- Add `OPENAI_API_KEY` to Supabase project secrets
-- Edge function handles authentication securely server-side
-- No API keys exposed in frontend code
+```bash
+supabase secrets set OPENAI_API_KEY sk-proj-your-key-here
+supabase functions deploy scan-receipt
+```
+
+**Security:**
+- API key stored securely in Supabase secrets
+- No frontend environment variables needed
+- All OpenAI communication happens server-side via Edge Function
+- No CORS issues (server-to-server communication)
 
 ---
 

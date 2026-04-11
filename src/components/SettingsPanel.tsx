@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, User, Phone, Mail, Users, Percent, Save, Download, Upload, Trash2, DollarSign, LogOut } from 'lucide-react';
+import { ArrowLeft, User, Phone, Mail, Users, Percent, Save, Download, Upload, Trash2, DollarSign, LogOut, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -22,6 +22,10 @@ const SettingsPanel = ({ userProfile, setUserProfile, onBack, onLogout }) => {
 
   const [annualGoal, setAnnualGoal] = useState(() => localStorage.getItem('truckpay_annual_goal') || '');
   const [weeklyGoalSetting, setWeeklyGoalSetting] = useState(() => localStorage.getItem('truckpay_weekly_goal') || '');
+
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordLoading, setPasswordLoading] = useState(false);
 
   const storageUsedMB = (() => {
     try {
@@ -305,6 +309,29 @@ const SettingsPanel = ({ userProfile, setUserProfile, onBack, onLogout }) => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleChangePassword = async () => {
+    if (!newPassword || !confirmPassword) return;
+    if (newPassword !== confirmPassword) {
+      toast({ title: "Passwords don't match", description: "Please make sure both passwords are the same.", variant: "destructive" });
+      return;
+    }
+    if (newPassword.length < 6) {
+      toast({ title: "Password too short", description: "Password must be at least 6 characters.", variant: "destructive" });
+      return;
+    }
+
+    setPasswordLoading(true);
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) {
+      toast({ title: "Failed to change password", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Password updated", description: "Your password has been changed successfully.", duration: 3000 });
+      setNewPassword('');
+      setConfirmPassword('');
+    }
+    setPasswordLoading(false);
   };
 
   return (
@@ -727,6 +754,46 @@ const SettingsPanel = ({ userProfile, setUserProfile, onBack, onLogout }) => {
             >
               <Trash2 className="h-4 w-4 mr-2" />
               Clear All Data
+            </Button>
+          </div>
+        </div>
+
+        {/* Change Password */}
+        <div className="brutal-border brutal-shadow-lg p-6 bg-background mb-8">
+          <div className="flex items-center gap-3 mb-4">
+            <Lock className="h-5 w-5 text-primary" />
+            <h2 className="text-xl brutal-text font-bold">CHANGE PASSWORD</h2>
+          </div>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="new-password" className="text-sm brutal-text font-medium">New Password</Label>
+              <Input
+                id="new-password"
+                type="password"
+                placeholder="Enter new password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                className="brutal-border h-11"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirm-password" className="text-sm brutal-text font-medium">Confirm New Password</Label>
+              <Input
+                id="confirm-password"
+                type="password"
+                placeholder="Repeat new password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="brutal-border h-11"
+              />
+            </div>
+            <Button
+              onClick={handleChangePassword}
+              disabled={passwordLoading || !newPassword || !confirmPassword}
+              className="w-full h-12 brutal-border brutal-shadow bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-bold"
+            >
+              <Lock className="h-4 w-4 mr-2" />
+              {passwordLoading ? 'Updating...' : 'Update Password'}
             </Button>
           </div>
         </div>

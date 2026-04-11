@@ -12,6 +12,7 @@ import { getUserWeekStart, getUserWeekEnd } from '@/lib/weeklyPeriodUtils';
 import { calculateFixedDeductionsForWeek } from '@/lib/loadReportsUtils';
 import LoginPage from '@/components/LoginPage';
 import Registration from '@/components/Registration';
+import ResetPasswordPage from '@/components/ResetPasswordPage';
 import LoadReports from '@/components/LoadReports';
 import Deductions from '@/components/Deductions';
 import ForecastSummary from '@/components/ForecastSummary';
@@ -57,7 +58,7 @@ const SnapshotTooltip = ({ text }: { text: string }) => {
 };
 
 const Index = () => {
-  const { user, loading, signOut } = useAuth();
+  const { user, loading, signOut, isPasswordRecovery } = useAuth();
   const { isFeatureAllowed, subscription, upgradeTo } = useSubscription();
   const [currentView, setCurrentView] = useState('dashboard');
   const [showRegistration, setShowRegistration] = useState(false);
@@ -334,16 +335,20 @@ const Index = () => {
     );
   }
 
+  if (isPasswordRecovery) {
+    return <ResetPasswordPage onDone={() => {}} />;
+  }
+
   if (!user) {
     if (showRegistration) {
       return (
-        <Registration 
+        <Registration
           onComplete={handleRegistrationComplete}
           onBackToLogin={() => setShowRegistration(false)}
         />
       );
     }
-    
+
     return <LoginPage onShowRegistration={() => setShowRegistration(true)} />;
   }
 
