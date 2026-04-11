@@ -22,12 +22,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
 
   useEffect(() => {
-    // Set up auth state listener
+    let listenerFired = false;
+
+    // Set up auth state listener FIRST — catches PASSWORD_RECOVERY before getSession
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        listenerFired = true;
         if (event === 'PASSWORD_RECOVERY') {
           setIsPasswordRecovery(true);
-        } else {
+        } else if (event === 'USER_UPDATED' || event === 'SIGNED_OUT' || event === 'SIGNED_IN') {
           setIsPasswordRecovery(false);
         }
         setSession(session);
@@ -36,11 +39,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     );
 
-    // Check for existing session
+    // Only use getSession as fallback if the listener hasn't fired (normal page load with existing session)
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
+      if (!listenerFired) {
+        setSession(session);
+        setUser(session?.user ?? null);
+        setLoading(false);
+      }
     });
 
     return () => subscription.unsubscribe();
