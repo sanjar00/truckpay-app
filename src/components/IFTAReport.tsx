@@ -221,11 +221,15 @@ const IFTAReport = ({ onBack }: IFTAReportProps) => {
       const totalMilesForLoad = load.estimatedMiles || 0;
 
       if (pickupState && deliveryState && pickupState !== deliveryState) {
+        // Pre-fill origin and destination states with 0 miles.
+        // Mileage intentionally left at 0 — use Auto-calculate or enter manually.
+        // A 50/50 split would be wrong for multi-state routes (e.g. IL→MO→AR→TX).
         setEditStatesMiles([
-          { state: pickupState, miles: Math.round(totalMilesForLoad / 2) },
-          { state: deliveryState, miles: Math.round(totalMilesForLoad / 2) },
+          { state: pickupState, miles: 0 },
+          { state: deliveryState, miles: 0 },
         ]);
       } else if (pickupState) {
+        // Same-state load — full estimated miles go to that state
         setEditStatesMiles([{ state: pickupState, miles: totalMilesForLoad }]);
       } else {
         setEditStatesMiles([{ state: 'TX', miles: 0 }]);
