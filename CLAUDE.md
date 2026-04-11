@@ -11,7 +11,7 @@ TruckPay (truckpay.app) is a Progressive Web App (PWA) for truck drivers to trac
 their weekly earnings, deductions, and expenses. It is built and maintained by
 Sanjar Azizov. The app is currently in active use by real truck drivers.
 
-Current live version: **V2.2**
+Current live version: **V2.3**
 
 ---
 
@@ -26,7 +26,7 @@ Current live version: **V2.2**
   receipt scanning via vision — called via Supabase Edge Function
 - **Utilities:** date-fns for date manipulation, lucide-react for icons
 - **PWA:** Service worker and manifest.json for installability
-- **Hosting:** Netlify (or similar)
+- **Hosting:** Netlify — live at **truckpay.app**
 
 ---
 
@@ -268,8 +268,7 @@ Enforce this on every new feature — no exceptions.
 - **No horizontal scrolling** ever
 - **Tap targets:** Minimum 44x44px for all buttons and interactive elements
 - **No hover-only interactions** — all actions must work on touch
-- **Bottom tab bar** (to be implemented): fixed navigation with 4 tabs:
-  🚚 Loads | 💸 Expenses | 📊 Summary | ⚙️ More
+- **Bottom tab bar** — implemented: 5 tabs (Loads | Expenses | + Add Load | Summary | More). Hidden on desktop (md:hidden). "More" opens a sheet with Personal Expenses, Per Diem, IFTA, Settings, Logout.
 - **Forms:** Pre-fill today's date on all date fields — driver changes only if needed
 - **Load Rate field:** Show `$0.00` placeholder — never pre-fill a fake amount
 - **Empty states:** Every list must have a helpful empty state message, not just blank space
@@ -312,29 +311,12 @@ Footer reads "TRUCKPAY V2.1" — update to "TRUCKPAY V2.2".
 
 ### 🟠 P1 — High Priority
 
-**4. Bottom tab bar navigation**
-This is the #1 UX priority. The current home-screen tile navigation requires
-going back to home between every section. Replace with a persistent bottom tab
-bar fixed to the bottom of all screens:
+**4. ✅ Bottom tab bar navigation — DONE**
+Implemented: 5-tab bar (Loads | Expenses | + Add Load | Summary | More).
+Hidden on md+ screens. "More" sheet includes Personal Expenses, Per Diem, IFTA, Settings, Logout.
 
-```
-[ 🚚 Loads ] [ 💸 Expenses ] [ 📊 Summary ] [ ⚙️ More ]
-```
-
-- Loads → Load Reports (#loads)
-- Expenses → Deductions (#deductions)
-- Summary → Earnings Summary (#summary)
-- More → opens a sheet with: Personal Expenses, Per Diem, IFTA, Settings, Logout
-- Active tab highlighted in amber
-- Tab bar always visible — no page should require going "back to home" to navigate
-
-**5. Add Load button not accessible enough**
-Adding a load is the most frequent driver action. Currently requires navigating
-to Load Reports and scrolling to find the amber ADD LOAD button. Fix:
-- Add a floating action button (FAB) on the Load Reports page, fixed to the
-  bottom-right above the tab bar: large amber `+` button, always visible
-- Optionally add a quick "Add Load" shortcut card on the Home screen below
-  the weekly snapshot
+**5. ✅ Add Load button in bottom nav — DONE**
+"+" button in center of bottom nav opens Add Load modal from any screen.
 
 **6. Personal Expenses — all forms expanded by default**
 Every expense category (Mechanic, Tires, Truck Wash, Parts, etc.) shows its
@@ -365,11 +347,9 @@ don't know which one to use. Either:
 - Add a small tooltip/note: "Fuel entered here applies to this week's loads.
   For recurring fixed fuel costs, use Deductions."
 
-**10. AI Receipt Scanner — add context label**
-The "SCAN RECEIPT WITH AI / AI-POWERED" button in Deductions appears mid-page
-with no explanation of what it does or what type of receipt to scan.
-Add a brief descriptor below the button: "Take a photo of a fuel, toll, or
-expense receipt — Claude will read the amount and date automatically."
+**10. ✅ AI Receipt Scanner — moved to Personal Expenses — DONE**
+Scanner removed from Deductions. Now lives in Personal Expenses page only.
+Auto-creates expense category if it doesn't exist. Uses OpenAI gpt-4o via Supabase Edge Function.
 
 **11. Odometer fields interrupt Load Reports flow**
 The ODOMETER MONDAY / ODOMETER SUNDAY fields sit between the weekly stats cards
@@ -455,7 +435,7 @@ Only show if `profile.weeklyGoal` is set. If not set, show a subtle prompt:
 
 ## Known Issues (Do Not Re-introduce)
 
-1. **Mileage bug** — described above in Mileage Calculation section. Fixed in V2.1. Do not revert.
+1. **Mileage bug** — fixed in V2.1. Always sum per-week deltas (endMileage − startMileage per week), never subtract first-week-start from last-week-end. Show `--` if endMileage is 0 or missing. Do not revert.
 
 2. **Desktop layout breaks** — the app renders wide blank columns on desktop.
    This is acceptable for now — the app is mobile-only. Do not attempt a
@@ -612,6 +592,36 @@ const IFTA_DIESEL_RATES = {
 
 ---
 
+## Authentication — Password Reset Flow
+
+**Forgot Password (login page):**
+- "Forgot password?" link appears next to the Password label
+- Switches to a reset form — user enters email, clicks "Send Reset Link"
+- Calls `supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + '/' })`
+- Supabase emails a magic link; user clicks it and lands back on the app
+
+**Password recovery interception (`useAuth.tsx`):**
+- `onAuthStateChange` listener fires `PASSWORD_RECOVERY` event when the magic link is clicked
+- Sets `isPasswordRecovery = true` in context
+- `getSession()` fallback is skipped if the listener already fired (prevents overwriting the recovery flag)
+- `isPasswordRecovery` clears when `USER_UPDATED`, `SIGNED_IN`, or `SIGNED_OUT` fires
+
+**ResetPasswordPage component:**
+- Shown in `Index.tsx` when `isPasswordRecovery === true` — intercepts the main app render
+- User sets a new password → `supabase.auth.updateUser({ password })` → triggers `USER_UPDATED` → `isPasswordRecovery` clears → user lands in the main app
+
+**Change Password (Settings page):**
+- "Change Password" section in SettingsPanel, above the Logout button
+- Two fields: New Password + Confirm Password
+- Validates match and minimum 6 characters before calling `supabase.auth.updateUser({ password })`
+
+**Supabase dashboard requirement:**
+- **Authentication → URL Configuration → Redirect URLs** must include `https://truckpay.app/**`
+- **Site URL** must be set to `https://truckpay.app`
+- Without this, reset links redirect to the Netlify preview URL instead
+
+---
+
 ## Data Safety Rules
 
 - Always test database migrations in development before deploying to production
@@ -629,6 +639,7 @@ const IFTA_DIESEL_RATES = {
 | V2.0 | Added Per Diem, IFTA, Weekly Forecast, Deadhead, Monthly chart, Lane Performance, State dropdowns |
 | V2.1 | Mileage bug fix, Load Profitability grades (A/B/C/D), AI Receipt Scanner, Subscription/Paywall, Plain English labels, ZIP-to-ZIP auto-mileage, Weekly mileage auto-fill, WeeklyForecastCard with goal tracking |
 | V2.2 | Replaced dispatcher/broker/BOL with Detention Pay, Three driver types (owner-op/lease-op/company), Lease Miles Cost weekly deduction, Company-driver per-mile and percentage pay types, Detention included in all gross totals |
+| V2.3 | Bottom tab bar (5 tabs, desktop-hidden), Add Load modal from nav, smart expense forecasting, Pay Breakdown modal, AI Receipt Scanner moved to Personal Expenses, Forgot Password + Password Recovery page, Change Password in Settings |
 
 ---
 
@@ -662,6 +673,8 @@ parked at a truck stop?"* If no, simplify it.
 - Do NOT use a space as a thousands separator in numbers — always use a comma (`5,059` not `5 059`)
 - Do NOT expand all Personal Expense category forms by default — collapse them, expand on tap
 - Do NOT truncate lane names in Lane Performance or IFTA — allow text to wrap
+- Do NOT hardcode a domain in `redirectTo` for Supabase auth emails — always use `window.location.origin` so it works on both truckpay.app and preview deployments
+- Do NOT forget: Supabase dashboard must have `https://truckpay.app/**` in Redirect URLs allowlist for password reset emails to work on production
 
 ---
 
@@ -694,11 +707,21 @@ parked at a truck stop?"* If no, simplify it.
 - **Detention Pay field** — replaces dispatcher/broker/BOL fields; added to gross before deductions; shown on load cards and included in all gross totals (LoadReports, ForecastSummary, home snapshot)
 - **WeeklyForecastCard** — projects weekly gross/net with confidence level (LOW/MODERATE/HIGH), progress bar toward weekly goal, loads needed to hit goal, comparison vs. historical average
 - Version V2.2
+- **Bottom tab bar** — 5-tab persistent nav (Loads | Expenses | + Add Load | Summary | More); hidden on desktop
+- **Add Load from nav** — center "+" button in bottom tab bar opens Add Load modal from any screen
+- **Add/Edit Load modals** — both forms open in Dialog modals instead of inline
+- **LoadSummaryCards responsive grid** — 1 col mobile, 2 col tablet, 3 col desktop; Take-Home card with Pay Breakdown modal
+- **Pay Breakdown moved to modal** — accessible via info icon on Take-Home card
+- **Smart expense forecasting** — WeeklyForecastCard learns historical expense-to-gross ratio for projected take-home
+- **Week navigation compact on mobile** — arrow-only buttons on mobile, full text on desktop
+- **AI Receipt Scanner in Personal Expenses** — removed from Deductions; auto-creates category if needed
+- **Forgot Password** — on login page; sends Supabase reset email
+- **Password Recovery page** — intercepts reset link, shows set-new-password form before entering app
+- **Change Password in Settings** — dedicated section above Logout button
+- Version V2.3
 
 ### 🔄 In Progress / Next Up
-- **Bottom tab bar navigation** (highest UX priority — see UI/UX Improvement Backlog #4)
 - Fix remaining code label strings in production (see UI/UX Improvement Backlog #1)
-- Move logout out of header into Settings (see UI/UX Improvement Backlog #2)
 - Lane Performance RPM column
 - Annual Income Goal (Settings + YTD progress bar)
 - Multi-load mileage estimation (when 6+ loads entered)

@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { ArrowLeft, FileText, Download, Info, Plus, Trash2 } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { ArrowLeft, FileText, Download, Info, Plus, Trash2, MapPin, Camera, Loader2, Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -9,8 +9,8 @@ import { formatCurrency } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { format, getQuarter, getYear, startOfQuarter, endOfQuarter, parseISO, isWithinInterval } from 'date-fns';
 
-// IFTA 2025 diesel tax rates (cents per gallon) by state
-const IFTA_RATES_2025: Record<string, number> = {
+// Hardcoded 2025 rates kept as fallback if the DB table is unavailable
+const IFTA_RATES_FALLBACK: Record<string, number> = {
   AL: 0.29, AZ: 0.27, AR: 0.285, CA: 0.61, CO: 0.205, CT: 0.44,
   DE: 0.22, FL: 0.363, GA: 0.326, ID: 0.32, IL: 0.467, IN: 0.55,
   IA: 0.325, KS: 0.26, KY: 0.268, LA: 0.20, ME: 0.312, MD: 0.427,
@@ -21,15 +21,28 @@ const IFTA_RATES_2025: Record<string, number> = {
   VT: 0.308, VA: 0.262, WA: 0.494, WV: 0.357, WI: 0.309, WY: 0.24,
 };
 
-const US_STATES = Object.keys(IFTA_RATES_2025).sort();
+const US_STATES = Object.keys(IFTA_RATES_FALLBACK).sort();
 
 interface StateMilesEntry { state: string; miles: number }
 interface FuelPurchaseEntry { state: string; gallons: number; pricePerGallon: number; amount: number }
+interface ScannedFuelData {
+  state: string;
+  gallons: number;
+  pricePerGallon: number;
+  amount: number;
+  date: string | null;
+}
+
 interface LoadData {
   id: string;
   pickupDate?: string;
   locationFrom: string;
   locationTo: string;
+  pickupZip?: string;
+  deliveryZip?: string;
+  pickupCityState?: string;
+  deliveryCityState?: string;
+  estimatedMiles?: number;
   statesMiles?: StateMilesEntry[];
   fuelPurchases?: FuelPurchaseEntry[];
 }
@@ -46,22 +59,88 @@ interface IFTAReportProps {
   onBack: () => void;
 }
 
+// Extract 2-letter state abbreviation from "City, ST" format
+function extractState(cityState?: string): string | null {
+  if (!cityState) return null;
+  const match = cityState.match(/,\s*([A-Z]{2})$/);
+  return match ? match[1] : null;
+}
+
+// Compress image: resize to maxPx on longest side, JPEG at given quality
+async function compressImage(file: File, maxPx: number, quality: number): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let { width, height } = img;
+      if (width > maxPx || height > maxPx) {
+        if (width > height) { height = Math.round((height * maxPx) / width); width = maxPx; }
+        else { width = Math.round((width * maxPx) / height); height = maxPx; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width; canvas.height = height;
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+
 const IFTAReport = ({ onBack }: IFTAReportProps) => {
   const { user } = useAuth();
   const today = new Date();
+
   const [selectedYear, setSelectedYear] = useState(String(getYear(today)));
   const [selectedQuarter, setSelectedQuarter] = useState(String(getQuarter(today)));
   const [loads, setLoads] = useState<LoadData[]>([]);
   const [loading, setLoading] = useState(false);
   const [editingLoadId, setEditingLoadId] = useState<string | null>(null);
-
-  // Temp state for editing a load's IFTA data
   const [editStatesMiles, setEditStatesMiles] = useState<StateMilesEntry[]>([]);
   const [editFuelPurchases, setEditFuelPurchases] = useState<FuelPurchaseEntry[]>([]);
+
+  // Option B: live rates from DB, fall back to hardcoded
+  const [iftaRates, setIftaRates] = useState<Record<string, number>>(IFTA_RATES_FALLBACK);
+
+  // Enhancement A: auto-calculating state miles
+  const [calculatingMiles, setCalculatingMiles] = useState(false);
+
+  // Enhancement C: fuel receipt scanner
+  const fuelScanInputRef = useRef<HTMLInputElement>(null);
+  const [scanningFuel, setScanningFuel] = useState(false);
+  const [scannedFuelData, setScannedFuelData] = useState<ScannedFuelData | null>(null);
 
   const quarterStart = startOfQuarter(new Date(Number(selectedYear), (Number(selectedQuarter) - 1) * 3, 1));
   const quarterEnd = endOfQuarter(quarterStart);
 
+  // Option B: fetch rates from ifta_rates table whenever quarter/year changes
+  useEffect(() => {
+    const fetchRates = async () => {
+      try {
+        const { data } = await supabase
+          .from('ifta_rates')
+          .select('state, rate')
+          .eq('year', Number(selectedYear))
+          .eq('quarter', Number(selectedQuarter));
+        if (data && data.length > 0) {
+          const rateMap: Record<string, number> = {};
+          data.forEach(({ state, rate }: { state: string; rate: number }) => {
+            rateMap[state] = Number(rate);
+          });
+          setIftaRates(rateMap);
+        } else {
+          setIftaRates(IFTA_RATES_FALLBACK);
+        }
+      } catch {
+        setIftaRates(IFTA_RATES_FALLBACK);
+      }
+    };
+    fetchRates();
+  }, [selectedYear, selectedQuarter]);
+
+  // Fetch loads
   useEffect(() => {
     if (!user) return;
     const fetchLoads = async () => {
@@ -69,7 +148,7 @@ const IFTAReport = ({ onBack }: IFTAReportProps) => {
       try {
         const { data, error } = await supabase
           .from('load_reports')
-          .select('id, pickup_date, location_from, location_to, states_miles, fuel_purchases')
+          .select('id, pickup_date, location_from, location_to, pickup_zip, delivery_zip, pickup_city_state, delivery_city_state, estimated_miles, states_miles, fuel_purchases')
           .eq('user_id', user.id);
         if (error) throw error;
         if (data) {
@@ -79,6 +158,11 @@ const IFTAReport = ({ onBack }: IFTAReportProps) => {
               pickupDate: l.pickup_date,
               locationFrom: l.location_from,
               locationTo: l.location_to,
+              pickupZip: l.pickup_zip,
+              deliveryZip: l.delivery_zip,
+              pickupCityState: l.pickup_city_state,
+              deliveryCityState: l.delivery_city_state,
+              estimatedMiles: l.estimated_miles,
               statesMiles: l.states_miles as StateMilesEntry[] | undefined,
               fuelPurchases: l.fuel_purchases as FuelPurchaseEntry[] | undefined,
             }))
@@ -99,61 +183,142 @@ const IFTAReport = ({ onBack }: IFTAReportProps) => {
     return isWithinInterval(d, { start: quarterStart, end: quarterEnd });
   });
 
-  // Aggregate IFTA data
+  // Aggregate IFTA data across all filtered loads
   const stateAgg: Record<string, IFTARowData> = {};
   filteredLoads.forEach((load) => {
     (load.statesMiles || []).forEach(({ state, miles }) => {
-      if (!stateAgg[state]) stateAgg[state] = { state, milesDriven: 0, fuelGallons: 0, taxRate: IFTA_RATES_2025[state] || 0, taxDue: 0 };
+      if (!stateAgg[state]) stateAgg[state] = { state, milesDriven: 0, fuelGallons: 0, taxRate: iftaRates[state] || 0, taxDue: 0 };
       stateAgg[state].milesDriven += miles;
     });
     (load.fuelPurchases || []).forEach(({ state, gallons }) => {
-      if (!stateAgg[state]) stateAgg[state] = { state, milesDriven: 0, fuelGallons: 0, taxRate: IFTA_RATES_2025[state] || 0, taxDue: 0 };
+      if (!stateAgg[state]) stateAgg[state] = { state, milesDriven: 0, fuelGallons: 0, taxRate: iftaRates[state] || 0, taxDue: 0 };
       stateAgg[state].fuelGallons += gallons;
     });
   });
 
-  // Calculate tax due per state
   const totalMiles = Object.values(stateAgg).reduce((s, r) => s + r.milesDriven, 0);
   const totalGallons = Object.values(stateAgg).reduce((s, r) => s + r.fuelGallons, 0);
-  const fleetMPG = totalGallons > 0 && totalMiles > 0 ? totalMiles / totalGallons : 6; // default 6 mpg
+  const fleetMPG = totalGallons > 0 && totalMiles > 0 ? totalMiles / totalGallons : 6;
 
   const rows = Object.values(stateAgg).map((row) => {
-    const taxableMiles = row.milesDriven;
-    const gallonsConsumed = taxableMiles / fleetMPG;
+    const gallonsConsumed = row.milesDriven / fleetMPG;
     const taxDue = (gallonsConsumed - row.fuelGallons) * row.taxRate;
     return { ...row, taxDue };
   }).sort((a, b) => a.state.localeCompare(b.state));
 
   const totalTaxDue = rows.reduce((s, r) => s + r.taxDue, 0);
 
+  // Enhancement D: pre-fill state miles from pickup/delivery city_state when no data yet
   const startEditLoad = (load: LoadData) => {
     setEditingLoadId(load.id);
-    setEditStatesMiles(load.statesMiles ? [...load.statesMiles] : [{ state: 'TX', miles: 0 }]);
+    setScannedFuelData(null);
+
+    if (load.statesMiles && load.statesMiles.length > 0) {
+      setEditStatesMiles([...load.statesMiles]);
+    } else {
+      const pickupState = extractState(load.pickupCityState);
+      const deliveryState = extractState(load.deliveryCityState);
+      const totalMilesForLoad = load.estimatedMiles || 0;
+
+      if (pickupState && deliveryState && pickupState !== deliveryState) {
+        setEditStatesMiles([
+          { state: pickupState, miles: Math.round(totalMilesForLoad / 2) },
+          { state: deliveryState, miles: Math.round(totalMilesForLoad / 2) },
+        ]);
+      } else if (pickupState) {
+        setEditStatesMiles([{ state: pickupState, miles: totalMilesForLoad }]);
+      } else {
+        setEditStatesMiles([{ state: 'TX', miles: 0 }]);
+      }
+    }
+
     setEditFuelPurchases(load.fuelPurchases ? [...load.fuelPurchases] : []);
+  };
+
+  const cancelEdit = () => {
+    setEditingLoadId(null);
+    setScannedFuelData(null);
   };
 
   const saveLoadIFTA = async (loadId: string) => {
     try {
       const { error } = await supabase
         .from('load_reports')
-        .update({
-          states_miles: editStatesMiles as any,
-          fuel_purchases: editFuelPurchases as any,
-        })
+        .update({ states_miles: editStatesMiles as any, fuel_purchases: editFuelPurchases as any })
         .eq('id', loadId)
         .eq('user_id', user!.id);
       if (error) throw error;
       setLoads((prev) =>
         prev.map((l) =>
-          l.id === loadId
-            ? { ...l, statesMiles: editStatesMiles, fuelPurchases: editFuelPurchases }
-            : l
+          l.id === loadId ? { ...l, statesMiles: editStatesMiles, fuelPurchases: editFuelPurchases } : l
         )
       );
       setEditingLoadId(null);
+      setScannedFuelData(null);
     } catch (e) {
       console.error(e);
     }
+  };
+
+  // Enhancement A: call the calculate-ifta-miles edge function
+  const calculateStateMiles = async (load: LoadData) => {
+    if (!load.pickupZip || !load.deliveryZip) return;
+    setCalculatingMiles(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('calculate-ifta-miles', {
+        body: { pickupZip: load.pickupZip, deliveryZip: load.deliveryZip },
+      });
+      if (error) throw error;
+      if (data?.stateMiles?.length) {
+        setEditStatesMiles(data.stateMiles);
+      }
+    } catch (e) {
+      console.error('calculate-ifta-miles error:', e);
+    } finally {
+      setCalculatingMiles(false);
+    }
+  };
+
+  // Enhancement C: scan a fuel receipt image
+  const handleFuelScanFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    setScanningFuel(true);
+    setScannedFuelData(null);
+    try {
+      const dataUrl = await compressImage(file, 1024, 0.8);
+      const base64 = dataUrl.split(',')[1];
+      const { data, error } = await supabase.functions.invoke('scan-receipt', {
+        body: { imageBase64: base64, mode: 'fuel' },
+      });
+      if (error) throw error;
+      setScannedFuelData({
+        state: data.state || 'TX',
+        gallons: data.gallons || 0,
+        pricePerGallon: data.pricePerGallon || 0,
+        amount: data.amount || 0,
+        date: data.date || null,
+      });
+    } catch (e) {
+      console.error('fuel scan error:', e);
+    } finally {
+      setScanningFuel(false);
+    }
+  };
+
+  const confirmScannedFuel = () => {
+    if (!scannedFuelData) return;
+    setEditFuelPurchases((prev) => [
+      ...prev,
+      {
+        state: scannedFuelData.state,
+        gallons: scannedFuelData.gallons,
+        pricePerGallon: scannedFuelData.pricePerGallon,
+        amount: scannedFuelData.amount,
+      },
+    ]);
+    setScannedFuelData(null);
   };
 
   const handleExport = () => {
@@ -165,8 +330,7 @@ const IFTAReport = ({ onBack }: IFTAReportProps) => {
       '',
       'State | Miles Driven | Fuel Purchased (gal) | Tax Rate | Tax Due/Credit',
       ...rows.map(
-        (r) =>
-          `${r.state} | ${r.milesDriven.toLocaleString()} | ${r.fuelGallons.toFixed(1)} | $${r.taxRate.toFixed(4)} | $${r.taxDue.toFixed(2)}`
+        (r) => `${r.state} | ${r.milesDriven.toLocaleString()} | ${r.fuelGallons.toFixed(1)} | $${r.taxRate.toFixed(4)} | $${r.taxDue.toFixed(2)}`
       ),
       '',
       `TOTAL TAX ${totalTaxDue >= 0 ? 'DUE' : 'CREDIT'}: $${Math.abs(totalTaxDue).toFixed(2)}`,
@@ -186,6 +350,16 @@ const IFTAReport = ({ onBack }: IFTAReportProps) => {
 
   return (
     <div className="min-h-screen bg-background brutal-grid p-3 sm:p-6">
+      {/* Hidden file input for fuel receipt scanner */}
+      <input
+        ref={fuelScanInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={handleFuelScanFile}
+      />
+
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex items-center gap-4">
@@ -203,8 +377,10 @@ const IFTAReport = ({ onBack }: IFTAReportProps) => {
           <CardContent className="p-4 flex gap-3">
             <Info className="w-5 h-5 text-accent flex-shrink-0 mt-0.5" />
             <p className="brutal-mono text-xs">
-              IFTA requires reporting miles driven and fuel purchased per state each quarter. Add state miles &amp; fuel
-              data to each load below, then export the quarterly report.
+              IFTA requires reporting miles driven and fuel purchased per state each quarter.
+              Use <strong>Auto-calculate</strong> to fill in state miles automatically from your load's route,
+              or tap <strong>Edit</strong> to enter them manually. Add fuel receipts by tapping
+              <strong> Scan Receipt</strong> or entering gallons manually.
             </p>
           </CardContent>
         </Card>
@@ -220,10 +396,10 @@ const IFTAReport = ({ onBack }: IFTAReportProps) => {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="1">Q1 (JAN–MAR)</SelectItem>
-                    <SelectItem value="2">Q2 (APR–JUN)</SelectItem>
-                    <SelectItem value="3">Q3 (JUL–SEP)</SelectItem>
-                    <SelectItem value="4">Q4 (OCT–DEC)</SelectItem>
+                    <SelectItem value="1">Q1 (Jan–Mar)</SelectItem>
+                    <SelectItem value="2">Q2 (Apr–Jun)</SelectItem>
+                    <SelectItem value="3">Q3 (Jul–Sep)</SelectItem>
+                    <SelectItem value="4">Q4 (Oct–Dec)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -276,7 +452,7 @@ const IFTAReport = ({ onBack }: IFTAReportProps) => {
                         <td className="p-2 text-right">{row.fuelGallons.toFixed(1)}</td>
                         <td className="p-2 text-right">${row.taxRate.toFixed(4)}</td>
                         <td className={`p-2 text-right font-bold ${row.taxDue > 0 ? 'text-destructive' : 'text-green-700'}`}>
-                          {row.taxDue > 0 ? '+' : ''}{row.taxDue >= 0 ? '' : '-'}${Math.abs(row.taxDue).toFixed(2)}
+                          {row.taxDue > 0 ? '+' : ''}{row.taxDue < 0 ? '-' : ''}${Math.abs(row.taxDue).toFixed(2)}
                         </td>
                       </tr>
                     ))}
@@ -293,11 +469,11 @@ const IFTAReport = ({ onBack }: IFTAReportProps) => {
           </Card>
         )}
 
-        {/* Load-by-load IFTA data entry */}
+        {/* Load-by-load data entry */}
         {filteredLoads.length > 0 && (
           <Card className="brutal-border brutal-shadow bg-background">
             <CardHeader className="pb-3">
-              <CardTitle className="brutal-text text-lg font-bold">LOAD DATA — ADD STATE MILES & FUEL</CardTitle>
+              <CardTitle className="brutal-text text-lg font-bold">LOAD DATA — STATE MILES & FUEL</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               {filteredLoads.map((load) => (
@@ -310,21 +486,43 @@ const IFTAReport = ({ onBack }: IFTAReportProps) => {
                     <Button
                       size="sm"
                       variant="outline"
-                      className="brutal-border brutal-hover text-xs"
-                      onClick={() => editingLoadId === load.id ? setEditingLoadId(null) : startEditLoad(load)}
+                      className="brutal-border brutal-hover text-xs flex-shrink-0"
+                      onClick={() => editingLoadId === load.id ? cancelEdit() : startEditLoad(load)}
                     >
                       {editingLoadId === load.id ? 'CANCEL' : 'EDIT'}
                     </Button>
                   </div>
 
                   {editingLoadId === load.id ? (
-                    <div className="space-y-3 mt-3">
+                    <div className="space-y-4 mt-3">
+
                       {/* State Miles */}
                       <div>
-                        <p className="brutal-mono text-xs font-bold mb-1">STATE MILES</p>
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="brutal-mono text-xs font-bold">STATE MILES</p>
+                          {/* Enhancement A: auto-calculate button — only if load has ZIPs */}
+                          {load.pickupZip && load.deliveryZip && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="brutal-border text-xs h-7 gap-1"
+                              onClick={() => calculateStateMiles(load)}
+                              disabled={calculatingMiles}
+                            >
+                              {calculatingMiles
+                                ? <Loader2 className="w-3 h-3 animate-spin" />
+                                : <MapPin className="w-3 h-3" />}
+                              {calculatingMiles ? 'Calculating...' : 'Auto-calculate'}
+                            </Button>
+                          )}
+                        </div>
+
                         {editStatesMiles.map((sm, idx) => (
                           <div key={idx} className="flex gap-2 mb-1">
-                            <Select value={sm.state} onValueChange={(v) => setEditStatesMiles(prev => prev.map((x, i) => i === idx ? { ...x, state: v } : x))}>
+                            <Select
+                              value={sm.state}
+                              onValueChange={(v) => setEditStatesMiles((prev) => prev.map((x, i) => i === idx ? { ...x, state: v } : x))}
+                            >
                               <SelectTrigger className="brutal-border w-24 h-8 text-xs">
                                 <SelectValue />
                               </SelectTrigger>
@@ -336,25 +534,40 @@ const IFTAReport = ({ onBack }: IFTAReportProps) => {
                               type="number"
                               placeholder="miles"
                               value={sm.miles || ''}
-                              onChange={(e) => setEditStatesMiles(prev => prev.map((x, i) => i === idx ? { ...x, miles: Number(e.target.value) } : x))}
+                              onChange={(e) => setEditStatesMiles((prev) => prev.map((x, i) => i === idx ? { ...x, miles: Number(e.target.value) } : x))}
                               className="brutal-border h-8 text-xs w-24"
                             />
-                            <Button size="sm" variant="ghost" onClick={() => setEditStatesMiles(prev => prev.filter((_, i) => i !== idx))} className="h-8 px-2">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setEditStatesMiles((prev) => prev.filter((_, i) => i !== idx))}
+                              className="h-8 px-2"
+                            >
                               <Trash2 className="w-3 h-3" />
                             </Button>
                           </div>
                         ))}
-                        <Button size="sm" variant="outline" className="brutal-border text-xs h-7" onClick={() => setEditStatesMiles(prev => [...prev, { state: 'TX', miles: 0 }])}>
+
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="brutal-border text-xs h-7"
+                          onClick={() => setEditStatesMiles((prev) => [...prev, { state: 'TX', miles: 0 }])}
+                        >
                           <Plus className="w-3 h-3 mr-1" /> ADD STATE
                         </Button>
                       </div>
 
                       {/* Fuel Purchases */}
                       <div>
-                        <p className="brutal-mono text-xs font-bold mb-1">FUEL PURCHASES</p>
+                        <p className="brutal-mono text-xs font-bold mb-2">FUEL PURCHASES</p>
+
                         {editFuelPurchases.map((fp, idx) => (
                           <div key={idx} className="flex gap-2 mb-1 flex-wrap">
-                            <Select value={fp.state} onValueChange={(v) => setEditFuelPurchases(prev => prev.map((x, i) => i === idx ? { ...x, state: v } : x))}>
+                            <Select
+                              value={fp.state}
+                              onValueChange={(v) => setEditFuelPurchases((prev) => prev.map((x, i) => i === idx ? { ...x, state: v } : x))}
+                            >
                               <SelectTrigger className="brutal-border w-24 h-8 text-xs">
                                 <SelectValue />
                               </SelectTrigger>
@@ -362,19 +575,127 @@ const IFTAReport = ({ onBack }: IFTAReportProps) => {
                                 {US_STATES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                               </SelectContent>
                             </Select>
-                            <Input type="number" placeholder="gallons" value={fp.gallons || ''} onChange={(e) => setEditFuelPurchases(prev => prev.map((x, i) => i === idx ? { ...x, gallons: Number(e.target.value) } : x))} className="brutal-border h-8 text-xs w-20" />
-                            <Input type="number" placeholder="$/gal" step="0.01" value={fp.pricePerGallon || ''} onChange={(e) => setEditFuelPurchases(prev => prev.map((x, i) => i === idx ? { ...x, pricePerGallon: Number(e.target.value), amount: Number(e.target.value) * fp.gallons } : x))} className="brutal-border h-8 text-xs w-20" />
-                            <Button size="sm" variant="ghost" onClick={() => setEditFuelPurchases(prev => prev.filter((_, i) => i !== idx))} className="h-8 px-2">
+                            <Input
+                              type="number"
+                              placeholder="gallons"
+                              value={fp.gallons || ''}
+                              onChange={(e) => setEditFuelPurchases((prev) => prev.map((x, i) => i === idx ? { ...x, gallons: Number(e.target.value) } : x))}
+                              className="brutal-border h-8 text-xs w-20"
+                            />
+                            <Input
+                              type="number"
+                              placeholder="$/gal"
+                              step="0.01"
+                              value={fp.pricePerGallon || ''}
+                              onChange={(e) => setEditFuelPurchases((prev) => prev.map((x, i) => i === idx ? { ...x, pricePerGallon: Number(e.target.value), amount: Number(e.target.value) * fp.gallons } : x))}
+                              className="brutal-border h-8 text-xs w-20"
+                            />
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setEditFuelPurchases((prev) => prev.filter((_, i) => i !== idx))}
+                              className="h-8 px-2"
+                            >
                               <Trash2 className="w-3 h-3" />
                             </Button>
                           </div>
                         ))}
-                        <Button size="sm" variant="outline" className="brutal-border text-xs h-7" onClick={() => setEditFuelPurchases(prev => [...prev, { state: 'TX', gallons: 0, pricePerGallon: 0, amount: 0 }])}>
-                          <Plus className="w-3 h-3 mr-1" /> ADD FUEL
-                        </Button>
+
+                        <div className="flex gap-2 flex-wrap">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="brutal-border text-xs h-7"
+                            onClick={() => setEditFuelPurchases((prev) => [...prev, { state: 'TX', gallons: 0, pricePerGallon: 0, amount: 0 }])}
+                          >
+                            <Plus className="w-3 h-3 mr-1" /> ADD FUEL
+                          </Button>
+
+                          {/* Enhancement C: scan fuel receipt */}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="brutal-border text-xs h-7 gap-1"
+                            onClick={() => fuelScanInputRef.current?.click()}
+                            disabled={scanningFuel}
+                          >
+                            {scanningFuel
+                              ? <Loader2 className="w-3 h-3 animate-spin" />
+                              : <Camera className="w-3 h-3" />}
+                            {scanningFuel ? 'Scanning...' : 'Scan Receipt'}
+                          </Button>
+                        </div>
+
+                        {/* Scanned fuel data confirmation card */}
+                        {scannedFuelData && (
+                          <div className="mt-3 p-3 bg-accent/10 brutal-border rounded space-y-2">
+                            <p className="brutal-mono text-xs font-bold">RECEIPT SCANNED — REVIEW & CONFIRM</p>
+                            <div className="grid grid-cols-2 gap-x-3 gap-y-1 brutal-mono text-xs items-center">
+                              <span className="text-muted-foreground">State</span>
+                              <Select
+                                value={scannedFuelData.state}
+                                onValueChange={(v) => setScannedFuelData((prev) => prev ? { ...prev, state: v } : prev)}
+                              >
+                                <SelectTrigger className="brutal-border h-7 text-xs">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {US_STATES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+
+                              <span className="text-muted-foreground">Gallons</span>
+                              <Input
+                                type="number"
+                                value={scannedFuelData.gallons || ''}
+                                onChange={(e) => setScannedFuelData((prev) => prev ? { ...prev, gallons: Number(e.target.value) } : prev)}
+                                className="brutal-border h-7 text-xs"
+                              />
+
+                              <span className="text-muted-foreground">Price / gal</span>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                value={scannedFuelData.pricePerGallon || ''}
+                                onChange={(e) => setScannedFuelData((prev) => prev ? { ...prev, pricePerGallon: Number(e.target.value) } : prev)}
+                                className="brutal-border h-7 text-xs"
+                              />
+
+                              <span className="text-muted-foreground">Total paid</span>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                value={scannedFuelData.amount || ''}
+                                onChange={(e) => setScannedFuelData((prev) => prev ? { ...prev, amount: Number(e.target.value) } : prev)}
+                                className="brutal-border h-7 text-xs"
+                              />
+                            </div>
+                            <div className="flex gap-2 pt-1">
+                              <Button
+                                size="sm"
+                                className="brutal-border bg-primary text-primary-foreground brutal-hover text-xs h-7 gap-1"
+                                onClick={confirmScannedFuel}
+                              >
+                                <Check className="w-3 h-3" /> Add to Load
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="text-xs h-7 gap-1"
+                                onClick={() => setScannedFuelData(null)}
+                              >
+                                <X className="w-3 h-3" /> Discard
+                              </Button>
+                            </div>
+                          </div>
+                        )}
                       </div>
 
-                      <Button size="sm" className="brutal-border bg-primary text-primary-foreground brutal-hover text-xs" onClick={() => saveLoadIFTA(load.id)}>
+                      <Button
+                        size="sm"
+                        className="brutal-border bg-primary text-primary-foreground brutal-hover text-xs"
+                        onClick={() => saveLoadIFTA(load.id)}
+                      >
                         SAVE
                       </Button>
                     </div>
@@ -400,7 +721,10 @@ const IFTAReport = ({ onBack }: IFTAReportProps) => {
         )}
 
         {rows.length > 0 && (
-          <Button onClick={handleExport} className="w-full brutal-border bg-secondary text-secondary-foreground brutal-shadow brutal-hover brutal-text">
+          <Button
+            onClick={handleExport}
+            className="w-full brutal-border bg-secondary text-secondary-foreground brutal-shadow brutal-hover brutal-text"
+          >
             <Download className="w-4 h-4 mr-2" />
             EXPORT IFTA REPORT
           </Button>
@@ -409,8 +733,8 @@ const IFTAReport = ({ onBack }: IFTAReportProps) => {
         <Card className="brutal-border bg-muted/30">
           <CardContent className="p-4">
             <p className="brutal-mono text-xs text-muted-foreground">
-              ⚠️ This is an estimate using 2025 diesel rates. Rates change quarterly. Verify with official IFTA rates
-              before filing. Consult a licensed tax professional or accountant for final filing.
+              ⚠️ This is an estimate using {selectedYear} Q{selectedQuarter} diesel rates. Rates change quarterly.
+              Verify with official IFTA rates before filing. Consult a licensed tax professional for final filing.
             </p>
           </CardContent>
         </Card>
