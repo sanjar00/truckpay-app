@@ -193,26 +193,28 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
   };
 
   // Checks whether the user has pre-existing load data and, if so, grants 90-day Pro access.
+  // TODO: Re-enable after testing subscription flow. Currently disabled for testing.
   const activateEarlyAdopter = async () => {
     if (!user || subscription.earlyAdopter) return;
-    const today = new Date().toISOString().split('T')[0];
-    const { data: existingLoads } = await supabase
-      .from('load_reports')
-      .select('id')
-      .eq('user_id', user.id)
-      .lt('date_added', today)
-      .limit(1);
-
-    if (existingLoads && existingLoads.length > 0) {
-      const end = new Date();
-      end.setDate(end.getDate() + 90);
-      updateSub({
-        earlyAdopter: true,
-        tier: 'pro',
-        startDate: new Date().toISOString(),
-        endDate: end.toISOString(),
-      });
-    }
+    // TEMPORARILY DISABLED FOR TESTING
+    // const today = new Date().toISOString().split('T')[0];
+    // const { data: existingLoads } = await supabase
+    //   .from('load_reports')
+    //   .select('id')
+    //   .eq('user_id', user.id)
+    //   .lt('date_added', today)
+    //   .limit(1);
+    //
+    // if (existingLoads && existingLoads.length > 0) {
+    //   const end = new Date();
+    //   end.setDate(end.getDate() + 90);
+    //   updateSub({
+    //     earlyAdopter: true,
+    //     tier: 'pro',
+    //     startDate: new Date().toISOString(),
+    //     endDate: end.toISOString(),
+    //   });
+    // }
   };
 
   const dismissEarlyAdopterBanner = () => {

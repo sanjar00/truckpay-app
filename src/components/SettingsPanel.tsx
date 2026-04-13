@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, User, Phone, Mail, Users, Percent, Save, Download, Upload, Trash2, DollarSign, LogOut, Lock } from 'lucide-react';
+import { ArrowLeft, User, Phone, Mail, Users, Percent, Save, Download, Upload, Trash2, DollarSign, LogOut, Lock, Zap, Star, CreditCard, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Calendar } from 'lucide-react';
+import { useSubscription, BillingCycle, SubscriptionTier } from '@/hooks/useSubscription';
 
 const SettingsPanel = ({ userProfile, setUserProfile, onBack, onLogout }) => {
   const [formData, setFormData] = useState({ ...userProfile });
@@ -19,6 +20,32 @@ const SettingsPanel = ({ userProfile, setUserProfile, onBack, onLogout }) => {
   const [showFinalConfirm, setShowFinalConfirm] = useState(false);
   const { toast } = useToast();
   const { user, signOut } = useAuth();
+  const { subscription, upgradeTo, openCustomerPortal } = useSubscription();
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
+  const [upgradingTier, setUpgradingTier] = useState<SubscriptionTier | null>(null);
+  const [portalLoading, setPortalLoading] = useState(false);
+
+  const handleUpgrade = async (tier: SubscriptionTier) => {
+    setUpgradingTier(tier);
+    await upgradeTo(tier, billingCycle);
+    setUpgradingTier(null);
+  };
+
+  const handleManageSubscription = async () => {
+    setPortalLoading(true);
+    await openCustomerPortal();
+    setPortalLoading(false);
+  };
+
+  const PRICES = {
+    pro:   { monthly: '$14.99', annual: '$9.99', annualTotal: '$119.88' },
+    owner: { monthly: '$29.99', annual: '$19.99', annualTotal: '$239.88' },
+  };
+
+  const currentTier = subscription.tier;
+  const isEarlyAdopter = subscription.earlyAdopter;
+  const isTrial = subscription.trialUsed && currentTier === 'pro' && subscription.endDate && new Date(subscription.endDate) > new Date();
+  const hasStripeSubscription = !!subscription.stripeSubscriptionId;
 
   const [annualGoal, setAnnualGoal] = useState(() => localStorage.getItem('truckpay_annual_goal') || '');
   const [weeklyGoalSetting, setWeeklyGoalSetting] = useState(() => localStorage.getItem('truckpay_weekly_goal') || '');
@@ -602,6 +629,185 @@ const SettingsPanel = ({ userProfile, setUserProfile, onBack, onLogout }) => {
               </p>
             </div>
           </div>
+        </div>
+
+        {/* Subscription Plan */}
+        <div className="brutal-border brutal-shadow-lg p-6 bg-background mb-8">
+          <div className="flex items-center gap-3 mb-2">
+            <CreditCard className="h-5 w-5 text-primary" />
+            <h2 className="text-xl brutal-text font-bold">SUBSCRIPTION PLAN</h2>
+          </div>
+
+          {/* Current plan badge */}
+          <div className="mb-5">
+            {currentTier === 'free' && !isEarlyAdopter && (
+              <p className="brutal-mono text-sm text-muted-foreground">
+                You are on the <span className="font-bold text-foreground">Free</span> plan.
+              </p>
+            )}
+            {currentTier === 'pro' && isEarlyAdopter && (
+              <p className="brutal-mono text-sm text-green-700 font-bold">
+                Early Adopter — Pro free until{' '}
+                {subscription.endDate ? new Date(subscription.endDate).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }) : '—'}
+              </p>
+            )}
+            {currentTier === 'pro' && !isEarlyAdopter && isTrial && (
+              <p className="brutal-mono text-sm text-amber-700 font-bold">
+                Pro Trial — expires{' '}
+                {subscription.endDate ? new Date(subscription.endDate).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }) : '—'}
+              </p>
+            )}
+            {currentTier === 'pro' && !isEarlyAdopter && !isTrial && hasStripeSubscription && (
+              <p className="brutal-mono text-sm text-green-700 font-bold">Active Pro subscription</p>
+            )}
+            {currentTier === 'owner' && hasStripeSubscription && (
+              <p className="brutal-mono text-sm text-green-700 font-bold">Active Owner-Operator subscription</p>
+            )}
+          </div>
+
+          {/* Billing toggle */}
+          <div className="flex items-center gap-3 mb-5">
+            <div className="brutal-border inline-flex rounded overflow-hidden">
+              <button
+                className={`px-4 py-2 brutal-mono text-xs font-bold transition-colors ${billingCycle === 'monthly' ? 'bg-primary text-primary-foreground' : 'bg-background text-foreground hover:bg-muted'}`}
+                onClick={() => setBillingCycle('monthly')}
+              >
+                MONTHLY
+              </button>
+              <button
+                className={`px-4 py-2 brutal-mono text-xs font-bold transition-colors ${billingCycle === 'annual' ? 'bg-primary text-primary-foreground' : 'bg-background text-foreground hover:bg-muted'}`}
+                onClick={() => setBillingCycle('annual')}
+              >
+                ANNUAL
+              </button>
+            </div>
+            {billingCycle === 'annual' && (
+              <span className="brutal-mono text-xs text-green-600 font-bold">SAVE ~33%</span>
+            )}
+          </div>
+
+          {/* Plan cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {/* Free */}
+            <div className={`brutal-border p-4 ${currentTier === 'free' ? 'border-accent bg-accent/5' : 'bg-muted/20'}`}>
+              <p className="brutal-text text-base font-bold mb-1">FREE</p>
+              <p className="brutal-text text-2xl font-bold mb-3">$0<span className="brutal-mono text-sm font-normal">/mo</span></p>
+              <ul className="brutal-mono text-xs space-y-1 text-muted-foreground mb-4">
+                <li>✓ Current week only</li>
+                <li>✓ Up to 5 loads/week</li>
+                <li>✗ History &amp; reports</li>
+                <li>✗ IFTA &amp; Per Diem</li>
+                <li>✗ Export</li>
+              </ul>
+              {currentTier === 'free' ? (
+                <div className="w-full h-10 brutal-border bg-muted/30 flex items-center justify-center">
+                  <span className="brutal-mono text-xs font-bold text-muted-foreground">CURRENT PLAN</span>
+                </div>
+              ) : (
+                <div className="w-full h-10 brutal-border bg-muted/30 flex items-center justify-center">
+                  <span className="brutal-mono text-xs text-muted-foreground">Included</span>
+                </div>
+              )}
+            </div>
+
+            {/* Pro */}
+            <div className={`brutal-border p-4 ${currentTier === 'pro' ? 'border-accent bg-accent/10' : 'bg-background'}`}>
+              <div className="flex items-center gap-2 mb-1">
+                <Zap className="w-4 h-4 text-accent" />
+                <p className="brutal-text text-base font-bold">PRO</p>
+              </div>
+              <p className="brutal-text text-2xl font-bold mb-0">
+                {billingCycle === 'annual' ? PRICES.pro.annual : PRICES.pro.monthly}
+                <span className="brutal-mono text-sm font-normal">/mo</span>
+              </p>
+              {billingCycle === 'annual' && (
+                <p className="brutal-mono text-xs text-muted-foreground mb-2">Billed {PRICES.pro.annualTotal}/yr</p>
+              )}
+              <ul className="brutal-mono text-xs space-y-1 text-muted-foreground mb-4 mt-2">
+                <li>✓ Full load history</li>
+                <li>✓ IFTA reports</li>
+                <li>✓ Per Diem tracker</li>
+                <li>✓ CSV/PDF export</li>
+                <li>✓ AI receipt scanner</li>
+              </ul>
+              {currentTier === 'pro' ? (
+                hasStripeSubscription ? (
+                  <Button
+                    className="w-full brutal-border bg-muted/30 hover:bg-muted/50 text-foreground brutal-text text-xs h-10"
+                    disabled={portalLoading || upgradingTier !== null}
+                    onClick={handleManageSubscription}
+                  >
+                    {portalLoading ? <><Loader2 className="w-3 h-3 mr-1 animate-spin" />Loading...</> : 'MANAGE PLAN'}
+                  </Button>
+                ) : (
+                  <div className="w-full h-10 brutal-border bg-accent/20 flex items-center justify-center">
+                    <span className="brutal-mono text-xs font-bold text-accent">CURRENT PLAN</span>
+                  </div>
+                )
+              ) : currentTier === 'owner' ? (
+                <div className="w-full h-10 brutal-border bg-muted/20 flex items-center justify-center">
+                  <span className="brutal-mono text-xs text-muted-foreground">Included in Owner-Op</span>
+                </div>
+              ) : (
+                <Button
+                  className="w-full brutal-border bg-accent hover:bg-accent/90 text-accent-foreground brutal-text text-xs h-10"
+                  disabled={upgradingTier !== null || portalLoading}
+                  onClick={() => handleUpgrade('pro')}
+                >
+                  {upgradingTier === 'pro' ? <><Loader2 className="w-3 h-3 mr-1 animate-spin" />REDIRECTING...</> : 'UPGRADE TO PRO'}
+                </Button>
+              )}
+            </div>
+
+            {/* Owner-Op */}
+            <div className={`brutal-border p-4 ${currentTier === 'owner' ? 'border-accent bg-accent/10' : 'bg-background'}`}>
+              <div className="flex items-center gap-2 mb-1">
+                <Star className="w-4 h-4 text-yellow-500" />
+                <p className="brutal-text text-base font-bold">OWNER-OP</p>
+              </div>
+              <p className="brutal-text text-2xl font-bold mb-0">
+                {billingCycle === 'annual' ? PRICES.owner.annual : PRICES.owner.monthly}
+                <span className="brutal-mono text-sm font-normal">/mo</span>
+              </p>
+              {billingCycle === 'annual' && (
+                <p className="brutal-mono text-xs text-muted-foreground mb-2">Billed {PRICES.owner.annualTotal}/yr</p>
+              )}
+              <ul className="brutal-mono text-xs space-y-1 text-muted-foreground mb-4 mt-2">
+                <li>✓ Everything in Pro</li>
+                <li>✓ Dispatcher book</li>
+                <li>✓ Lane analytics</li>
+                <li>✓ Annual goal tracking</li>
+                <li>✓ Priority support</li>
+              </ul>
+              {currentTier === 'owner' ? (
+                hasStripeSubscription ? (
+                  <Button
+                    className="w-full brutal-border bg-muted/30 hover:bg-muted/50 text-foreground brutal-text text-xs h-10"
+                    disabled={portalLoading || upgradingTier !== null}
+                    onClick={handleManageSubscription}
+                  >
+                    {portalLoading ? <><Loader2 className="w-3 h-3 mr-1 animate-spin" />Loading...</> : 'MANAGE PLAN'}
+                  </Button>
+                ) : (
+                  <div className="w-full h-10 brutal-border bg-accent/20 flex items-center justify-center">
+                    <span className="brutal-mono text-xs font-bold text-accent">CURRENT PLAN</span>
+                  </div>
+                )
+              ) : (
+                <Button
+                  className="w-full brutal-border bg-primary hover:bg-primary/90 text-primary-foreground brutal-text text-xs h-10"
+                  disabled={upgradingTier !== null || portalLoading}
+                  onClick={() => handleUpgrade('owner')}
+                >
+                  {upgradingTier === 'owner' ? <><Loader2 className="w-3 h-3 mr-1 animate-spin" />REDIRECTING...</> : 'UPGRADE TO OWNER-OP'}
+                </Button>
+              )}
+            </div>
+          </div>
+
+          <p className="brutal-mono text-xs text-center text-muted-foreground mt-4">
+            Payments processed securely by Stripe. Cancel any time.
+          </p>
         </div>
 
         {/* Income Goals */}
