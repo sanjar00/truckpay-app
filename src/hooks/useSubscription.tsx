@@ -143,10 +143,24 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const isFeatureAllowed = (feature: AnyFeature): boolean => {
-    // Early adopters on free tier get all Pro features for 90 days (checked at load time)
-    if (subscription.earlyAdopter && subscription.tier === 'free') {
+    const now = new Date();
+    const expired = subscription.endDate && new Date(subscription.endDate) < now;
+
+    // Early adopters get all Pro features for 90 days — check expiry at runtime too
+    if (subscription.earlyAdopter && !expired) {
       if ((PRO_FEATURES as readonly string[]).includes(feature)) return true;
     }
+
+    // Stripe-managed subscriptions: trust the tier, no end-date enforcement here
+    // (webhook handles cancellation/renewal server-side)
+    if (subscription.stripeSubscriptionId) {
+      if (subscription.tier === 'owner') return true;
+      if (subscription.tier === 'pro') return (PRO_FEATURES as readonly string[]).includes(feature);
+    }
+
+    // Trial or manually-set subscriptions: enforce end date
+    if (expired) return false;
+
     if (subscription.tier === 'owner') return true;
     if (subscription.tier === 'pro') {
       return (PRO_FEATURES as readonly string[]).includes(feature);
