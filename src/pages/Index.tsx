@@ -59,16 +59,13 @@ const SnapshotTooltip = ({ text }: { text: string }) => {
 
 const Index = () => {
   const { user, loading, signOut, isPasswordRecovery } = useAuth();
-  const { isFeatureAllowed, subscription, upgradeTo } = useSubscription();
+  const { isFeatureAllowed, subscription, loading: subscriptionLoading, activateEarlyAdopter, dismissEarlyAdopterBanner } = useSubscription();
   const [currentView, setCurrentView] = useState('dashboard');
   const [showRegistration, setShowRegistration] = useState(false);
   const [upgradeModal, setUpgradeModal] = useState<{ feature: string; tier: 'pro' | 'owner' } | null>(null);
   const [userProfile, setUserProfile] = useState(null);
   const [loads, setLoads] = useState([]);
   const [deductions, setDeductions] = useState([]);
-  const [earlyAdopterBannerDismissed, setEarlyAdopterBannerDismissed] = useState(
-    () => localStorage.getItem('truckpay_ea_banner_dismissed') === 'true'
-  );
   const [weekSnapshot, setWeekSnapshot] = useState<{ loadCount: number; gross: number; expenses: number; net: number; weekStart: Date; weekEnd: Date } | null>(null);
   const [showMoreSheet, setShowMoreSheet] = useState(false);
   const [showAddLoadModal, setShowAddLoadModal] = useState(false);
@@ -213,27 +210,8 @@ const Index = () => {
       });
     }
 
-    // Early adopter check: if user has existing loads and is still on free tier
-    if (!subscription.earlyAdopter && subscription.tier === 'free') {
-      const today = new Date().toISOString().split('T')[0];
-      const { data: existingLoads } = await supabase
-        .from('load_reports')
-        .select('id')
-        .eq('user_id', user.id)
-        .lt('date_added', today)
-        .limit(1);
-      if (existingLoads && existingLoads.length > 0) {
-        localStorage.setItem('truckpay_early_adopter', 'true');
-        const endDate = new Date();
-        endDate.setDate(endDate.getDate() + 90);
-        upgradeTo('pro');
-        // Mark early adopter in subscription (upgradeTo sets endDate to 1 month — override)
-        const sub = JSON.parse(localStorage.getItem('truckpay_subscription') || '{}');
-        sub.earlyAdopter = true;
-        sub.endDate = endDate.toISOString();
-        localStorage.setItem('truckpay_subscription', JSON.stringify(sub));
-      }
-    }
+    // Early adopter check: grant 90-day Pro if user has pre-existing load data
+    await activateEarlyAdopter();
   };
 
   const handleRegistrationComplete = () => {
@@ -322,7 +300,7 @@ const Index = () => {
     }
   };
 
-  if (loading) {
+  if (loading || subscriptionLoading) {
     return (
       <div className="min-h-screen bg-background brutal-grid flex items-center justify-center">
         <div className="text-center">
@@ -521,16 +499,13 @@ const Index = () => {
               </div>
 
               {/* Early Adopter Banner */}
-              {subscription.earlyAdopter && !earlyAdopterBannerDismissed && subscription.endDate && (
+              {subscription.earlyAdopter && !subscription.earlyAdopterBannerDismissed && subscription.endDate && (
                 <div className="brutal-border bg-primary/10 p-4 brutal-shadow flex items-center justify-between gap-3">
                   <p className="brutal-mono text-sm text-foreground flex-1">
                     🎉 Early Adopter Bonus: Pro free until {new Date(subscription.endDate).toLocaleDateString()}. Thank you for using TruckPay!
                   </p>
                   <button
-                    onClick={() => {
-                      setEarlyAdopterBannerDismissed(true);
-                      localStorage.setItem('truckpay_ea_banner_dismissed', 'true');
-                    }}
+                    onClick={dismissEarlyAdopterBanner}
                     className="text-muted-foreground hover:text-foreground flex-shrink-0"
                   >
                     ✕

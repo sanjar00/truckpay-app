@@ -68,6 +68,7 @@ const UpgradeModal = ({ featureName, requiredTier, onClose }: UpgradeModalProps)
                   <li>✓ YTD dashboard</li>
                   <li>✓ Receipt photos</li>
                 </ul>
+                {/* TODO: Replace onClick with a Stripe Checkout redirect once payment integration is added */}
                 <Button
                   className="w-full brutal-border bg-accent hover:bg-accent text-accent-foreground brutal-hover brutal-text text-sm"
                   onClick={() => { upgradeTo('pro'); onClose(); }}
@@ -92,6 +93,7 @@ const UpgradeModal = ({ featureName, requiredTier, onClose }: UpgradeModalProps)
                   <li>✓ Annual goal tracking</li>
                   <li>✓ Priority support</li>
                 </ul>
+                {/* TODO: Replace onClick with a Stripe Checkout redirect once payment integration is added */}
                 <Button
                   className="w-full brutal-border bg-primary hover:bg-primary text-primary-foreground brutal-hover brutal-text text-sm"
                   onClick={() => { upgradeTo('owner'); onClose(); }}
@@ -117,7 +119,7 @@ const UpgradeModal = ({ featureName, requiredTier, onClose }: UpgradeModalProps)
           )}
 
           <p className="brutal-mono text-xs text-center text-muted-foreground">
-            Stripe integration coming soon. Upgrades saved locally for now.
+            Secure payment processing coming soon.
           </p>
         </div>
       </div>

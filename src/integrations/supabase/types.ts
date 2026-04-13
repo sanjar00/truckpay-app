@@ -237,6 +237,45 @@ export type Database = {
         }
         Relationships: []
       }
+      subscriptions: {
+        Row: {
+          id: string
+          user_id: string
+          tier: string
+          start_date: string | null
+          end_date: string | null
+          trial_used: boolean
+          early_adopter: boolean
+          early_adopter_banner_dismissed: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          tier?: string
+          start_date?: string | null
+          end_date?: string | null
+          trial_used?: boolean
+          early_adopter?: boolean
+          early_adopter_banner_dismissed?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          tier?: string
+          start_date?: string | null
+          end_date?: string | null
+          trial_used?: boolean
+          early_adopter?: boolean
+          early_adopter_banner_dismissed?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
