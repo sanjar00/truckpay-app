@@ -21,6 +21,8 @@ import PersonalExpenses from '@/components/PersonalExpenses';
 import PerDiemCalculator from '@/components/PerDiemCalculator';
 import IFTAReport from '@/components/IFTAReport';
 import UpgradeModal from '@/components/UpgradeModal';
+import SubscriptionSuccessModal from '@/components/SubscriptionSuccessModal';
+import { SubscriptionTier } from '@/hooks/useSubscription';
 
 const SnapshotTooltip = ({ text }: { text: string }) => {
   const [open, setOpen] = useState(false);
@@ -63,7 +65,7 @@ const Index = () => {
   const [currentView, setCurrentView] = useState('dashboard');
   const [showRegistration, setShowRegistration] = useState(false);
   const [upgradeModal, setUpgradeModal] = useState<{ feature: string; tier: 'pro' | 'owner' } | null>(null);
-  const [checkoutSuccess, setCheckoutSuccess] = useState(false);
+  const [successModal, setSuccessModal] = useState<{ tier: SubscriptionTier; isTrial: boolean } | null>(null);
   const [userProfile, setUserProfile] = useState(null);
   const [loads, setLoads] = useState([]);
   const [deductions, setDeductions] = useState([]);
@@ -77,11 +79,10 @@ const Index = () => {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('checkout') === 'success') {
-      setCheckoutSuccess(true);
-      // Remove the query param without a full page reload
+      const tierParam = params.get('tier') as SubscriptionTier | null;
       window.history.replaceState({}, '', window.location.pathname);
-      // Re-fetch from Supabase — webhook may have already updated the row
       if (user) refreshSubscription();
+      setSuccessModal({ tier: tierParam ?? 'pro', isTrial: false });
     }
   }, [user]);
 
@@ -511,21 +512,6 @@ const Index = () => {
                 )}
               </div>
 
-              {/* Stripe checkout success banner */}
-              {checkoutSuccess && (
-                <div className="brutal-border bg-green-50 p-4 brutal-shadow flex items-center justify-between gap-3">
-                  <p className="brutal-mono text-sm text-green-800 flex-1">
-                    🎉 Payment successful! Your subscription is now active.
-                  </p>
-                  <button
-                    onClick={() => setCheckoutSuccess(false)}
-                    className="text-green-600 hover:text-green-800 flex-shrink-0"
-                  >
-                    ✕
-                  </button>
-                </div>
-              )}
-
               {/* Early Adopter Banner */}
               {subscription.earlyAdopter && !subscription.earlyAdopterBannerDismissed && subscription.endDate && (
                 <div className="brutal-border bg-primary/10 p-4 brutal-shadow flex items-center justify-between gap-3">
@@ -751,6 +737,15 @@ const Index = () => {
           featureName={upgradeModal.feature}
           requiredTier={upgradeModal.tier}
           onClose={() => setUpgradeModal(null)}
+          onSuccess={(tier, isTrial) => { setUpgradeModal(null); setSuccessModal({ tier, isTrial }); }}
+        />
+      )}
+
+      {successModal && (
+        <SubscriptionSuccessModal
+          tier={successModal.tier}
+          isTrial={successModal.isTrial}
+          onClose={() => setSuccessModal(null)}
         />
       )}
 

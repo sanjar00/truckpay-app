@@ -8,6 +8,7 @@ interface UpgradeModalProps {
   featureName: string;
   requiredTier: 'pro' | 'owner';
   onClose: () => void;
+  onSuccess?: (tier: SubscriptionTier, isTrial: boolean) => void;
 }
 
 const FEATURE_DESCRIPTIONS: Record<string, string> = {
@@ -29,7 +30,7 @@ const PRICES = {
   owner: { monthly: '$29.99', annual: '$19.99', annualTotal: '$239.88' },
 };
 
-const UpgradeModal = ({ featureName, requiredTier, onClose }: UpgradeModalProps) => {
+const UpgradeModal = ({ featureName, requiredTier, onClose, onSuccess }: UpgradeModalProps) => {
   const { subscription, upgradeTo, startTrial } = useSubscription();
   const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
   const [loadingTier, setLoadingTier] = useState<SubscriptionTier | null>(null);
@@ -167,7 +168,7 @@ const UpgradeModal = ({ featureName, requiredTier, onClose }: UpgradeModalProps)
                 variant="outline"
                 className="brutal-border brutal-hover brutal-text text-sm"
                 disabled={loadingTier !== null}
-                onClick={() => { startTrial(); onClose(); }}
+                onClick={() => { startTrial(); onClose(); onSuccess?.('pro', true); }}
               >
                 START 7-DAY FREE TRIAL (PRO)
               </Button>

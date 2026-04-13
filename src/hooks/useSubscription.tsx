@@ -182,7 +182,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
       body: {
         tier,
         billingCycle,
-        successUrl: `${window.location.origin}/?checkout=success`,
+        successUrl: `${window.location.origin}/?checkout=success&tier=${tier}`,
         cancelUrl: window.location.href,
       },
       headers: { Authorization: `Bearer ${accessToken}` },
