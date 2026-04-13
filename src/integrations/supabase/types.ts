@@ -247,6 +247,8 @@ export type Database = {
           trial_used: boolean
           early_adopter: boolean
           early_adopter_banner_dismissed: boolean
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
           created_at: string
           updated_at: string
         }
@@ -259,6 +261,8 @@ export type Database = {
           trial_used?: boolean
           early_adopter?: boolean
           early_adopter_banner_dismissed?: boolean
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -271,6 +275,8 @@ export type Database = {
           trial_used?: boolean
           early_adopter?: boolean
           early_adopter_banner_dismissed?: boolean
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
           created_at?: string
           updated_at?: string
         }

@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
 export type SubscriptionTier = 'free' | 'pro' | 'owner';
+export type BillingCycle = 'monthly' | 'annual';
 
 export interface Subscription {
   tier: SubscriptionTier;
@@ -11,6 +12,8 @@ export interface Subscription {
   trialUsed: boolean;
   earlyAdopter: boolean;
   earlyAdopterBannerDismissed: boolean;
+  stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
 }
 
 const DEFAULT_SUB: Subscription = {
@@ -20,6 +23,8 @@ const DEFAULT_SUB: Subscription = {
   trialUsed: false,
   earlyAdopter: false,
   earlyAdopterBannerDismissed: false,
+  stripeCustomerId: null,
+  stripeSubscriptionId: null,
 };
 
 export const PRO_FEATURES = ['ifta', 'perdiem', 'ytd', 'fullHistory', 'export', 'receipts', 'forecast'] as const;
@@ -33,10 +38,12 @@ interface SubscriptionContextValue {
   subscription: Subscription;
   loading: boolean;
   isFeatureAllowed: (feature: AnyFeature) => boolean;
-  upgradeTo: (tier: SubscriptionTier) => void;
+  upgradeTo: (tier: SubscriptionTier, billingCycle: BillingCycle) => Promise<void>;
   startTrial: () => void;
   activateEarlyAdopter: () => Promise<void>;
   dismissEarlyAdopterBanner: () => void;
+  openCustomerPortal: () => Promise<void>;
+  refreshSubscription: () => Promise<void>;
 }
 
 const SubscriptionContext = createContext<SubscriptionContextValue | null>(null);
@@ -78,10 +85,13 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
           trialUsed: data.trial_used,
           earlyAdopter: data.early_adopter,
           earlyAdopterBannerDismissed: data.early_adopter_banner_dismissed,
+          stripeCustomerId: data.stripe_customer_id ?? null,
+          stripeSubscriptionId: data.stripe_subscription_id ?? null,
         };
 
         // Expire non-early-adopter paid subscriptions that have passed their end date
-        if (sub.endDate && new Date(sub.endDate) < new Date() && sub.tier !== 'free' && !sub.earlyAdopter) {
+        // (Stripe subscriptions are renewed via webhook, so this handles edge cases only)
+        if (sub.endDate && new Date(sub.endDate) < new Date() && sub.tier !== 'free' && !sub.earlyAdopter && !sub.stripeSubscriptionId) {
           sub.tier = 'free';
           sub.endDate = null;
           await persistToSupabase(userId, sub);
@@ -101,9 +111,6 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const persistToSupabase = async (userId: string, sub: Subscription) => {
-    // TODO: When Stripe is integrated, subscription tier and dates should be updated
-    //       via Stripe webhooks (stripe_subscription_id → status → tier mapping) rather
-    //       than direct upserts. This upsert is the simulation layer only.
     const { error } = await supabase
       .from('subscriptions')
       .upsert(
@@ -115,6 +122,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
           trial_used: sub.trialUsed,
           early_adopter: sub.earlyAdopter,
           early_adopter_banner_dismissed: sub.earlyAdopterBannerDismissed,
+          // stripe_customer_id and stripe_subscription_id are set by the webhook only
           updated_at: new Date().toISOString(),
         },
         { onConflict: 'user_id' }
@@ -146,21 +154,38 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
     return false;
   };
 
-  const upgradeTo = (tier: SubscriptionTier) => {
-    // TODO: Replace with Stripe Checkout redirect — create a Stripe Checkout session,
-    //       redirect the user to Stripe's payment page, then handle the
-    //       checkout.session.completed webhook to update the subscriptions table.
-    //       For now, simulates a paid upgrade by writing directly to Supabase.
-    const now = new Date();
-    const end = new Date(now);
-    end.setMonth(end.getMonth() + 1);
-    updateSub({ tier, startDate: now.toISOString(), endDate: end.toISOString() });
+  // Redirects the user to Stripe Checkout for the chosen plan/cycle.
+  // On successful payment, Stripe fires checkout.session.completed → stripe-webhook
+  // edge function updates the subscriptions table → app reloads subscription on return.
+  const upgradeTo = async (tier: SubscriptionTier, billingCycle: BillingCycle) => {
+    if (!user) return;
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData?.session?.access_token;
+    if (!accessToken) return;
+
+    const { data, error } = await supabase.functions.invoke('create-checkout-session', {
+      body: {
+        tier,
+        billingCycle,
+        successUrl: `${window.location.origin}/?checkout=success`,
+        cancelUrl: window.location.href,
+      },
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    if (error || !data?.url) {
+      console.error('Failed to create checkout session:', error);
+      return;
+    }
+
+    window.location.href = data.url;
   };
 
+  // 7-day free Pro trial — no payment required.
+  // Stripe trial subscriptions (trial_period_days) can replace this in a future sprint.
   const startTrial = () => {
     if (subscription.trialUsed) return;
-    // TODO: When Stripe is integrated, create a trial subscription via Stripe API
-    //       (trial_period_days on the subscription) instead of writing locally.
     const now = new Date();
     const end = new Date(now);
     end.setDate(end.getDate() + 7);
@@ -168,7 +193,6 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
   };
 
   // Checks whether the user has pre-existing load data and, if so, grants 90-day Pro access.
-  // Called from Index.tsx after the user profile loads.
   const activateEarlyAdopter = async () => {
     if (!user || subscription.earlyAdopter) return;
     const today = new Date().toISOString().split('T')[0];
@@ -195,6 +219,33 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
     updateSub({ earlyAdopterBannerDismissed: true });
   };
 
+  // Redirects to Stripe Customer Portal so the user can manage or cancel their subscription.
+  const openCustomerPortal = async () => {
+    if (!user) return;
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData?.session?.access_token;
+    if (!accessToken) return;
+
+    const { data, error } = await supabase.functions.invoke('create-portal-session', {
+      body: { returnUrl: window.location.href },
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    if (error || !data?.url) {
+      console.error('Failed to open customer portal:', error);
+      return;
+    }
+
+    window.location.href = data.url;
+  };
+
+  // Re-fetches the subscription from Supabase — call this after returning from Stripe Checkout.
+  const refreshSubscription = async () => {
+    if (!user) return;
+    await loadSubscription(user.id);
+  };
+
   return (
     <SubscriptionContext.Provider value={{
       subscription,
@@ -204,6 +255,8 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
       startTrial,
       activateEarlyAdopter,
       dismissEarlyAdopterBanner,
+      openCustomerPortal,
+      refreshSubscription,
     }}>
       {children}
     </SubscriptionContext.Provider>

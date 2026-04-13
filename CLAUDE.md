@@ -198,6 +198,72 @@ Akrom Aripov is an early adopter — do not lock him out.
 
 ---
 
+## Stripe Integration
+
+**Account:** `acct_1TLaKsDDJ9hkmBpw` (live mode)
+
+### Products
+
+| Product | Stripe ID |
+|---------|-----------|
+| TruckPay Pro | `prod_UKFDC6PGYVFyy4` |
+| TruckPay Owner-Op | `prod_UKFDp0tlwSiXqk` |
+
+### Prices
+
+| Plan | Billing | Price ID | Amount | Payment Link |
+|------|---------|----------|--------|--------------|
+| Pro | Monthly | `price_1TLainDDJ9hkmBpwH8pF7LXu` | $14.99/mo | https://buy.stripe.com/dRmdR9f19aEsb49ayag7e00 |
+| Pro | Annual | `price_1TLaiqDDJ9hkmBpw2EEWTeIv` | $119.88/yr | https://buy.stripe.com/eVq28r6uD5k8got21Eg7e01 |
+| Owner-Op | Monthly | `price_1TLaitDDJ9hkmBpwG40JiG5d` | $29.99/mo | https://buy.stripe.com/eVq00j6uDcMA1tzfSug7e02 |
+| Owner-Op | Annual | `price_1TLaiwDDJ9hkmBpwZ1jI886S` | $239.88/yr | https://buy.stripe.com/14AaEX7yH3c03BH0XAg7e03 |
+
+### Integration Architecture
+
+The Stripe integration uses **Supabase Edge Functions** — no Stripe SDK on the frontend.
+
+**Edge Functions needed (backlog):**
+
+1. `create-checkout-session` — Creates a Stripe Checkout session
+   - Receives: `{ priceId, userId }`
+   - Creates/retrieves Stripe customer linked to `user_id`
+   - Returns: `{ url }` — redirect user to this Stripe-hosted checkout page
+   - On success, Stripe redirects to `https://truckpay.app/?session_id={CHECKOUT_SESSION_ID}`
+
+2. `stripe-webhook` — Handles Stripe lifecycle events
+   - Always verify `stripe-signature` header using `STRIPE_WEBHOOK_SECRET`
+   - Handle events:
+     - `checkout.session.completed` → upsert `subscriptions` row (tier, startDate, endDate)
+     - `customer.subscription.updated` → update tier/status
+     - `customer.subscription.deleted` → downgrade to Free
+   - Maps `price_id` to tier:
+     ```javascript
+     const PRICE_TO_TIER = {
+       'price_1TLainDDJ9hkmBpwH8pF7LXu': 'pro',       // Pro monthly
+       'price_1TLaiqDDJ9hkmBpw2EEWTeIv': 'pro',       // Pro annual
+       'price_1TLaitDDJ9hkmBpwG40JiG5d': 'owner-op',  // Owner-Op monthly
+       'price_1TLaiwDDJ9hkmBpwZ1jI886S': 'owner-op',  // Owner-Op annual
+     };
+     ```
+
+3. `customer-portal` — Creates a Stripe billing portal session
+   - Lets users manage/cancel their own subscription
+   - Returns: `{ url }` — redirect user to Stripe portal
+
+**Supabase secrets required:**
+```bash
+supabase secrets set STRIPE_SECRET_KEY sk_live_...
+supabase secrets set STRIPE_WEBHOOK_SECRET whsec_...
+```
+
+**Frontend flow:**
+- On paywall trigger → call `create-checkout-session` with the appropriate `priceId`
+- Redirect to Stripe Checkout URL
+- On return → re-fetch subscription from `subscriptions` table
+- Subscription status drives all paywall checks (no localStorage simulation)
+
+---
+
 ## Pages / Sections
 
 The app uses hash-based routing. All sections on one page, shown/hidden by JS.
@@ -664,7 +730,7 @@ parked at a truck stop?"* If no, simplify it.
 - Do NOT break existing Supabase data when adding new features or migrations
 - Do NOT modify database schema without planning a migration
 - Do NOT make unnecessary network calls — batch queries where possible
-- Do NOT implement Stripe payments directly — add a TODO comment and simulate with Supabase for now
+- Do NOT skip Stripe webhook verification — always validate `stripe-signature` header in the Edge Function
 - Do NOT introduce new date input fields without using calendar picker Popover pattern
 - Do NOT break existing component patterns or styling conventions
 - Do NOT show the logout button as a top-level CTA in the header — it belongs inside Settings
@@ -727,7 +793,7 @@ parked at a truck stop?"* If no, simplify it.
 - Multi-load mileage estimation (when 6+ loads entered)
 
 ### 📋 Backlog
-- Stripe payment integration (replace localStorage simulation)
+- Stripe payment integration — Stripe account configured (products + prices live). Edge Functions needed: `create-checkout-session`, `stripe-webhook`, `customer-portal` (see Stripe Integration section)
 - PDF export for weekly reports and IFTA (see also UI/UX Improvement Backlog #7)
 - Push notifications for end-of-week reminders
 - App Store / Google Play native wrapper (Capacitor recommended)

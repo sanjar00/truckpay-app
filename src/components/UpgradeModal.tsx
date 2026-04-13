@@ -1,7 +1,8 @@
-import { X, Star, Zap, Lock } from 'lucide-react';
+import { useState } from 'react';
+import { X, Star, Zap, Lock, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { useSubscription } from '@/hooks/useSubscription';
+import { useSubscription, BillingCycle, SubscriptionTier } from '@/hooks/useSubscription';
 
 interface UpgradeModalProps {
   featureName: string;
@@ -23,9 +24,23 @@ const FEATURE_DESCRIPTIONS: Record<string, string> = {
   multiTruck: 'Multi-Truck Management',
 };
 
+const PRICES = {
+  pro:   { monthly: '$14.99', annual: '$9.99', annualTotal: '$119.88' },
+  owner: { monthly: '$29.99', annual: '$19.99', annualTotal: '$239.88' },
+};
+
 const UpgradeModal = ({ featureName, requiredTier, onClose }: UpgradeModalProps) => {
   const { subscription, upgradeTo, startTrial } = useSubscription();
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
+  const [loadingTier, setLoadingTier] = useState<SubscriptionTier | null>(null);
   const featureLabel = FEATURE_DESCRIPTIONS[featureName] || featureName;
+
+  const handleUpgrade = async (tier: SubscriptionTier) => {
+    setLoadingTier(tier);
+    await upgradeTo(tier, billingCycle);
+    // upgradeTo redirects to Stripe — this line only runs if redirect fails
+    setLoadingTier(null);
+  };
 
   return (
     <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
@@ -43,11 +58,32 @@ const UpgradeModal = ({ featureName, requiredTier, onClose }: UpgradeModalProps)
 
         <div className="p-6 space-y-6">
           <div className="text-center">
-            <p className="brutal-mono text-sm text-muted-foreground mb-1">TO ACCESS</p>
+            <p className="brutal-mono text-xs text-muted-foreground mb-1">TO ACCESS</p>
             <p className="brutal-text text-2xl font-bold text-accent">{featureLabel}</p>
-            <p className="brutal-mono text-sm text-muted-foreground mt-2">
+            <p className="brutal-mono text-xs text-muted-foreground mt-2">
               requires {requiredTier === 'owner' ? 'Owner-Operator' : 'Pro'} plan
             </p>
+          </div>
+
+          {/* Billing cycle toggle */}
+          <div className="flex items-center justify-center">
+            <div className="brutal-border inline-flex rounded overflow-hidden">
+              <button
+                className={`px-4 py-2 brutal-mono text-xs font-bold transition-colors ${billingCycle === 'monthly' ? 'bg-primary text-primary-foreground' : 'bg-background text-foreground hover:bg-muted'}`}
+                onClick={() => setBillingCycle('monthly')}
+              >
+                MONTHLY
+              </button>
+              <button
+                className={`px-4 py-2 brutal-mono text-xs font-bold transition-colors ${billingCycle === 'annual' ? 'bg-primary text-primary-foreground' : 'bg-background text-foreground hover:bg-muted'}`}
+                onClick={() => setBillingCycle('annual')}
+              >
+                ANNUAL
+              </button>
+            </div>
+            {billingCycle === 'annual' && (
+              <span className="ml-3 brutal-mono text-xs text-green-600 font-bold">SAVE ~33%</span>
+            )}
           </div>
 
           {/* Tier Cards */}
@@ -59,8 +95,16 @@ const UpgradeModal = ({ featureName, requiredTier, onClose }: UpgradeModalProps)
                   <Zap className="w-4 h-4 text-accent" />
                   <p className="brutal-text text-lg font-bold">PRO</p>
                 </div>
-                <p className="brutal-text text-2xl font-bold mb-1">$14.99<span className="brutal-mono text-sm font-normal">/mo</span></p>
-                <ul className="brutal-mono text-xs space-y-1 text-muted-foreground mb-4">
+                <p className="brutal-text text-2xl font-bold mb-0">
+                  {billingCycle === 'annual' ? PRICES.pro.annual : PRICES.pro.monthly}
+                  <span className="brutal-mono text-sm font-normal">/mo</span>
+                </p>
+                {billingCycle === 'annual' && (
+                  <p className="brutal-mono text-xs text-muted-foreground mb-2">
+                    Billed {PRICES.pro.annualTotal}/yr
+                  </p>
+                )}
+                <ul className="brutal-mono text-xs space-y-1 text-muted-foreground mb-4 mt-2">
                   <li>✓ Full load history</li>
                   <li>✓ IFTA reports</li>
                   <li>✓ Per Diem tracker</li>
@@ -68,12 +112,14 @@ const UpgradeModal = ({ featureName, requiredTier, onClose }: UpgradeModalProps)
                   <li>✓ YTD dashboard</li>
                   <li>✓ Receipt photos</li>
                 </ul>
-                {/* TODO: Replace onClick with a Stripe Checkout redirect once payment integration is added */}
                 <Button
                   className="w-full brutal-border bg-accent hover:bg-accent text-accent-foreground brutal-hover brutal-text text-sm"
-                  onClick={() => { upgradeTo('pro'); onClose(); }}
+                  disabled={loadingTier !== null}
+                  onClick={() => handleUpgrade('pro')}
                 >
-                  UPGRADE TO PRO
+                  {loadingTier === 'pro' ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" />REDIRECTING...</>
+                  ) : 'UPGRADE TO PRO'}
                 </Button>
               </CardContent>
             </Card>
@@ -85,20 +131,30 @@ const UpgradeModal = ({ featureName, requiredTier, onClose }: UpgradeModalProps)
                   <Star className="w-4 h-4 text-yellow-500" />
                   <p className="brutal-text text-lg font-bold">OWNER-OP</p>
                 </div>
-                <p className="brutal-text text-2xl font-bold mb-1">$29.99<span className="brutal-mono text-sm font-normal">/mo</span></p>
-                <ul className="brutal-mono text-xs space-y-1 text-muted-foreground mb-4">
+                <p className="brutal-text text-2xl font-bold mb-0">
+                  {billingCycle === 'annual' ? PRICES.owner.annual : PRICES.owner.monthly}
+                  <span className="brutal-mono text-sm font-normal">/mo</span>
+                </p>
+                {billingCycle === 'annual' && (
+                  <p className="brutal-mono text-xs text-muted-foreground mb-2">
+                    Billed {PRICES.owner.annualTotal}/yr
+                  </p>
+                )}
+                <ul className="brutal-mono text-xs space-y-1 text-muted-foreground mb-4 mt-2">
                   <li>✓ Everything in Pro</li>
                   <li>✓ Dispatcher contact book</li>
                   <li>✓ Lane analytics</li>
                   <li>✓ Annual goal tracking</li>
                   <li>✓ Priority support</li>
                 </ul>
-                {/* TODO: Replace onClick with a Stripe Checkout redirect once payment integration is added */}
                 <Button
                   className="w-full brutal-border bg-primary hover:bg-primary text-primary-foreground brutal-hover brutal-text text-sm"
-                  onClick={() => { upgradeTo('owner'); onClose(); }}
+                  disabled={loadingTier !== null}
+                  onClick={() => handleUpgrade('owner')}
                 >
-                  UPGRADE TO OWNER-OP
+                  {loadingTier === 'owner' ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" />REDIRECTING...</>
+                  ) : 'UPGRADE TO OWNER-OP'}
                 </Button>
               </CardContent>
             </Card>
@@ -110,6 +166,7 @@ const UpgradeModal = ({ featureName, requiredTier, onClose }: UpgradeModalProps)
               <Button
                 variant="outline"
                 className="brutal-border brutal-hover brutal-text text-sm"
+                disabled={loadingTier !== null}
                 onClick={() => { startTrial(); onClose(); }}
               >
                 START 7-DAY FREE TRIAL (PRO)
@@ -119,7 +176,7 @@ const UpgradeModal = ({ featureName, requiredTier, onClose }: UpgradeModalProps)
           )}
 
           <p className="brutal-mono text-xs text-center text-muted-foreground">
-            Secure payment processing coming soon.
+            Payments processed securely by Stripe. Cancel any time.
           </p>
         </div>
       </div>

@@ -59,10 +59,11 @@ const SnapshotTooltip = ({ text }: { text: string }) => {
 
 const Index = () => {
   const { user, loading, signOut, isPasswordRecovery } = useAuth();
-  const { isFeatureAllowed, subscription, loading: subscriptionLoading, activateEarlyAdopter, dismissEarlyAdopterBanner } = useSubscription();
+  const { isFeatureAllowed, subscription, loading: subscriptionLoading, activateEarlyAdopter, dismissEarlyAdopterBanner, refreshSubscription } = useSubscription();
   const [currentView, setCurrentView] = useState('dashboard');
   const [showRegistration, setShowRegistration] = useState(false);
   const [upgradeModal, setUpgradeModal] = useState<{ feature: string; tier: 'pro' | 'owner' } | null>(null);
+  const [checkoutSuccess, setCheckoutSuccess] = useState(false);
   const [userProfile, setUserProfile] = useState(null);
   const [loads, setLoads] = useState([]);
   const [deductions, setDeductions] = useState([]);
@@ -71,6 +72,18 @@ const Index = () => {
   const [showAddLoadModal, setShowAddLoadModal] = useState(false);
   const [newLoad, setNewLoad] = useState({ rate: '', companyDeduction: '', pickupDate: new Date().toISOString().split('T')[0], deliveryDate: new Date().toISOString().split('T')[0], deadheadMiles: '', detentionAmount: '', notes: '', pickupZip: '', deliveryZip: '', pickupCityState: '', deliveryCityState: '', locationFrom: '', locationTo: '', estimatedMiles: undefined as any });
   const [loadingAddLoad, setLoadingAddLoad] = useState(false);
+
+  // Detect return from Stripe Checkout and refresh subscription
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('checkout') === 'success') {
+      setCheckoutSuccess(true);
+      // Remove the query param without a full page reload
+      window.history.replaceState({}, '', window.location.pathname);
+      // Re-fetch from Supabase — webhook may have already updated the row
+      if (user) refreshSubscription();
+    }
+  }, [user]);
 
   useEffect(() => {
     if (user) {
@@ -497,6 +510,21 @@ const Index = () => {
                   </div>
                 )}
               </div>
+
+              {/* Stripe checkout success banner */}
+              {checkoutSuccess && (
+                <div className="brutal-border bg-green-50 p-4 brutal-shadow flex items-center justify-between gap-3">
+                  <p className="brutal-mono text-sm text-green-800 flex-1">
+                    🎉 Payment successful! Your subscription is now active.
+                  </p>
+                  <button
+                    onClick={() => setCheckoutSuccess(false)}
+                    className="text-green-600 hover:text-green-800 flex-shrink-0"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
 
               {/* Early Adopter Banner */}
               {subscription.earlyAdopter && !subscription.earlyAdopterBannerDismissed && subscription.endDate && (
