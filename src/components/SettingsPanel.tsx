@@ -1004,6 +1004,36 @@ const SettingsPanel = ({ userProfile, setUserProfile, onBack, onLogout }) => {
           </div>
         </div>
 
+        {/* Legal */}
+        <div className="brutal-border brutal-shadow-lg p-6 bg-background mb-4">
+          <div
+            className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-4"
+            style={{ fontFamily: 'monospace', letterSpacing: '1px' }}
+          >
+            Legal
+          </div>
+          <div className="flex flex-col gap-3">
+            <a
+              href="/privacy-policy.html"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-between p-3 brutal-border brutal-shadow bg-background hover:bg-accent transition-colors rounded"
+            >
+              <span className="text-sm font-bold">Privacy Policy</span>
+              <span className="text-muted-foreground text-xs">↗</span>
+            </a>
+            <a
+              href="/terms-of-service.html"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-between p-3 brutal-border brutal-shadow bg-background hover:bg-accent transition-colors rounded"
+            >
+              <span className="text-sm font-bold">Terms of Service</span>
+              <span className="text-muted-foreground text-xs">↗</span>
+            </a>
+          </div>
+        </div>
+
         {/* Logout */}
         <div className="brutal-border brutal-shadow-lg p-6 bg-background mb-8">
           <Button
