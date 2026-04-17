@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, User, Phone, Mail, Users, Percent, Save, Download, Upload, Trash2, DollarSign, LogOut, Lock, Zap, Star, CreditCard, Loader2 } from 'lucide-react';
+import { ArrowLeft, User, Phone, Mail, Users, Percent, Save, Download, Upload, Trash2, DollarSign, LogOut, Lock, Zap, Star, CreditCard, Loader2, Link } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -19,7 +19,7 @@ const SettingsPanel = ({ userProfile, setUserProfile, onBack, onLogout }) => {
   const [deleteAccountToo, setDeleteAccountToo] = useState(false);
   const [showFinalConfirm, setShowFinalConfirm] = useState(false);
   const { toast } = useToast();
-  const { user, signOut } = useAuth();
+  const { user, signOut, isSocialAuth } = useAuth();
   const { subscription, upgradeTo, openCustomerPortal } = useSubscription();
   const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
   const [upgradingTier, setUpgradingTier] = useState<SubscriptionTier | null>(null);
@@ -967,12 +967,21 @@ const SettingsPanel = ({ userProfile, setUserProfile, onBack, onLogout }) => {
         {/* Change Password */}
         <div className="brutal-border brutal-shadow-lg p-6 bg-background mb-8">
           <div className="flex items-center gap-3 mb-4">
-            <Lock className="h-5 w-5 text-primary" />
-            <h2 className="text-xl brutal-text font-bold">CHANGE PASSWORD</h2>
+            {isSocialAuth ? <Link className="h-5 w-5 text-primary" /> : <Lock className="h-5 w-5 text-primary" />}
+            <h2 className="text-xl brutal-text font-bold">
+              {isSocialAuth ? 'SET A PASSWORD' : 'CHANGE PASSWORD'}
+            </h2>
           </div>
+          {isSocialAuth && (
+            <p className="text-sm text-muted-foreground mb-4">
+              Your account uses Google/LinkedIn sign-in. You can optionally set a password to also log in with email.
+            </p>
+          )}
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="new-password" className="text-sm brutal-text font-medium">New Password</Label>
+              <Label htmlFor="new-password" className="text-sm brutal-text font-medium">
+                {isSocialAuth ? 'Password' : 'New Password'}
+              </Label>
               <Input
                 id="new-password"
                 type="password"

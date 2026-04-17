@@ -8,20 +8,25 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   isPasswordRecovery: boolean;
+  isSocialAuth: boolean;
   signUp: (email: string, password: string, userData: any) => Promise<{ error: any }>;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signInWithGoogle: () => Promise<{ error: any }>;
   signInWithLinkedIn: () => Promise<{ error: any }>;
+  completeSocialProfile: (userData: any) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+const SOCIAL_PROVIDERS = ['google', 'linkedin_oidc'];
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
+  const [isSocialAuth, setIsSocialAuth] = useState(false);
 
   useEffect(() => {
     let listenerFired = false;
@@ -35,6 +40,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         } else if (event === 'USER_UPDATED' || event === 'SIGNED_OUT' || event === 'SIGNED_IN') {
           setIsPasswordRecovery(false);
         }
+        const provider = session?.user?.app_metadata?.provider ?? '';
+        setIsSocialAuth(SOCIAL_PROVIDERS.includes(provider));
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
@@ -75,6 +82,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return { error };
   };
 
+  const completeSocialProfile = async (userData: any) => {
+    if (!user) return { error: new Error('No user') };
+    const { error } = await supabase.from('profiles').upsert({
+      id: user.id,
+      full_name: userData.full_name,
+      phone: userData.phone,
+      driver_type: userData.driver_type,
+      company_deduction: userData.company_deduction || '0',
+      weekly_period: userData.weekly_period,
+      lease_rate_per_mile: userData.lease_rate_per_mile || null,
+      company_pay_type: userData.company_pay_type || null,
+      company_pay_rate: userData.company_pay_rate || null,
+    });
+    return { error };
+  };
+
   const signInWithGoogle = async () => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -101,10 +124,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       session,
       loading,
       isPasswordRecovery,
+      isSocialAuth,
       signUp,
       signIn,
       signInWithGoogle,
       signInWithLinkedIn,
+      completeSocialProfile,
       signOut
     }}>
       {children}

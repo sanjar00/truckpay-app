@@ -12,13 +12,15 @@ import { useToast } from '@/hooks/use-toast';
 interface RegistrationProps {
   onComplete: () => void;
   onBackToLogin: () => void;
+  prefillData?: { fullName?: string; email?: string };
+  isSocialAuth?: boolean;
 }
 
-const Registration = ({ onComplete, onBackToLogin }: RegistrationProps) => {
+const Registration = ({ onComplete, onBackToLogin, prefillData, isSocialAuth = false }: RegistrationProps) => {
   const [formData, setFormData] = useState({
-    fullName: '',
+    fullName: prefillData?.fullName || '',
     phone: '',
-    email: '',
+    email: prefillData?.email || '',
     password: '',
     driverType: '',
     companyDeduction: '',
@@ -28,58 +30,71 @@ const Registration = ({ onComplete, onBackToLogin }: RegistrationProps) => {
     companyPayRate: '',
   });
   const [loading, setLoading] = useState(false);
-  const { signUp } = useAuth();
+  const { signUp, completeSocialProfile } = useAuth();
   const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Validate required base fields
-    if (!formData.fullName || !formData.email || !formData.password || !formData.driverType || !formData.weeklyPeriod) {
+    const passwordRequired = !isSocialAuth;
+    if (!formData.fullName || !formData.email || (passwordRequired && !formData.password) || !formData.driverType || !formData.weeklyPeriod) {
       toast({ title: "Missing fields", description: "Please fill in all required fields.", variant: "destructive" });
       return;
     }
-    // Lease-operator: both deduction % and lease rate required
     if (formData.driverType === 'lease-operator' && (!formData.companyDeduction || !formData.leaseRatePerMile)) {
       toast({ title: "Missing fields", description: "Please enter your company deduction rate and lease rate per mile.", variant: "destructive" });
       return;
     }
-    // Company driver: pay type + rate required
     if (formData.driverType === 'company-driver' && (!formData.companyPayType || !formData.companyPayRate)) {
       toast({ title: "Missing fields", description: "Please select how you're paid and enter the rate.", variant: "destructive" });
       return;
     }
-    // Owner-operator: company deduction required
     if (formData.driverType === 'owner-operator' && !formData.companyDeduction) {
       toast({ title: "Missing fields", description: "Please enter your company deduction rate.", variant: "destructive" });
       return;
     }
 
     setLoading(true);
-    const { error } = await signUp(formData.email, formData.password, {
-      full_name: formData.fullName,
-      phone: formData.phone,
-      driver_type: formData.driverType,
-      company_deduction: formData.companyDeduction || '0',
-      weekly_period: formData.weeklyPeriod,
-      lease_rate_per_mile: formData.leaseRatePerMile || null,
-      company_pay_type: formData.companyPayType || null,
-      company_pay_rate: formData.companyPayRate || null,
-    });
 
-    if (error) {
-      toast({
-        title: "Registration failed",
-        description: error.message,
-        variant: "destructive",
+    if (isSocialAuth) {
+      const { error } = await completeSocialProfile({
+        full_name: formData.fullName,
+        phone: formData.phone,
+        driver_type: formData.driverType,
+        company_deduction: formData.companyDeduction || '0',
+        weekly_period: formData.weeklyPeriod,
+        lease_rate_per_mile: formData.leaseRatePerMile || null,
+        company_pay_type: formData.companyPayType || null,
+        company_pay_rate: formData.companyPayRate || null,
       });
+      if (error) {
+        toast({ title: "Failed to save profile", description: error.message, variant: "destructive" });
+      } else {
+        onComplete();
+      }
     } else {
-      toast({
-        title: "Registration successful!",
-        description: "Please check your email to verify your account, then return to login.",
+      const { error } = await signUp(formData.email, formData.password, {
+        full_name: formData.fullName,
+        phone: formData.phone,
+        driver_type: formData.driverType,
+        company_deduction: formData.companyDeduction || '0',
+        weekly_period: formData.weeklyPeriod,
+        lease_rate_per_mile: formData.leaseRatePerMile || null,
+        company_pay_type: formData.companyPayType || null,
+        company_pay_rate: formData.companyPayRate || null,
       });
-      onComplete();
+      if (error) {
+        toast({ title: "Registration failed", description: error.message, variant: "destructive" });
+      } else {
+        toast({
+          title: "Registration successful!",
+          description: "Please check your email to verify your account, then return to login.",
+        });
+        onComplete();
+      }
     }
+
     setLoading(false);
   };
 
@@ -99,7 +114,12 @@ const Registration = ({ onComplete, onBackToLogin }: RegistrationProps) => {
             />
             <CardTitle className="text-2xl brutal-text text-accent">TruckPay</CardTitle>
           </div>
-          <p className="text-gray-600">Create Your Driver Account</p>
+          <p className="text-gray-600">
+            {isSocialAuth ? 'Complete Your Driver Profile' : 'Create Your Driver Account'}
+          </p>
+          {isSocialAuth && (
+            <p className="text-sm text-gray-500 mt-1">Your account is linked. Just fill in your driving details.</p>
+          )}
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -149,26 +169,29 @@ const Registration = ({ onComplete, onBackToLogin }: RegistrationProps) => {
                 value={formData.email}
                 onChange={(e) => handleInputChange('email', e.target.value)}
                 required
-                className="h-12"
+                readOnly={isSocialAuth}
+                className={`h-12 ${isSocialAuth ? 'bg-muted text-muted-foreground cursor-not-allowed' : ''}`}
               />
             </div>
 
-            {/* Password */}
-            <div className="space-y-2">
-              <Label htmlFor="password" className="flex items-center gap-2">
-                <Mail className="w-4 h-4" />
-                Password *
-              </Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="Create a secure password"
-                value={formData.password}
-                onChange={(e) => handleInputChange('password', e.target.value)}
-                required
-                className="h-12"
-              />
-            </div>
+            {/* Password — hidden for social auth */}
+            {!isSocialAuth && (
+              <div className="space-y-2">
+                <Label htmlFor="password" className="flex items-center gap-2">
+                  <Mail className="w-4 h-4" />
+                  Password *
+                </Label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="Create a secure password"
+                  value={formData.password}
+                  onChange={(e) => handleInputChange('password', e.target.value)}
+                  required
+                  className="h-12"
+                />
+              </div>
+            )}
 
             {/* Driver Type */}
             <div className="space-y-2">
@@ -350,23 +373,26 @@ const Registration = ({ onComplete, onBackToLogin }: RegistrationProps) => {
                 Choose when your work week starts. For example, if you select Saturday, your week will run from Saturday to Friday.
               </p>
             </div>
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               className="w-full h-12 brutal-border bg-info hover:bg-accent text-info-foreground hover:text-accent-foreground brutal-shadow-lg brutal-hover brutal-active"
               disabled={loading}
             >
-              {loading ? 'Creating Account...' : 'Create Account'}
+              {loading
+                ? (isSocialAuth ? 'Saving...' : 'Creating Account...')
+                : (isSocialAuth ? 'Complete Setup' : 'Create Account')
+              }
             </Button>
           </form>
 
           <div className="mt-4 text-center">
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               onClick={onBackToLogin}
               className="text-gray-600 hover:text-gray-800"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Login
+              {isSocialAuth ? 'Cancel & Sign Out' : 'Back to Login'}
             </Button>
           </div>
         </CardContent>

@@ -60,7 +60,7 @@ const SnapshotTooltip = ({ text }: { text: string }) => {
 };
 
 const Index = () => {
-  const { user, loading, signOut, isPasswordRecovery } = useAuth();
+  const { user, loading, signOut, isPasswordRecovery, isSocialAuth } = useAuth();
   const { isFeatureAllowed, subscription, loading: subscriptionLoading, activateEarlyAdopter, dismissEarlyAdopterBanner, refreshSubscription } = useSubscription();
   const [currentView, setCurrentView] = useState('dashboard');
   const [showRegistration, setShowRegistration] = useState(false);
@@ -342,6 +342,23 @@ const Index = () => {
     }
 
     return <LoginPage onShowRegistration={() => setShowRegistration(true)} />;
+  }
+
+  // Social auth user who hasn't completed their profile yet
+  if (isSocialAuth && userProfile === null && !loading) {
+    const meta = user.user_metadata ?? {};
+    const prefill = {
+      fullName: meta.full_name || meta.name || '',
+      email: user.email || '',
+    };
+    return (
+      <Registration
+        onComplete={handleRegistrationComplete}
+        onBackToLogin={handleLogout}
+        prefillData={prefill}
+        isSocialAuth={true}
+      />
+    );
   }
 
   const renderCurrentView = () => {
