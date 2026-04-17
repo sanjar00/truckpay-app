@@ -32,7 +32,7 @@ const PRICES = {
 
 const UpgradeModal = ({ featureName, requiredTier, onClose, onSuccess }: UpgradeModalProps) => {
   const { subscription, upgradeTo, startTrial } = useSubscription();
-  const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>('annual');
   const [loadingTier, setLoadingTier] = useState<SubscriptionTier | null>(null);
   const featureLabel = FEATURE_DESCRIPTIONS[featureName] || featureName;
 
@@ -70,16 +70,16 @@ const UpgradeModal = ({ featureName, requiredTier, onClose, onSuccess }: Upgrade
           <div className="flex items-center justify-center">
             <div className="brutal-border inline-flex rounded overflow-hidden">
               <button
-                className={`px-4 py-2 brutal-mono text-xs font-bold transition-colors ${billingCycle === 'monthly' ? 'bg-primary text-primary-foreground' : 'bg-background text-foreground hover:bg-muted'}`}
-                onClick={() => setBillingCycle('monthly')}
-              >
-                MONTHLY
-              </button>
-              <button
                 className={`px-4 py-2 brutal-mono text-xs font-bold transition-colors ${billingCycle === 'annual' ? 'bg-primary text-primary-foreground' : 'bg-background text-foreground hover:bg-muted'}`}
                 onClick={() => setBillingCycle('annual')}
               >
                 ANNUAL
+              </button>
+              <button
+                className={`px-4 py-2 brutal-mono text-xs font-bold transition-colors ${billingCycle === 'monthly' ? 'bg-primary text-primary-foreground' : 'bg-background text-foreground hover:bg-muted'}`}
+                onClick={() => setBillingCycle('monthly')}
+              >
+                MONTHLY
               </button>
             </div>
             {billingCycle === 'annual' && (

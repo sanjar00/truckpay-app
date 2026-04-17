@@ -1,6 +1,6 @@
 
 import { useState, useEffect, useRef } from 'react';
-import { Truck, Calculator, Settings, DollarSign, FileText, Receipt, Calendar, Map, Lock, Info, MoreHorizontal, Plus } from 'lucide-react';
+import { Truck, Calculator, Settings, DollarSign, FileText, Receipt, Calendar, Map, Lock, Info, MoreHorizontal, Plus, Camera } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import AddLoadForm from '@/components/AddLoadForm';
 import { Button } from '@/components/ui/button';
@@ -22,6 +22,7 @@ import PerDiemCalculator from '@/components/PerDiemCalculator';
 import IFTAReport from '@/components/IFTAReport';
 import UpgradeModal from '@/components/UpgradeModal';
 import SubscriptionSuccessModal from '@/components/SubscriptionSuccessModal';
+import ReceiptScanner from '@/components/ReceiptScanner';
 import { SubscriptionTier } from '@/hooks/useSubscription';
 
 const SnapshotTooltip = ({ text }: { text: string }) => {
@@ -74,8 +75,11 @@ const Index = () => {
   const [weekSnapshot, setWeekSnapshot] = useState<{ loadCount: number; gross: number; expenses: number; net: number; weekStart: Date; weekEnd: Date } | null>(null);
   const [showMoreSheet, setShowMoreSheet] = useState(false);
   const [showAddLoadModal, setShowAddLoadModal] = useState(false);
-  const [newLoad, setNewLoad] = useState({ rate: '', companyDeduction: '', pickupDate: new Date().toISOString().split('T')[0], deliveryDate: new Date().toISOString().split('T')[0], deadheadMiles: '', detentionAmount: '', notes: '', pickupZip: '', deliveryZip: '', pickupCityState: '', deliveryCityState: '', locationFrom: '', locationTo: '', estimatedMiles: undefined as any });
+  const [newLoad, setNewLoad] = useState({ rate: '', companyDeduction: '', pickupDate: new Date() as Date | undefined, deliveryDate: new Date() as Date | undefined, deadheadMiles: '', detentionAmount: '', notes: '', pickupZip: '', deliveryZip: '', pickupCityState: '', deliveryCityState: '', locationFrom: '', locationTo: '', estimatedMiles: undefined as any });
   const [loadingAddLoad, setLoadingAddLoad] = useState(false);
+  const [showScanDestPicker, setShowScanDestPicker] = useState(false);
+  const [showHomeReceiptScanner, setShowHomeReceiptScanner] = useState(false);
+  const [scanDestination, setScanDestination] = useState<'personal' | 'work' | null>(null);
 
   // Remove any stale/sensitive truckpay_* keys that should not be in localStorage
   useEffect(() => {
@@ -318,7 +322,7 @@ const Index = () => {
         console.error('Error:', error);
       } else {
         // Reset form and close modal
-        setNewLoad({ rate: '', companyDeduction: '', pickupDate: new Date().toISOString().split('T')[0], deliveryDate: new Date().toISOString().split('T')[0], deadheadMiles: '', detentionAmount: '', notes: '', pickupZip: '', deliveryZip: '', pickupCityState: '', deliveryCityState: '', locationFrom: '', locationTo: '', estimatedMiles: undefined });
+        setNewLoad({ rate: '', companyDeduction: '', pickupDate: new Date(), deliveryDate: new Date(), deadheadMiles: '', detentionAmount: '', notes: '', pickupZip: '', deliveryZip: '', pickupCityState: '', deliveryCityState: '', locationFrom: '', locationTo: '', estimatedMiles: undefined });
         setShowAddLoadModal(false);
         // Refresh week snapshot
         fetchWeekSnapshot(deductions);
@@ -329,6 +333,61 @@ const Index = () => {
     } finally {
       setLoadingAddLoad(false);
     }
+  };
+
+  const handleHomeReceiptConfirm = async (scannedReceipts: any[]) => {
+    setShowHomeReceiptScanner(false);
+    if (!user || scannedReceipts.length === 0) return;
+
+    if (scanDestination === 'personal') {
+      // Save to personal_expenses via supabase — mirror PersonalExpenses logic
+      for (const receipt of scannedReceipts) {
+        // Find or create expense type
+        const { data: existing } = await supabase
+          .from('personal_expense_types')
+          .select('id')
+          .eq('user_id', user.id)
+          .ilike('name', receipt.category)
+          .maybeSingle();
+
+        let typeId = existing?.id;
+        if (!typeId) {
+          const { data: created } = await supabase
+            .from('personal_expense_types')
+            .insert({ user_id: user.id, name: receipt.category })
+            .select('id')
+            .single();
+          typeId = created?.id;
+        }
+        if (!typeId) continue;
+
+        await supabase.from('personal_expenses').insert({
+          user_id: user.id,
+          expense_type_id: typeId,
+          amount: parseFloat(receipt.amount) || 0,
+          note: receipt.merchant || receipt.notes || '',
+          date: receipt.date || new Date().toISOString().split('T')[0],
+        });
+      }
+    } else if (scanDestination === 'work') {
+      // Save to weekly_extra_deductions under the correct week based on receipt date
+      for (const receipt of scannedReceipts) {
+        const receiptDate = receipt.date ? new Date(receipt.date + 'T00:00:00') : new Date();
+        const weekStartForReceipt = getUserWeekStart(receiptDate, userProfile);
+        const weekStartStr = weekStartForReceipt.toISOString().split('T')[0];
+
+        await supabase.from('weekly_extra_deductions').insert({
+          user_id: user.id,
+          week_start: weekStartStr,
+          name: receipt.category || receipt.merchant || 'Expense',
+          amount: parseFloat(receipt.amount) || 0,
+          date_added: receipt.date ? new Date(receipt.date + 'T00:00:00').toISOString() : new Date().toISOString(),
+        });
+      }
+      fetchWeekSnapshot(deductions);
+    }
+
+    setScanDestination(null);
   };
 
   if (loading || subscriptionLoading) {
@@ -559,6 +618,21 @@ const Index = () => {
                   </div>
                 )}
               </div>
+
+              {/* Scan Receipt with AI */}
+              {isFeatureAllowed('receipts') && (
+                <button
+                  onClick={() => setShowScanDestPicker(true)}
+                  className="w-full brutal-border bg-card p-4 brutal-shadow flex items-center gap-3 brutal-hover"
+                  style={{ borderRadius: '4px' }}
+                >
+                  <Camera className="w-5 h-5 flex-shrink-0" style={{ color: '#1a1a2e' }} />
+                  <div className="text-left">
+                    <p className="brutal-text text-sm" style={{ color: '#1a1a2e' }}>SCAN RECEIPT WITH AI</p>
+                    <p className="brutal-mono text-xs text-muted-foreground">Auto-fill expenses from a photo</p>
+                  </div>
+                </button>
+              )}
 
               {/* Early Adopter Banner */}
               {subscription.earlyAdopter && !subscription.earlyAdopterBannerDismissed && subscription.endDate && (
@@ -803,6 +877,41 @@ const Index = () => {
         />
       )}
 
+      {/* Scan Receipt — destination picker */}
+      {showScanDestPicker && (
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+          <div className="brutal-border bg-background brutal-shadow-xl w-full max-w-sm p-6 space-y-4">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="brutal-text text-xl">WHERE IS THIS RECEIPT FOR?</h2>
+              <button onClick={() => setShowScanDestPicker(false)} className="text-muted-foreground hover:text-foreground">✕</button>
+            </div>
+            <p className="brutal-mono text-xs text-muted-foreground">Choose where to save the scanned expense</p>
+            <button
+              className="w-full brutal-border p-4 text-left brutal-shadow brutal-hover flex flex-col gap-1"
+              onClick={() => { setScanDestination('personal'); setShowScanDestPicker(false); setShowHomeReceiptScanner(true); }}
+            >
+              <span className="brutal-text text-base">Personal Expense</span>
+              <span className="brutal-mono text-xs text-muted-foreground">Food, clothing, personal items, etc.</span>
+            </button>
+            <button
+              className="w-full brutal-border p-4 text-left brutal-shadow brutal-hover flex flex-col gap-1"
+              onClick={() => { setScanDestination('work'); setShowScanDestPicker(false); setShowHomeReceiptScanner(true); }}
+            >
+              <span className="brutal-text text-base">Truck / Work Expense</span>
+              <span className="brutal-mono text-xs text-muted-foreground">Fuel, tolls, maintenance — added to Load Reports week</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Scan Receipt — scanner (shown after destination chosen) */}
+      {showHomeReceiptScanner && (
+        <ReceiptScanner
+          onClose={() => { setShowHomeReceiptScanner(false); setScanDestination(null); }}
+          onConfirm={handleHomeReceiptConfirm}
+        />
+      )}
+
       {/* Add Load Modal */}
       <Dialog open={showAddLoadModal} onOpenChange={setShowAddLoadModal}>
         <DialogContent className="max-h-[90vh] overflow-y-auto brutal-border brutal-shadow-lg">
@@ -815,8 +924,8 @@ const Index = () => {
             onAddLoad={handleAddLoadFromHome}
             onCancel={() => setShowAddLoadModal(false)}
             loading={loadingAddLoad}
-            weekStart={new Date()}
-            weekEnd={new Date()}
+            weekStart={userProfile ? getUserWeekStart(new Date(), userProfile) : new Date()}
+            weekEnd={userProfile ? getUserWeekEnd(new Date(), userProfile) : new Date()}
             userProfile={userProfile}
           />
         </DialogContent>

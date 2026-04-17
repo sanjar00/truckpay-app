@@ -22,8 +22,8 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
     companyDeduction: userProfile?.companyDeduction || '',
     locationFrom: '',
     locationTo: '',
-    pickupDate: undefined,
-    deliveryDate: undefined
+    pickupDate: new Date(),
+    deliveryDate: new Date(),
   });
   const [showAddForm, setShowAddForm] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -172,8 +172,8 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
             companyDeduction: userProfile?.companyDeduction || '',
             locationFrom: '',
             locationTo: '',
-            pickupDate: undefined,
-            deliveryDate: undefined,
+            pickupDate: new Date(),
+            deliveryDate: new Date(),
             deadheadMiles: '',
             detentionAmount: '',
             notes: '',
