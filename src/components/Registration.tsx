@@ -149,7 +149,7 @@ const Registration = ({ onComplete, onBackToLogin, prefillData, isSocialAuth = f
               <Input
                 id="phone"
                 type="tel"
-                placeholder="(555) 123-4567"
+                placeholder="ex. (555) 123-4567"
                 value={formData.phone}
                 onChange={(e) => handleInputChange('phone', e.target.value)}
                 className="h-12"
