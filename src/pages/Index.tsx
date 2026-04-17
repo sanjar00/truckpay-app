@@ -230,6 +230,7 @@ const Index = () => {
 
   const handleRegistrationComplete = () => {
     setShowRegistration(false);
+    fetchUserProfile();
   };
 
   const navigateTo = (view: string, feature: 'perdiem' | 'ifta' | 'forecast' | null = null) => {
@@ -344,8 +345,8 @@ const Index = () => {
     return <LoginPage onShowRegistration={() => setShowRegistration(true)} />;
   }
 
-  // Social auth user who hasn't completed their profile yet
-  if (isSocialAuth && userProfile === null && !loading) {
+  // Social auth user who hasn't completed their profile yet (trigger created a stub row, but driver_type is missing)
+  if (isSocialAuth && !loading && (!userProfile || !userProfile.driverType)) {
     const meta = user.user_metadata ?? {};
     const prefill = {
       fullName: meta.full_name || meta.name || '',
