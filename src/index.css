@@ -96,6 +96,14 @@
     @apply border-border;
   }
 
+  input::placeholder,
+  textarea::placeholder {
+    color: #9ca3af;
+    font-weight: 400;
+    font-style: italic;
+    opacity: 1;
+  }
+
   body {
     @apply bg-background text-foreground;
     font-family: 'Space Grotesk', sans-serif;
