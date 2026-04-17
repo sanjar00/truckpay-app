@@ -59,7 +59,7 @@ const LoadReportsHeader = ({
               {format(weekStart, 'MMM d')} – {format(weekEnd, 'MMM d, yyyy')}
             </p>
             <p className="brutal-mono text-xs text-info-foreground opacity-80">
-              ({getWeeklyPeriodDisplay(userProfile?.weeklyPeriod || 'sunday')})
+              {getWeeklyPeriodDisplay(userProfile?.weeklyPeriod || 'sunday')}
             </p>
           </div>
           <Button
@@ -91,7 +91,7 @@ const LoadReportsHeader = ({
               {format(weekStart, 'MMM d')} – {format(weekEnd, 'MMM d, yyyy')}
             </p>
             <p className="brutal-mono text-xs text-info-foreground opacity-80">
-              ({getWeeklyPeriodDisplay(userProfile?.weeklyPeriod || 'sunday')})
+              {getWeeklyPeriodDisplay(userProfile?.weeklyPeriod || 'sunday')}
             </p>
           </div>
           <Button

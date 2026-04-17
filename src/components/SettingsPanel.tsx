@@ -308,7 +308,10 @@ const SettingsPanel = ({ userProfile, setUserProfile, onBack, onLogout }) => {
           throw new Error('Failed to delete account. Please contact support at dev@saaz.site.');
         }
         
-        // Sign out after successful deletion
+        // Clear all local user data then sign out
+        Object.keys(localStorage)
+          .filter(k => k.startsWith('truckpay_'))
+          .forEach(k => localStorage.removeItem(k));
         await supabase.auth.signOut();
         
         toast({

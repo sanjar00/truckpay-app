@@ -42,16 +42,16 @@ export const calculateDriverPay = (
 };
 
 export const getWeeklyPeriodDisplay = (weeklyPeriod: string) => {
-  const periodMap = {
-    'sunday': 'SUNDAY_TO_SATURDAY',
-    'monday': 'MONDAY_TO_SUNDAY',
-    'tuesday': 'TUESDAY_TO_MONDAY',
-    'wednesday': 'WEDNESDAY_TO_TUESDAY',
-    'thursday': 'THURSDAY_TO_WEDNESDAY',
-    'friday': 'FRIDAY_TO_THURSDAY',
-    'saturday': 'SATURDAY_TO_FRIDAY'
+  const periodMap: Record<string, string> = {
+    'sunday': 'Sun – Sat',
+    'monday': 'Mon – Sun',
+    'tuesday': 'Tue – Mon',
+    'wednesday': 'Wed – Tue',
+    'thursday': 'Thu – Wed',
+    'friday': 'Fri – Thu',
+    'saturday': 'Sat – Fri'
   };
-  return periodMap[weeklyPeriod] || 'SUNDAY_TO_SATURDAY';
+  return periodMap[weeklyPeriod] || 'Sun – Sat';
 };
 
 export const calculateFixedDeductionsForWeek = (deductions: any[], weekStartDate: Date) => {

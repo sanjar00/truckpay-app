@@ -1,6 +1,6 @@
 
 import { useState } from 'react';
-import { DollarSign, Percent, Calendar as CalendarIcon, ChevronDown, ChevronUp, MapPin, Loader2 } from 'lucide-react';
+import { DollarSign, Percent, Calendar as CalendarIcon, ChevronDown, ChevronRight, MapPin, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -185,7 +185,7 @@ const AddLoadForm = ({
                 )}
               >
                 <CalendarIcon className="mr-2 h-4 w-4" />
-                {newLoad.pickupDate ? format(newLoad.pickupDate, "PPP") : format(new Date(), "PPP")}
+                {newLoad.pickupDate ? format(newLoad.pickupDate, "MMM d, yyyy") : format(new Date(), "MMM d, yyyy")}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
@@ -221,7 +221,7 @@ const AddLoadForm = ({
                 )}
               >
                 <CalendarIcon className="mr-2 h-4 w-4" />
-                {newLoad.deliveryDate ? format(newLoad.deliveryDate, "PPP") : format(new Date(), "PPP")}
+                {newLoad.deliveryDate ? format(newLoad.deliveryDate, "MMM d, yyyy") : format(new Date(), "MMM d, yyyy")}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
@@ -253,7 +253,7 @@ const AddLoadForm = ({
             type="number"
             placeholder="$0.00"
             step="0.01"
-            value={newLoad.rate}
+            value={newLoad.rate || ''}
             onChange={(e) => setNewLoad({ ...newLoad, rate: e.target.value })}
             className="h-12"
           />
@@ -270,7 +270,7 @@ const AddLoadForm = ({
           onClick={() => setShowOptional(!showOptional)}
           className="flex items-center gap-2 brutal-mono text-xs text-muted-foreground hover:text-foreground transition-colors w-full py-2"
         >
-          {showOptional ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+          {showOptional ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
           {showOptional ? 'Hide Details' : 'More Details'}
         </button>
 
@@ -334,7 +334,8 @@ const AddLoadForm = ({
         <div className="flex gap-3 pt-4">
           <Button
             onClick={handleAddLoad}
-            className="flex-1 bg-green-600 hover:bg-green-700"
+            className="flex-1 brutal-border font-extrabold uppercase tracking-wide"
+            style={{ background: '#f0a500', color: '#1a1a2e', border: '2px solid #1a1a2e' }}
             disabled={loading || !newLoad.rate || !newLoad.pickupZip || !newLoad.deliveryZip || !zip.pickupInfo || !zip.deliveryInfo}
           >
             {loading ? 'Adding...' : 'Add Load'}

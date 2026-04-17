@@ -59,6 +59,8 @@ const SnapshotTooltip = ({ text }: { text: string }) => {
   );
 };
 
+const ALLOWED_LOCAL_KEYS = new Set(['truckpay_weekly_goal', 'truckpay_annual_goal']);
+
 const Index = () => {
   const { user, loading, signOut, isPasswordRecovery, isSocialAuth } = useAuth();
   const { isFeatureAllowed, subscription, loading: subscriptionLoading, activateEarlyAdopter, dismissEarlyAdopterBanner, refreshSubscription } = useSubscription();
@@ -74,6 +76,13 @@ const Index = () => {
   const [showAddLoadModal, setShowAddLoadModal] = useState(false);
   const [newLoad, setNewLoad] = useState({ rate: '', companyDeduction: '', pickupDate: new Date().toISOString().split('T')[0], deliveryDate: new Date().toISOString().split('T')[0], deadheadMiles: '', detentionAmount: '', notes: '', pickupZip: '', deliveryZip: '', pickupCityState: '', deliveryCityState: '', locationFrom: '', locationTo: '', estimatedMiles: undefined as any });
   const [loadingAddLoad, setLoadingAddLoad] = useState(false);
+
+  // Remove any stale/sensitive truckpay_* keys that should not be in localStorage
+  useEffect(() => {
+    Object.keys(localStorage)
+      .filter(k => k.startsWith('truckpay_') && !ALLOWED_LOCAL_KEYS.has(k))
+      .forEach(k => localStorage.removeItem(k));
+  }, []);
 
   // Detect return from Stripe Checkout and refresh subscription
   useEffect(() => {
@@ -241,7 +250,14 @@ const Index = () => {
     setCurrentView(view);
   };
 
+  const clearLocalUserData = () => {
+    Object.keys(localStorage)
+      .filter(k => k.startsWith('truckpay_'))
+      .forEach(k => localStorage.removeItem(k)); // wipe everything including goals on logout
+  };
+
   const handleLogout = async () => {
+    clearLocalUserData();
     await signOut();
     setCurrentView('dashboard');
     setUserProfile(null);
@@ -528,6 +544,20 @@ const Index = () => {
                     <p className="brutal-text text-sm text-accent-foreground mt-1">No loads recorded yet — tap Load Reports to add your first load.</p>
                   </div>
                 )}
+
+                {/* New user onboarding callout when 0 loads this week */}
+                {weekSnapshot && weekSnapshot.loadCount === 0 && (
+                  <div className="brutal-border bg-card p-4 brutal-shadow flex items-center justify-between gap-3">
+                    <p className="brutal-mono text-sm text-foreground">Add your first load to get started</p>
+                    <button
+                      onClick={() => setShowAddLoadModal(true)}
+                      className="brutal-border font-extrabold uppercase tracking-wide text-xs px-3 py-2 brutal-shadow brutal-hover flex-shrink-0"
+                      style={{ background: '#f0a500', color: '#1a1a2e', border: '2px solid #1a1a2e', borderRadius: '4px' }}
+                    >
+                      + Add Load
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Early Adopter Banner */}
@@ -596,7 +626,10 @@ const Index = () => {
                   className="h-24 sm:h-32 brutal-border bg-info hover:bg-accent text-info-foreground hover:text-accent-foreground brutal-shadow-lg brutal-hover brutal-active p-4 sm:p-6 flex flex-col items-start justify-center relative"
                 >
                   {!isFeatureAllowed('perdiem') && (
-                    <Lock className="w-4 h-4 absolute top-2 right-2 opacity-60" />
+                    <div className="absolute top-2 right-2 flex items-center gap-1">
+                      <span className="brutal-mono text-xs font-bold px-1.5 py-0.5 rounded" style={{ background: '#f0a500', color: '#1a1a2e', fontSize: '10px', lineHeight: 1 }}>PRO</span>
+                      <Lock className="w-3 h-3 opacity-60" />
+                    </div>
                   )}
                   <Calendar className="w-6 h-6 sm:w-10 sm:h-10 mb-2 sm:mb-3" />
                   <div className="text-left">
@@ -610,7 +643,10 @@ const Index = () => {
                   className="h-24 sm:h-32 brutal-border bg-info hover:bg-accent text-info-foreground hover:text-accent-foreground brutal-shadow-lg brutal-hover brutal-active p-4 sm:p-6 flex flex-col items-start justify-center relative"
                 >
                   {!isFeatureAllowed('ifta') && (
-                    <Lock className="w-4 h-4 absolute top-2 right-2 opacity-60" />
+                    <div className="absolute top-2 right-2 flex items-center gap-1">
+                      <span className="brutal-mono text-xs font-bold px-1.5 py-0.5 rounded" style={{ background: '#f0a500', color: '#1a1a2e', fontSize: '10px', lineHeight: 1 }}>PRO</span>
+                      <Lock className="w-3 h-3 opacity-60" />
+                    </div>
                   )}
                   <Map className="w-6 h-6 sm:w-10 sm:h-10 mb-2 sm:mb-3" />
                   <div className="text-left">
@@ -623,7 +659,7 @@ const Index = () => {
               {/* Footer */}
               <div className="brutal-border bg-muted p-3 sm:p-6 brutal-shadow text-center">
                 <p className="brutal-mono text-xs sm:text-sm text-muted-foreground mobile-text-wrap">
-                  TRUCKPAY V2.2
+                  TRUCKPAY V2.3
                 </p>
               </div>
             </div>

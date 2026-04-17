@@ -165,8 +165,8 @@ const UpgradeModal = ({ featureName, requiredTier, onClose, onSuccess }: Upgrade
           {!subscription.trialUsed && (
             <div className="text-center">
               <Button
-                variant="outline"
-                className="brutal-border brutal-hover brutal-text text-sm"
+                className="brutal-border font-extrabold uppercase tracking-wide text-sm w-full"
+                style={{ background: '#f0a500', color: '#1a1a2e', border: '2px solid #1a1a2e' }}
                 disabled={loadingTier !== null}
                 onClick={() => { startTrial(); onClose(); onSuccess?.('pro', true); }}
               >
