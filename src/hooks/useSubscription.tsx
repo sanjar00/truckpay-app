@@ -99,9 +99,18 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
 
         setSubscription(sub);
       } else {
-        // First login — create a default subscription row
-        await persistToSupabase(userId, DEFAULT_SUB);
-        setSubscription(DEFAULT_SUB);
+        // First login — grant 90-day Pro early adopter access to all new users
+        const end = new Date();
+        end.setDate(end.getDate() + 90);
+        const newUserSub: Subscription = {
+          ...DEFAULT_SUB,
+          tier: 'pro',
+          earlyAdopter: true,
+          startDate: new Date().toISOString(),
+          endDate: end.toISOString(),
+        };
+        await persistToSupabase(userId, newUserSub);
+        setSubscription(newUserSub);
       }
     } catch (err) {
       console.error('Subscription load error:', err);
