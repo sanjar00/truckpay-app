@@ -19,6 +19,7 @@ export type Database = {
           full_name: string
           id: string
           lease_rate_per_mile: number | null
+          onboarded: boolean
           phone: string | null
           updated_at: string
           weekly_period: string | null
@@ -33,6 +34,7 @@ export type Database = {
           full_name: string
           id: string
           lease_rate_per_mile?: number | null
+          onboarded?: boolean
           phone?: string | null
           updated_at?: string
           weekly_period?: string | null
@@ -47,6 +49,7 @@ export type Database = {
           full_name?: string
           id?: string
           lease_rate_per_mile?: number | null
+          onboarded?: boolean
           phone?: string | null
           updated_at?: string
           weekly_period?: string | null

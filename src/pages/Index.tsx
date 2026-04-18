@@ -23,6 +23,7 @@ import IFTAReport from '@/components/IFTAReport';
 import UpgradeModal from '@/components/UpgradeModal';
 import SubscriptionSuccessModal from '@/components/SubscriptionSuccessModal';
 import ReceiptScanner from '@/components/ReceiptScanner';
+import OnboardingCarousel from '@/components/OnboardingCarousel';
 import { SubscriptionTier } from '@/hooks/useSubscription';
 
 const SnapshotTooltip = ({ text }: { text: string }) => {
@@ -80,6 +81,7 @@ const Index = () => {
   const [showScanDestPicker, setShowScanDestPicker] = useState(false);
   const [showHomeReceiptScanner, setShowHomeReceiptScanner] = useState(false);
   const [scanDestination, setScanDestination] = useState<'personal' | 'work' | null>(null);
+  const [onboardingDismissed, setOnboardingDismissed] = useState(false);
 
   // Remove any stale/sensitive truckpay_* keys that should not be in localStorage
   useEffect(() => {
@@ -234,6 +236,7 @@ const Index = () => {
         leaseRatePerMile: data.lease_rate_per_mile ?? null,
         companyPayType: data.company_pay_type ?? null,
         companyPayRate: data.company_pay_rate ?? null,
+        onboarded: data.onboarded ?? true,
       });
     }
 
@@ -915,6 +918,22 @@ const Index = () => {
         <ReceiptScanner
           onClose={() => { setShowHomeReceiptScanner(false); setScanDestination(null); }}
           onConfirm={handleHomeReceiptConfirm}
+        />
+      )}
+
+      {/* First-run onboarding carousel */}
+      {user && userProfile && userProfile.onboarded === false && !onboardingDismissed && (
+        <OnboardingCarousel
+          userId={user.id}
+          userName={userProfile.name}
+          driverType={userProfile.driverType}
+          onComplete={() => {
+            setOnboardingDismissed(true);
+            setUserProfile((prev: any) => (prev ? { ...prev, onboarded: true } : prev));
+            if (weekSnapshot && weekSnapshot.loadCount === 0) {
+              setShowAddLoadModal(true);
+            }
+          }}
         />
       )}
 

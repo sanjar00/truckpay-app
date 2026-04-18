@@ -17,14 +17,14 @@ Current live version: **V2.3**
 
 ## Tech Stack
 
-- **Frontend:** React 18, TypeScript, Vite
-- **UI Components:** shadcn/ui (Button, Input, Card, Popover, Calendar, Select, etc.)
-- **Styling:** Tailwind CSS + custom brutal design system classes
+- **Frontend:** React 18, TypeScript, Vite 5
+- **UI Components:** shadcn/ui (Button, Input, Card, Popover, Calendar, Select, Dialog, etc.)
+- **Styling:** Tailwind CSS 3 + custom brutal design system classes
 - **Database:** Supabase (PostgreSQL)
-- **Authentication:** Supabase Auth
-- **AI integration:** OpenAI ChatGPT API (gpt-4-vision) for
-  receipt scanning via vision — called via Supabase Edge Function
-- **Utilities:** date-fns for date manipulation, lucide-react for icons
+- **Authentication:** Supabase Auth (email/password + Google + LinkedIn social auth)
+- **AI integration:** OpenAI gpt-4o for receipt scanning via vision — called via Supabase Edge Function
+- **Charts:** Recharts 2
+- **Utilities:** date-fns 3 for date manipulation, lucide-react for icons
 - **PWA:** Service worker and manifest.json for installability
 - **Hosting:** Netlify — live at **truckpay.app**
 
@@ -32,14 +32,63 @@ Current live version: **V2.3**
 
 ## File Structure
 
-Standard React + Vite project structure:
-- `src/pages/` — page components (Index.tsx = Home, LoadReports.tsx, etc.)
-- `src/components/` — reusable components (LoadCard, AddLoadForm, ReceiptScanner, etc.)
-- `src/lib/` — utility functions (Supabase client, date helpers, etc.)
-- `src/styles/` — global CSS
-- `public/` — static assets, manifest.json, service worker
-- `vite.config.ts` — Vite configuration
-- `tailwind.config.js` — Tailwind CSS configuration
+```
+src/
+  pages/
+    Index.tsx          — Main app shell (all views, routing, modals, tab bar)
+    NotFound.tsx       — 404 page
+  components/
+    AddLoadForm.tsx         — Add/edit load form (ZIP lookup, dates, rate, detention)
+    LoadReports.tsx         — Load management page (weekly loads, summary, mileage)
+    LoadReportsHeader.tsx   — Week navigation header with period display
+    LoadCard.tsx            — Individual load card (edit/delete inline)
+    LoadSummaryCards.tsx    — Gross/net/expenses cards for the week
+    WeeklySummary.tsx       — Weekly breakdown of loads and deductions
+    WeeklyForecastCard.tsx  — Projected gross/net with confidence level and goal bar
+    MileageTracking.tsx     — Odometer start/end entry, deadhead miles display
+    Deductions.tsx          — Fixed deductions management
+    DeductionsSummary.tsx   — Summary view of deductions
+    ForecastSummary.tsx     — Multi-period earnings analysis, charts, lane performance
+    PersonalExpenses.tsx    — Personal (non-truck) expenses by category
+    ReceiptScanner.tsx      — AI receipt photo capture and review modal
+    PerDiemCalculator.tsx   — IRS meal deduction calculator
+    IFTAReport.tsx          — IFTA quarterly fuel tax report
+    SettingsPanel.tsx       — Profile, goals, subscription, password, account deletion
+    LoginPage.tsx           — Email/password + Google + LinkedIn login
+    Registration.tsx        — New user onboarding (profile + driver type setup)
+    ResetPasswordPage.tsx   — Password recovery flow (intercepts magic link)
+    UpgradeModal.tsx        — Tier comparison and upgrade/trial modal
+    SubscriptionSuccessModal.tsx — Post-upgrade success confirmation
+    ConfirmationDialog.tsx  — Generic confirm/cancel dialog
+    LocationCombobox.tsx    — Location autocomplete
+    SummaryCards.tsx        — Generic summary card component
+    WeekNavigation.tsx      — Standalone week nav (used in some contexts)
+  hooks/
+    useAuth.tsx             — Auth context (user, signOut, isPasswordRecovery, isSocialAuth)
+    useSubscription.tsx     — Subscription tier, feature gating, trial/upgrade logic
+    useLoadReports.ts       — Load CRUD, week navigation, newLoad state
+    useDeductionsManager.ts — Weekly deductions and extra deductions CRUD
+    useMileageManager.ts    — Odometer entry, auto-fill from adjacent weeks
+    useZipLookup.ts         — Google Maps ZIP → city/state + distance lookup
+    use-mobile.tsx          — Mobile viewport detection
+  lib/
+    loadReportsUtils.ts     — calculateDriverPay(), getWeeklyPeriodDisplay(), calculateFixedDeductionsForWeek()
+    weeklyPeriodUtils.ts    — getUserWeekStart(), getUserWeekEnd(), getWeekStartsOn()
+    utils.ts                — cn() tailwind class merge helper
+  types/
+    LoadReports.ts          — Load, NewLoad, WeeklyMileage, ExtraDeduction, DeleteConfirmation interfaces
+  integrations/
+    supabase/client.ts      — Supabase client singleton
+  styles/                   — Global CSS
+public/                     — manifest.json, service worker, icons
+supabase/functions/
+  scan-receipt/             — OpenAI gpt-4o receipt parser
+  driving-distance/         — Google Maps distance between two ZIPs
+  create-checkout-session/  — Stripe Checkout session creator
+  create-portal-session/    — Stripe Customer Portal session creator
+  stripe-webhook/           — Stripe event handler (subscription lifecycle)
+  calculate-ifta-miles/     — IFTA state mileage calculator
+```
 
 When modifying components, maintain existing patterns for imports, styling, and state management.
 Do not break the Supabase query patterns or date/locale formatting conventions.
@@ -102,15 +151,26 @@ Always display as `$X,XXX.XX` — use `.toLocaleString('en-US', {style:'currency
 Always use a comma as the thousands separator — never a space (e.g. `5,059` not `5 059`).
 
 ### Dates
-Display format: `Mon DD, YYYY` (e.g. `Apr 06, 2026`)
-Storage format: `YYYY-MM-DD` (ISO)
+Display format: `MMM D, YYYY` (e.g. `Apr 6, 2026`) — use `format(date, 'MMM d, yyyy')` from date-fns.
+Storage format: `YYYY-MM-DD` (ISO).
+All date picker buttons use calendar Popover pattern — never a plain `<input type="date">`.
+
+### PRO Lock Badge (locked nav tiles)
+```tsx
+<div className="absolute top-2 right-2 flex items-center gap-1">
+  <span className="brutal-mono text-xs font-bold px-1.5 py-0.5 rounded"
+    style={{ background: '#f0a500', color: '#1a1a2e', fontSize: '10px', lineHeight: 1 }}>PRO</span>
+  <Lock className="w-3 h-3 opacity-60" />
+</div>
+```
+Applied to: SUMMARY, PER DIEM, IFTA tiles on the home dashboard.
 
 ---
 
 ## Data Architecture
 
-All data is stored in Supabase PostgreSQL database. User authentication via Supabase Auth.
-Components fetch data via Supabase client with proper error handling and real-time subscriptions where needed.
+All data is stored in Supabase PostgreSQL. User authentication via Supabase Auth.
+Components fetch data via Supabase client with error handling and null checks.
 
 ### Key Tables
 
@@ -121,59 +181,65 @@ Components fetch data via Supabase client with proper error handling and real-ti
 - companyPayType: `'per_mile'` | `'percentage'` (company-driver only)
 - companyPayRate: $/mile or % value depending on companyPayType
 - leaseRatePerMile: cost per mile for lease-operator (deducted from net weekly)
-- earlyAdopterBannerDismissed: boolean — persist banner dismissal so it doesn't reappear
+- earlyAdopterBannerDismissed: boolean — persisted so banner never reappears after dismissal
 
 **load_reports** — Truck loads with earnings data
-- id, user_id, origin, destination, pickupDate, deliveryDate, loadRate, deductionRate, weekId
-- deadheadMiles, loadMiles, estimatedMiles, driverPay
-- pickupZip, deliveryZip, pickupCityState, deliveryCityState (auto-populated via Google Maps lookup)
-- detentionAmount (added when driver waits >2 hours at pickup/dropoff — adds to gross before deductions)
+- id, user_id, location_from, location_to, pickup_date, delivery_date, rate, company_deduction, driver_pay, week_period, date_added
+- deadhead_miles, estimated_miles
+- pickup_zip, delivery_zip, pickup_city_state, delivery_city_state (auto-populated via Google Maps)
+- detention_amount (added when driver waits >2 hours — adds to gross before deductions)
 - notes
-- created_at, updated_at
 
-**weekly_deductions** — Fixed weekly expense categories (FUEL, TOLL, MAINTENANCE, etc.)
-- id, user_id, type, amount, week_start, category, notes
+**weekly_deductions** — Per-week typed deductions (FUEL, TOLL, MAINTENANCE, etc.)
+- id, user_id, week_start, deduction_type, amount, updated_at
 
-**weekly_extra_deductions** — One-off weekly expenses
-- id, user_id, description, amount, week_start, category
+**weekly_extra_deductions** — One-off weekly expenses (free-text name)
+- id, user_id, week_start, name, amount, date_added
 
-**deductions** — Legacy deductions table (use weekly_deductions/weekly_extra_deductions for new data)
-
-**fixed_deductions** — Recurring weekly costs
+**fixed_deductions** — Recurring weekly costs effective from a date
 - id, user_id, name, amount, effectiveFrom
 
 **weekly_mileage** — Odometer readings per week
-- id, user_id, weekId, startMileage, endMileage, leaseMilesCost (only populated for lease-operator drivers)
+- id, user_id, week_start (ISO date string), startMileage, endMileage
+- leaseMilesCost (only populated for lease-operator drivers)
 
 **subscriptions** — User subscription tier and status
-- id, user_id, tier, startDate, endDate, trialUsed, earlyAdopter
+- id, user_id, tier, startDate, endDate, trialUsed, earlyAdopter, earlyAdopterBannerDismissed
+- stripeCustomerId, stripeSubscriptionId (set by webhook)
+
+**personal_expense_types** — User-defined personal expense categories
+- id, user_id, name
+
+**personal_expenses** — Individual personal expense entries
+- id, user_id, expense_type_id, amount, note, date
 
 ---
 
-## Week ID Calculation
+## Week ID / Week Start Calculation
 
-Week IDs are in format `YYYY-WXX`. This is critical — inconsistency here
-causes the mileage calculation bug. Always use this exact function:
+Week starts are ISO date strings (`YYYY-MM-DD`) based on the user's `weeklyPeriod` setting.
+Always use these helpers from `src/lib/weeklyPeriodUtils.ts`:
 
-```javascript
-function getWeekId(date, weekStart = 'monday') {
-  const d = new Date(date);
-  const dayOfWeek = d.getDay(); // 0=Sun, 1=Mon...
-  const offset = weekStart === 'monday'
-    ? (dayOfWeek === 0 ? -6 : 1 - dayOfWeek)
-    : -dayOfWeek;
-  const monday = new Date(d);
-  monday.setDate(d.getDate() + offset);
-  const year = monday.getFullYear();
-  const startOfYear = new Date(year, 0, 1);
-  const weekNum = Math.ceil(
-    ((monday - startOfYear) / 86400000 + startOfYear.getDay() + 1) / 7
-  );
-  return `${year}-W${String(weekNum).padStart(2, '0')}`;
-}
+```typescript
+getUserWeekStart(date, userProfile)  // → Date of week start for given date
+getUserWeekEnd(date, userProfile)    // → Date of week end for given date
 ```
 
-Use `profile.weeklyPeriod` ('monday' or 'sunday') as the weekStart parameter.
+The `weeklyPeriod` field maps to a day-of-week offset:
+- `'sunday'` → week starts Sunday (default)
+- `'monday'` → week starts Monday
+- (tuesday through saturday also supported)
+
+Week period display strings (from `getWeeklyPeriodDisplay()` in `loadReportsUtils.ts`):
+```
+'sunday'    → 'Sun – Sat'
+'monday'    → 'Mon – Sun'
+'tuesday'   → 'Tue – Mon'
+'wednesday' → 'Wed – Tue'
+'thursday'  → 'Thu – Wed'
+'friday'    → 'Fri – Thu'
+'saturday'  → 'Sat – Fri'
+```
 
 ---
 
@@ -182,19 +248,31 @@ Use `profile.weeklyPeriod` ('monday' or 'sunday') as the weekStart parameter.
 | Tier | Price | Gated Features |
 |------|-------|----------------|
 | Free | $0 | Current week only, max 5 loads/week |
-| Pro | $14.99/mo or $119.88/yr | Full history, IFTA, Per Diem, CSV export, YTD, AI Receipt Scanner |
-| Owner-Op | $29.99/mo or $239.88/yr | Everything in Pro + Dispatcher Book, Lane RPM Analytics, Annual Goal |
+| Pro | $14.99/mo or $9.99/mo (annual, $119.88/yr) | Full history, IFTA, Per Diem, CSV export, YTD, AI Receipt Scanner, Weekly Forecast |
+| Owner-Op | $29.99/mo or $19.99/mo (annual, $239.88/yr) | Everything in Pro + Dispatcher Book, Lane Analytics, Annual Goal |
 
-**Early Adopter rule:** Any user with existing data (loads/deductions before
-today) automatically gets `earlyAdopter: true` and 90 days of Pro free.
-Akrom Aripov is an early adopter — do not lock him out.
+**PRO features** (from `useSubscription.tsx`):
+`ifta`, `perdiem`, `ytd`, `fullHistory`, `export`, `receipts`, `forecast`
+
+**OWNER features** (in addition to Pro):
+`dispatcher`, `laneAnalytics`, `annualGoal`, `multiTruck`
+
+**Early Adopter rule:** Users with pre-existing loads/deductions get `earlyAdopter: true` and 90 days of Pro free. The auto-detection code is currently disabled (TODO in useSubscription.tsx line ~210) — early adopter status is set manually.
+
+**Trial:** 7-day free Pro trial, no payment required. One-time per account (`trialUsed` flag).
 
 **Paywall triggers:**
-- Navigating to IFTA or Per Diem (Free tier)
-- Clicking Export CSV (Free tier)
+- Navigating to SUMMARY, IFTA, or PER DIEM (Free tier)
 - Clicking "Scan Receipt with AI" (Free tier)
 - Navigating to any week older than current (Free tier)
 - Adding 6th load in a week (Free tier)
+
+**UpgradeModal defaults:**
+- Billing toggle defaults to `'annual'` (Annual shown first, saves ~33%)
+- Cards always render side-by-side (2-column grid, no mobile stack)
+- Pro features listed: Full load history, IFTA reports, Per Diem tracker, AI receipt scanner
+- Owner-Op features listed: Everything in Pro, Dispatcher book, Lane analytics, Annual goal tracking
+- Trial button at bottom (amber primary style) — shown only if `!subscription.trialUsed`
 
 ---
 
@@ -202,14 +280,7 @@ Akrom Aripov is an early adopter — do not lock him out.
 
 **Account:** `acct_1TLaKsDDJ9hkmBpw` (live mode)
 
-### Products
-
-| Product | Stripe ID |
-|---------|-----------|
-| TruckPay Pro | `prod_UKFDC6PGYVFyy4` |
-| TruckPay Owner-Op | `prod_UKFDp0tlwSiXqk` |
-
-### Prices
+### Products & Prices
 
 | Plan | Billing | Price ID | Amount | Payment Link |
 |------|---------|----------|--------|--------------|
@@ -218,66 +289,237 @@ Akrom Aripov is an early adopter — do not lock him out.
 | Owner-Op | Monthly | `price_1TLaitDDJ9hkmBpwG40JiG5d` | $29.99/mo | https://buy.stripe.com/eVq00j6uDcMA1tzfSug7e02 |
 | Owner-Op | Annual | `price_1TLaiwDDJ9hkmBpwZ1jI886S` | $239.88/yr | https://buy.stripe.com/14AaEX7yH3c03BH0XAg7e03 |
 
-### Integration Architecture
+### Edge Functions (all deployed)
 
-The Stripe integration uses **Supabase Edge Functions** — no Stripe SDK on the frontend.
-
-**Edge Functions needed (backlog):**
-
-1. `create-checkout-session` — Creates a Stripe Checkout session
+1. **`create-checkout-session`** — Creates Stripe Checkout session
    - Receives: `{ priceId, userId }`
-   - Creates/retrieves Stripe customer linked to `user_id`
-   - Returns: `{ url }` — redirect user to this Stripe-hosted checkout page
-   - On success, Stripe redirects to `https://truckpay.app/?session_id={CHECKOUT_SESSION_ID}`
+   - Returns: `{ url }` — redirect to Stripe-hosted checkout
+   - On success, Stripe redirects to `https://truckpay.app/?checkout=success`
 
-2. `stripe-webhook` — Handles Stripe lifecycle events
+2. **`stripe-webhook`** — Handles Stripe lifecycle events (deployed with `--no-verify-jwt`)
    - Always verify `stripe-signature` header using `STRIPE_WEBHOOK_SECRET`
-   - Handle events:
-     - `checkout.session.completed` → upsert `subscriptions` row (tier, startDate, endDate)
-     - `customer.subscription.updated` → update tier/status
-     - `customer.subscription.deleted` → downgrade to Free
-   - Maps `price_id` to tier:
+   - Events: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`
+   - Price-to-tier map:
      ```javascript
      const PRICE_TO_TIER = {
-       'price_1TLainDDJ9hkmBpwH8pF7LXu': 'pro',       // Pro monthly
-       'price_1TLaiqDDJ9hkmBpw2EEWTeIv': 'pro',       // Pro annual
-       'price_1TLaitDDJ9hkmBpwG40JiG5d': 'owner-op',  // Owner-Op monthly
-       'price_1TLaiwDDJ9hkmBpwZ1jI886S': 'owner-op',  // Owner-Op annual
+       'price_1TLainDDJ9hkmBpwH8pF7LXu': 'pro',
+       'price_1TLaiqDDJ9hkmBpw2EEWTeIv': 'pro',
+       'price_1TLaitDDJ9hkmBpwG40JiG5d': 'owner-op',
+       'price_1TLaiwDDJ9hkmBpwZ1jI886S': 'owner-op',
      };
      ```
 
-3. `customer-portal` — Creates a Stripe billing portal session
-   - Lets users manage/cancel their own subscription
-   - Returns: `{ url }` — redirect user to Stripe portal
+3. **`create-portal-session`** — Creates Stripe Customer Portal session for self-serve management
 
 **Supabase secrets required:**
 ```bash
 supabase secrets set STRIPE_SECRET_KEY sk_live_...
 supabase secrets set STRIPE_WEBHOOK_SECRET whsec_...
+supabase secrets set OPENAI_API_KEY sk-proj-...
 ```
-
-**Frontend flow:**
-- On paywall trigger → call `create-checkout-session` with the appropriate `priceId`
-- Redirect to Stripe Checkout URL
-- On return → re-fetch subscription from `subscriptions` table
-- Subscription status drives all paywall checks (no localStorage simulation)
 
 ---
 
-## Pages / Sections
+## Pages / Views
 
-The app uses hash-based routing. All sections on one page, shown/hidden by JS.
+The app uses `currentView` state in `Index.tsx` — no URL routing. All views rendered in place.
 
-| Hash | Name | Purpose |
-|------|------|---------|
-| `#home` | Home | Dashboard, weekly snapshot, navigation |
-| `#loads` | Load Reports | Week navigation, mileage, loads list, forecast |
-| `#deductions` | Deductions | Fixed deductions, weekly fuel/toll/custom entry |
-| `#summary` | Earnings Summary | Multi-period income analysis, charts, lane performance |
-| `#expenses` | Personal Expenses | Personal (non-truck) expense categories |
-| `#perdiem` | Per Diem | IRS daily meal deduction calculator |
-| `#ifta` | IFTA Report | Quarterly fuel tax report |
-| `#settings` | Settings | Profile, deduction types, data management |
+| View key | Name | Notes |
+|----------|------|-------|
+| `dashboard` | Home | Weekly snapshot, nav tiles, scan receipt, early adopter banner |
+| `loads` | Load Reports | Week navigation, mileage, loads list, forecast card |
+| `deductions` | Deductions | Fixed + weekly deductions |
+| `forecast` | Earnings Summary | Multi-period analysis, charts, lane performance (PRO) |
+| `expenses` | Personal Expenses | Personal expense categories (YTD default) |
+| `perdiem` | Per Diem | IRS meal deduction calculator (PRO) |
+| `ifta` | IFTA Report | Quarterly fuel tax report (PRO) |
+| `settings` | Settings | Profile, goals, subscription, password, account deletion |
+
+### Home Dashboard Layout (dashboard view)
+
+1. Header: Logo + "TRUCKPAY / DRIVE SMART. EARN MORE." + Settings gear button
+2. Weekly Snapshot card — Loads, Earned (gross), Expenses, Take-Home (net)
+   - Shows weekly goal progress bar if `truckpay_weekly_goal` set in localStorage
+   - Shows "Set a weekly goal →" link to Settings if not set
+3. "Add your first load to get started" callout (amber button) — shown only when `weekSnapshot.loadCount === 0`
+4. "SCAN RECEIPT WITH AI" button — shown only when `isFeatureAllowed('receipts')` is true
+5. Early Adopter banner — shown when `earlyAdopter && !earlyAdopterBannerDismissed && endDate`
+6. 6 nav tiles in 2-column grid (order matters):
+   1. LOAD REPORTS — "Manage Loads"
+   2. DEDUCTIONS — "Truck Expenses"
+   3. PERSONAL EXPENSES — "Track Expenses"
+   4. SUMMARY — "Earnings Breakdown" **[PRO badge if locked]**
+   5. PER DIEM — "IRS Meal Deduction" **[PRO badge if locked]**
+   6. IFTA REPORT — "Fuel Tax Filing" **[PRO badge if locked]**
+7. Footer: `TRUCKPAY V2.3`
+
+### Bottom Tab Bar (mobile only, `md:hidden`)
+
+5 tabs: Loads | Expenses | **+ Add Load (center)** | Summary | More
+
+"More" sheet contains: Personal Expenses, Per Diem, IFTA Report, Settings, Logout.
+
+---
+
+## LocalStorage
+
+Only two keys are intentionally stored:
+- `truckpay_weekly_goal` — user's weekly take-home goal (number string)
+- `truckpay_annual_goal` — user's annual income goal (number string)
+
+All other `truckpay_*` keys are stripped on app init (stale data guard) and all keys are cleared on logout/account deletion. **Never store subscription tier, early adopter status, or session data in localStorage** — those live only in the Supabase `subscriptions` table.
+
+```typescript
+const ALLOWED_LOCAL_KEYS = new Set(['truckpay_weekly_goal', 'truckpay_annual_goal']);
+```
+
+---
+
+## Add Load Form
+
+**Required fields:** Pickup ZIP, Delivery ZIP, Load Rate
+
+**Auto-populated:** Pickup/Delivery city+state (via ZIP lookup), Estimated Miles (Google Maps distance)
+
+**Always preselected:** Pickup Date and Delivery Date both default to `new Date()` (today) — they are actual `Date` objects in state, not strings. The calendar shows today highlighted on open.
+
+**Optional fields** (behind "More Details" toggle):
+- Company Deduction % (hidden for company-driver type)
+- Detention Pay ($)
+- Notes
+
+**Chevron behavior:** `ChevronRight` when collapsed → `ChevronDown` when expanded.
+
+**Submit button:** Amber (#f0a500), navy text (#1a1a2e), disabled until both ZIPs resolve successfully.
+
+**Validation:** Rate > 0, both ZIPs exactly 5 digits, both ZIPs must successfully resolve before submit is enabled.
+
+---
+
+## AI Receipt Scanner
+
+**Entry points:**
+1. **Personal Expenses page** — "SCAN RECEIPT WITH AI" button
+2. **Home dashboard** — "SCAN RECEIPT WITH AI" button (PRO users only) → destination picker first
+
+**Destination picker (home only):** User chooses between:
+- **Personal Expense** → saves to `personal_expenses` table (creates `personal_expense_types` row if needed)
+- **Truck / Work Expense** → saves to `weekly_extra_deductions` keyed to the week matching the receipt's date (uses `getUserWeekStart(receiptDate, userProfile)`)
+
+**Flow:**
+1. Take photo (mobile) or upload files (desktop)
+2. Images compressed: max 1024px, JPEG 0.80 quality
+3. Call `supabase/functions/scan-receipt/` with base64 image
+4. Receive: `{ merchant, category, amount, date, notes }`
+5. Review/edit in modal (merchant, category select, amount, date picker)
+6. Confirm → auto-create category if needed → save expense
+
+**Supported categories:** FUEL, TOLL, MAINTENANCE, PARTS, FOOD, LODGING, OTHER
+
+---
+
+## ZIP-to-ZIP Mileage Tracking
+
+1. User enters pickup ZIP → `useZipLookup` calls `driving-distance` edge function → resolves city/state
+2. User enters delivery ZIP → same lookup
+3. Both resolved → distance calculated via Google Maps Distance Matrix → shown as Estimated Miles (editable)
+
+**Key files:**
+- `src/hooks/useZipLookup.ts` — state and edge function calls
+- `supabase/functions/driving-distance/index.ts` — Google Maps API
+- Timeout: 10-second AbortController per call
+
+---
+
+## Driver Types & Pay Calculations
+
+Pay logic lives in `src/lib/loadReportsUtils.ts → calculateDriverPay()`.
+
+| Driver Type | Pay Formula | Notes |
+|-------------|-------------|-------|
+| `owner-operator` | `(rate + detention) × (1 - companyDeduction%)` | Company takes % of gross |
+| `lease-operator` | Same as owner-operator, PLUS `leaseMilesCost` deducted from weekly net | Lease cost = totalOdometerMiles × leaseRatePerMile |
+| `company-driver` (per_mile) | `estimatedMiles × companyPayRate` | Detention does NOT affect pay |
+| `company-driver` (percentage) | `(rate + detention) × companyPayRate%` | Percentage of gross including detention |
+
+**Detention Pay:** Added to gross BEFORE applying deduction % for owner-op, lease-op, and company-driver (percentage). Stored as `detention_amount` per load. Shown on load cards as `+ $X detention`.
+
+**Lease Miles Cost:** Only for lease-operator. Weekly: `totalOdometerMiles × leaseRatePerMile`. Stored in `weekly_mileage.leaseMilesCost`. Deducted at the weekly level, not per-load.
+
+---
+
+## Load Profitability Score
+
+```javascript
+function getLoadGrade(driverPay, miles) {
+  const rpm = driverPay / (miles || 500); // 500mi fallback
+  if (rpm >= 2.50) return { grade: 'A', label: 'EXCELLENT', color: '#2d6a2d' };
+  if (rpm >= 2.00) return { grade: 'B', label: 'GOOD',      color: '#4a90d9' };
+  if (rpm >= 1.50) return { grade: 'C', label: 'AVERAGE',   color: '#f0a500' };
+  return              { grade: 'D', label: 'POOR',      color: '#c0392b' };
+}
+```
+
+Shown as badge (48×48px max) on top-right of each load card with RPM: `$2.14/mi`.
+
+---
+
+## Per Diem Rates (IRS 2025)
+
+```javascript
+const PER_DIEM_FULL_DAY    = 80.00;  // Full day away from home
+const PER_DIEM_PARTIAL_DAY = 59.50;  // First and last day (75%)
+```
+
+Pickup day = partial. Delivery day = partial. All days between = full.
+Dates deduplicated across loads (driver may have multiple loads on same day).
+
+---
+
+## IFTA Tax Rates (2025 — Static Lookup)
+
+```javascript
+const IFTA_DIESEL_RATES = {
+  AL:0.290, AZ:0.270, AR:0.285, CA:0.610, CO:0.205, CT:0.440,
+  DE:0.220, FL:0.363, GA:0.326, ID:0.320, IL:0.467, IN:0.550,
+  IA:0.325, KS:0.260, KY:0.268, LA:0.200, ME:0.312, MD:0.427,
+  MA:0.240, MI:0.272, MN:0.285, MS:0.180, MO:0.170, MT:0.278,
+  NE:0.348, NV:0.270, NH:0.222, NJ:0.489, NM:0.210, NY:0.176,
+  NC:0.385, ND:0.230, OH:0.470, OK:0.190, OR:0.380, PA:0.741,
+  RI:0.370, SC:0.260, SD:0.280, TN:0.274, TX:0.200, UT:0.319,
+  VT:0.308, VA:0.262, WA:0.494, WV:0.357, WI:0.309, WY:0.240
+};
+// Update this table each quarter — IFTA rates change.
+```
+
+---
+
+## Authentication
+
+**Login:** Email/password, Google OAuth, LinkedIn OAuth
+**Social auth:** Users who sign in via Google/LinkedIn are redirected to Registration to complete their profile (driver type, company deduction, etc.) if `userProfile.driverType` is missing.
+
+**Forgot Password:**
+- "Forgot password?" link on login page
+- Calls `supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + '/' })`
+- User clicks magic link → app intercepts `PASSWORD_RECOVERY` auth event → shows `ResetPasswordPage`
+- Never hardcode domain in `redirectTo` — always use `window.location.origin`
+
+**Change Password (Settings):** Dedicated section with New Password + Confirm, validates match and min 6 chars.
+
+**Supabase dashboard requirements:**
+- Site URL: `https://truckpay.app`
+- Redirect URLs allowlist: `https://truckpay.app/**`
+
+---
+
+## Period Filters
+
+**ForecastSummary (Earnings Summary page):**
+Default: `'ytd'` (Year-to-Date). Options: Last 2 weeks, Last 3 weeks, Last 4 weeks, YTD, Custom range.
+
+**PersonalExpenses page:**
+Default: `'ytd'` (Year-to-Date, Jan 1 → today). Options: Year to Date, Last 2 weeks, Last 3 weeks, Last 4 weeks, Custom range.
 
 ---
 
@@ -285,26 +527,25 @@ The app uses hash-based routing. All sections on one page, shown/hidden by JS.
 
 The app must never show developer-style variable names or code strings to the user.
 All text must be plain English that a non-technical truck driver understands.
-Enforce this on every new feature — no exceptions.
 
 | ❌ Never use | ✅ Use instead |
 |-------------|---------------|
-| `WEEK_MANAGEMENT_SYSTEM` | Remove — don't show at all |
-| `EXPENSE_MANAGEMENT_SYSTEM` | Remove — don't show at all |
+| `WEEK_MANAGEMENT_SYSTEM` | Remove entirely |
+| `EXPENSE_MANAGEMENT_SYSTEM` | Remove entirely |
 | `DEDUCTION_TYPES` | `Deduction Types` |
 | `SET_RECURRING_WEEKLY_AMOUNTS` | `Set recurring weekly amounts` |
 | `CURRENT_FIXED_DEDUCTIONS` | `Current Fixed Deductions` |
 | `ADD_NEW_DEDUCTION_TYPE` | `Add New Deduction Type` |
-| `ENTER_NAME` | `Enter name` (or use a descriptive placeholder) |
+| `ENTER_NAME` | `Enter name` |
 | `ADD_TYPE` | `+ Add Type` |
 | `WEEKLY_AMOUNT_($)` | `Weekly Amount ($)` |
 | `FIXED_AT_$X.XX/WEEK` | `Fixed at $X.XX/week` |
 | `EFFECTIVE_FROM_MMM_D,_YYYY` | `Effective from MMM D, YYYY` |
-| `ADMIN_FEE` (as a label) | `Admin Fee` |
+| `ADMIN_FEE` (as label) | `Admin Fee` |
 | `WEEKLY__INSURANCE` (double underscore) | `Weekly Insurance` |
 | `PREV_WEEK` / `NEXT_WEEK` | `← Last Week` / `Next Week →` |
-| `CURRENT_WEEK` | Remove — the date range below already says it |
-| `MONDAY_TO_SUNDAY` | `Mon – Sun` or remove |
+| `CURRENT_WEEK` | Remove — date range says it already |
+| `MONDAY_TO_SUNDAY` | `Mon – Sun` |
 | `Apr_06 - Apr_12,_2026` (underscores) | `Apr 06 – Apr 12, 2026` |
 | `TOTAL_LOADS` | `Loads This Week` |
 | `GROSS_PAY` | `Total Earned` |
@@ -334,378 +575,30 @@ Enforce this on every new feature — no exceptions.
 - **No horizontal scrolling** ever
 - **Tap targets:** Minimum 44x44px for all buttons and interactive elements
 - **No hover-only interactions** — all actions must work on touch
-- **Bottom tab bar** — implemented: 5 tabs (Loads | Expenses | + Add Load | Summary | More). Hidden on desktop (md:hidden). "More" opens a sheet with Personal Expenses, Per Diem, IFTA, Settings, Logout.
-- **Forms:** Pre-fill today's date on all date fields — driver changes only if needed
-- **Load Rate field:** Show `$0.00` placeholder — never pre-fill a fake amount
-- **Empty states:** Every list must have a helpful empty state message, not just blank space
-
----
-
-## UI/UX Improvement Backlog
-> Sourced from a full audit of the live app (April 2026). Implement these as
-> part of V2.3 and beyond. Do not deviate from the design system when fixing these.
-
-### 🔴 P0 — Critical (fix before next release)
-
-**1. Code labels still visible in production**
-Despite the Language Rules above, several raw code strings are still rendering
-in the live app. Audit every component and ensure none of the ❌ strings from
-the Language Rules table appear anywhere in the UI. Specific confirmed locations:
-- `WEEK_MANAGEMENT_SYSTEM` — Load Reports page subtitle
-- `EXPENSE_MANAGEMENT_SYSTEM` — Deductions page subtitle
-- `DEDUCTION_TYPES` / `SET_RECURRING_WEEKLY_AMOUNTS` — Deductions section headers
-- `CURRENT_WEEK` / `PREV_WEEK` / `NEXT_WEEK` — week navigation buttons
-- `MONDAY_TO_SUNDAY` — week range label
-- `Apr_06 - Apr_12,_2026` — date with underscores instead of spaces
-- `FIXED_AT_$X.XX/WEEK` / `EFFECTIVE_FROM_...` — deduction confirmation messages
-- `WEEKLY_AMOUNT_($)` — deduction input label
-- `ENTER_NAME` / `ADD_TYPE` — Deductions form placeholder and button
-- `CURRENT_FIXED_DEDUCTIONS` / `ADMIN_FEE` / `WEEKLY__INSURANCE` — deduction items
-- `ADD_NEW_DEDUCTION_TYPE` — section heading
-- `Enter expense type nam` — truncated placeholder on Personal Expenses
-
-**2. Logout button is a top-level red CTA**
-The OUT (logout) button is bright red and sits prominently in the top-right
-header next to the Settings gear icon. A driver could accidentally log out.
-Move logout inside the Settings page. The header should only show the Settings
-icon (⚙️). No logout button visible on any page except inside Settings.
-
-**3. Version tag shows wrong version**
-Footer reads "TRUCKPAY V2.1" — update to "TRUCKPAY V2.2".
-
----
-
-### 🟠 P1 — High Priority
-
-**4. ✅ Bottom tab bar navigation — DONE**
-Implemented: 5-tab bar (Loads | Expenses | + Add Load | Summary | More).
-Hidden on md+ screens. "More" sheet includes Personal Expenses, Per Diem, IFTA, Settings, Logout.
-
-**5. ✅ Add Load button in bottom nav — DONE**
-"+" button in center of bottom nav opens Add Load modal from any screen.
-
-**6. Personal Expenses — all forms expanded by default**
-Every expense category (Mechanic, Tires, Truck Wash, Parts, etc.) shows its
-full "Add New Expense" form (Amount, Date, Note, ADD button) at all times.
-With 4+ categories this creates a wall of identical forms.
-Fix: collapse all forms by default. Show only the category header with total
-amount and expense count. Expand the form on tap. Use an accordion pattern.
-
-**7. IFTA page — no export button**
-Per Diem has an EXPORT button but IFTA does not. IFTA's entire purpose is to
-produce a report for filing. Add an "Export IFTA Report" button (same style as
-Per Diem's export) at the bottom of the IFTA page.
-
----
-
-### 🟠 P2 — Medium Priority
-
-**8. "Recurring" checkbox label on Deductions**
-The checkbox next to each deduction type is labeled "FIX" — this is unclear.
-Replace with "Recurring" as a toggle label. The meaning should be obvious:
-toggle on = this deduction repeats every week automatically.
-
-**9. Fuel tracked in two places — clarify or consolidate**
-Fuel expenses appear both in Load Reports (as weekly Fuel & Expenses entries)
-and in Deductions (as a FUEL deduction type). This confuses drivers — they
-don't know which one to use. Either:
-- Consolidate both into one place with a clear label, OR
-- Add a small tooltip/note: "Fuel entered here applies to this week's loads.
-  For recurring fixed fuel costs, use Deductions."
-
-**10. ✅ AI Receipt Scanner — moved to Personal Expenses — DONE**
-Scanner removed from Deductions. Now lives in Personal Expenses page only.
-Auto-creates expense category if it doesn't exist. Uses OpenAI gpt-4o via Supabase Edge Function.
-
-**11. Odometer fields interrupt Load Reports flow**
-The ODOMETER MONDAY / ODOMETER SUNDAY fields sit between the weekly stats cards
-and the forecast card in Load Reports. This breaks the reading flow. Options:
-- Move them into a collapsible "Miles This Week" section that is closed by
-  default and expands on tap
-- Or move them to a dedicated Mileage tab within Load Reports
-
-**12. Lane names truncated throughout Summary and IFTA**
-Lane names are cut off everywhere: `MISSISSIPPI → FLO...`, `FOUNTAIN HILL, PA ...`,
-`JACKSON, TN → WA...`. Full route names are important — drivers need to
-recognize their lanes at a glance. Fix by allowing text to wrap to a second
-line instead of truncating with `...`.
-
-**13. Early Adopter banner persists after dismissal**
-The "🎉 Early Adopter Bonus: Pro free until 07.07.2026" banner reappears on
-every app load even after the driver taps ✕. Persist the dismissal:
-store `earlyAdopterBannerDismissed: true` in the `profiles` table and check
-it on load. Once dismissed, never show it again.
-
-**14. IFTA empty state — add first-use guidance**
-All loads on the IFTA page show "No state miles entered" with just an EDIT
-button and no explanation. A first-time user has no idea what to do.
-Add a prominent info banner at the top of the load list when no state miles
-have been entered:
-"Tap EDIT on each load to add the miles you drove per state. This is required
-for your quarterly IFTA filing."
-
----
-
-### 🟡 P3 — Polish
-
-**15. Remove "WELCOME, [NAME]!" from Home screen**
-The greeting "WELCOME, AKROM ARIPOV!" takes up space without adding value.
-Drivers know their own name. Remove it. The weekly snapshot card is a
-sufficient and more useful greeting.
-
-**16. Pay Breakdown — differentiate income vs. deduction rows**
-In the Pay Breakdown section at the bottom of Load Reports, all rows render
-with the same visual weight (plain text, same size). Make the breakdown
-scannable:
-- Income rows (Total Earned, After Company Cut): normal or slightly positive styling
-- Deduction rows (Other Expenses, Weekly Fixed Costs): red text or a minus prefix
-- Take-Home: largest, boldest number in the breakdown — green, hero size
-
-**17. "AVG DRIVER PAY" label repeats on every lane row**
-In the Lane Performance section of Earnings Summary, every row ends with
-`· AVG DRIVER PAY`. Since every row is a driver pay figure, this label adds
-clutter without adding meaning. Remove it — the column is self-explanatory.
-
-**18. RPM missing on some lane rows — improve display**
-Some lane rows in Lane Performance show `--` for RPM because mileage data is
-missing. Instead of a plain dash, show a small amber indicator: `⚠ No miles`
-so the driver knows why RPM is unavailable and what to fix.
-
-**19. "AT THIS PACE..." forecast label**
-Replace "AT THIS PACE..." with "This Week's Forecast" — clearer and consistent
-with the Language Rules table above. The confidence level (HIGH/MODERATE/LOW)
-can stay as a badge.
-
-**20. Per Diem — tax bracket is hardcoded at 25%**
-The "EST. TAX SAVINGS (25% BRACKET)" label assumes all drivers are in the 25%
-bracket. Add a tax bracket selector to the Settings page (options: 10%, 12%,
-22%, 24%, 32%) and use `profile.taxBracket` to calculate the savings estimate.
-Default to 22% if not set. Show the selected bracket in the label.
-
-**21. Home screen nav tiles have no visual hierarchy**
-All 6 nav tiles (Load Reports, Deductions, Summary, Personal Expenses, Per Diem,
-IFTA) look identical. Daily-use sections should feel more prominent than
-quarterly ones. Consider:
-- Making the Load Reports tile taller or distinctly styled (most-used feature)
-- Grouping tiles: "Weekly" (Loads, Deductions) vs. "Reports" (Summary,
-  Per Diem, IFTA) with a small section label between groups
-
-**22. Home screen weekly goal progress**
-The home snapshot shows what the driver earned but not how it compares to
-their goal. Add a small progress bar below the Take-Home number:
-`$2,456 of $5,000 goal ████░░░░ 49%`
-Only show if `profile.weeklyGoal` is set. If not set, show a subtle prompt:
-"Set a weekly goal →"
-
----
-
-## Known Issues (Do Not Re-introduce)
-
-1. **Mileage bug** — fixed in V2.1. Always sum per-week deltas (endMileage − startMileage per week), never subtract first-week-start from last-week-end. Show `--` if endMileage is 0 or missing. Do not revert.
-
-2. **Desktop layout breaks** — the app renders wide blank columns on desktop.
-   This is acceptable for now — the app is mobile-only. Do not attempt a
-   desktop redesign unless asked.
-
----
-
-## AI Receipt Scanner — Implementation Notes
-
-**Location:** Personal Expenses page. Button: "SCAN RECEIPT WITH AI"
-
-**Purpose:** Auto-extract merchant, category, amount, and date from receipt images to quickly add personal expenses.
-
-**API:** OpenAI ChatGPT (gpt-4o) via Supabase Edge Function
-
-**Frontend flow:**
-1. User clicks "SCAN RECEIPT WITH AI" button in Personal Expenses
-2. Choose "TAKE PHOTO" (mobile) or "UPLOAD FILES" (desktop)
-3. Images compressed: max 1024px, JPEG quality 0.80
-4. Call edge function: `supabase/functions/scan-receipt/` with base64 image
-5. Receive parsed JSON: `{ merchant, category, amount, date, notes }`
-6. Review extracted data in modal
-7. Auto-create expense category if doesn't exist
-8. Add expense under that category
-
-**Edge function (`supabase/functions/scan-receipt/index.ts`):**
-- Receives: `{ imageBase64: base64String }`
-- Returns: `{ merchant, category, amount, date, notes }`
-- Uses OpenAI gpt-4o model via `OPENAI_API_KEY` environment variable
-- API key stored securely in Supabase secrets, never exposed in frontend
-
-**Image handling:**
-- Compress before API: max 1024px, JPEG quality 0.80
-- Process multiple images sequentially (not in parallel)
-- Show progress: "Processing 2 of 4 receipts..."
-- Display receipt image thumbnail in review modal
-
-**Categories auto-created:**
-Supported receipt categories: FUEL, TOLL, MAINTENANCE, PARTS, FOOD, LODGING, OTHER
-If category doesn't exist in Personal Expenses, it's created automatically on confirmation.
-
-**Environment setup:**
-```bash
-supabase secrets set OPENAI_API_KEY sk-proj-your-key-here
-supabase functions deploy scan-receipt
-```
-
-**Security:**
-- API key stored securely in Supabase secrets
-- No frontend environment variables needed
-- All OpenAI communication happens server-side via Edge Function
-- No CORS issues (server-to-server communication)
-
----
-
-## ZIP-to-ZIP Mileage Tracking
-
-The Add Load form now auto-populates estimated mileage via Google Maps:
-
-1. **User enters pickup ZIP** → Lookup via Geocoding API (extracts city, state, lat/lng)
-2. **User enters delivery ZIP** → Same lookup process
-3. **When both ZIPs resolve** → Distance Matrix API calculates driving distance in miles
-4. **Form shows estimated miles** → Driver can edit if needed
-
-**Implementation:**
-- Frontend: `useZipLookup()` hook manages state and calls Supabase edge function
-- Edge function: `supabase/functions/driving-distance/` handles Google Maps API calls
-- Database: `load_reports` includes `pickup_zip`, `delivery_zip`, `pickup_city_state`, `delivery_city_state`, `estimated_miles`
-- Validation: ZIP inputs require exactly 5 digits (regex: `^\d{5}$`)
-- Timeout: 10-second AbortController on edge function calls
-- Error handling: Clear error messages when ZIP lookup fails, prevents form submission until both ZIPs resolve successfully
-
-**Key files:**
-- `src/hooks/useZipLookup.ts` — State management and Google Maps calls
-- `supabase/functions/driving-distance/index.ts` — Edge function server
-- `src/components/AddLoadForm.tsx` — Form integration with ZIP inputs and estimated miles display
-- Database migration: `20260409000000_add_zip_and_miles_to_loads.sql`
-
----
-
-## Driver Types & Pay Calculations
-
-Three driver types are supported. Pay logic is in `src/lib/loadReportsUtils.ts → calculateDriverPay()`.
-
-| Driver Type | Pay Formula | Notes |
-|-------------|-------------|-------|
-| `owner-operator` | `(rate + detention) × (1 - companyDeduction%)` | Company takes a % cut of gross |
-| `lease-operator` | Same as owner-operator, PLUS `leaseMilesCost` deducted from weekly net | Lease cost = totalWeeklyMiles × leaseRatePerMile |
-| `company-driver` (per_mile) | `estimatedMiles × companyPayRate` | Fixed $/mile; detention does NOT affect pay |
-| `company-driver` (percentage) | `(rate + detention) × companyPayRate%` | Percentage of gross including detention |
-
-**Detention Pay rules:**
-- Detention is additional pay when driver waits >2 hours at pickup or dropoff
-- Stored as `detention_amount` on each load
-- Added to the load rate BEFORE applying percentage deductions for owner-op, lease-op, and company-driver (percentage) types
-- Included in all gross pay totals across LoadReports, ForecastSummary, and Index home snapshot
-- Displayed on load cards as "+ $X detention"
-
-**Lease Miles Cost rules:**
-- Only applies to `lease-operator` driver type
-- Calculated weekly: `totalOdometerMiles × leaseRatePerMile`
-- Stored in `weekly_mileage.lease_miles_cost`
-- Deducted from net pay AFTER all other deductions (shown as a separate line in WeeklySummary)
-- Does NOT affect individual load driver pay — deducted at the weekly level
-
----
-
-## Load Profitability Score
-
-Grade each load by Rate Per Mile (driver pay ÷ estimated miles):
-
-```javascript
-function getLoadGrade(driverPay, miles) {
-  const rpm = driverPay / (miles || 500); // 500mi fallback
-  if (rpm >= 2.50) return { grade: 'A', label: 'EXCELLENT', color: '#2d6a2d' };
-  if (rpm >= 2.00) return { grade: 'B', label: 'GOOD',      color: '#4a90d9' };
-  if (rpm >= 1.50) return { grade: 'C', label: 'AVERAGE',   color: '#f0a500' };
-  return              { grade: 'D', label: 'POOR',      color: '#c0392b' };
-}
-```
-
-Display as a small badge (48×48px max) on top-right of each load card.
-Show RPM below the grade letter: `$2.14/mi`
-
----
-
-## Per Diem Rates (IRS 2025)
-
-```javascript
-const PER_DIEM_FULL_DAY    = 80.00;  // Full day away from home
-const PER_DIEM_PARTIAL_DAY = 59.50;  // First and last day (75% of full)
-```
-
-Pickup day = partial. Delivery day = partial. All days in between = full.
-Deduplicate dates across loads (driver may have multiple loads same day).
-
----
-
-## IFTA Tax Rates (2025 — Static Lookup)
-
-```javascript
-const IFTA_DIESEL_RATES = {
-  AL:0.290, AZ:0.270, AR:0.285, CA:0.610, CO:0.205, CT:0.440,
-  DE:0.220, FL:0.363, GA:0.326, ID:0.320, IL:0.467, IN:0.550,
-  IA:0.325, KS:0.260, KY:0.268, LA:0.200, ME:0.312, MD:0.427,
-  MA:0.240, MI:0.272, MN:0.285, MS:0.180, MO:0.170, MT:0.278,
-  NE:0.348, NV:0.270, NH:0.222, NJ:0.489, NM:0.210, NY:0.176,
-  NC:0.385, ND:0.230, OH:0.470, OK:0.190, OR:0.380, PA:0.741,
-  RI:0.370, SC:0.260, SD:0.280, TN:0.274, TX:0.200, UT:0.319,
-  VT:0.308, VA:0.262, WA:0.494, WV:0.357, WI:0.309, WY:0.240
-};
-// Note: IFTA rates change quarterly. Update this table each quarter.
-```
-
----
-
-## Authentication — Password Reset Flow
-
-**Forgot Password (login page):**
-- "Forgot password?" link appears next to the Password label
-- Switches to a reset form — user enters email, clicks "Send Reset Link"
-- Calls `supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + '/' })`
-- Supabase emails a magic link; user clicks it and lands back on the app
-
-**Password recovery interception (`useAuth.tsx`):**
-- `onAuthStateChange` listener fires `PASSWORD_RECOVERY` event when the magic link is clicked
-- Sets `isPasswordRecovery = true` in context
-- `getSession()` fallback is skipped if the listener already fired (prevents overwriting the recovery flag)
-- `isPasswordRecovery` clears when `USER_UPDATED`, `SIGNED_IN`, or `SIGNED_OUT` fires
-
-**ResetPasswordPage component:**
-- Shown in `Index.tsx` when `isPasswordRecovery === true` — intercepts the main app render
-- User sets a new password → `supabase.auth.updateUser({ password })` → triggers `USER_UPDATED` → `isPasswordRecovery` clears → user lands in the main app
-
-**Change Password (Settings page):**
-- "Change Password" section in SettingsPanel, above the Logout button
-- Two fields: New Password + Confirm Password
-- Validates match and minimum 6 characters before calling `supabase.auth.updateUser({ password })`
-
-**Supabase dashboard requirement:**
-- **Authentication → URL Configuration → Redirect URLs** must include `https://truckpay.app/**`
-- **Site URL** must be set to `https://truckpay.app`
-- Without this, reset links redirect to the Netlify preview URL instead
+- **Bottom tab bar** — 5 tabs (Loads | Expenses | + Add Load | Summary | More), hidden on `md+` screens
+- **Forms:** Pickup and delivery dates always preselected to `new Date()` as a `Date` object — driver changes only if needed
+- **Load Rate field:** Show `$0.00` placeholder — never pre-fill a value
+- **Empty states:** Every list must have a helpful empty state message, not blank space
+- **Personal Expenses:** Forms collapsed by default — expand on tap (accordion pattern)
 
 ---
 
 ## Data Safety Rules
 
 - Always test database migrations in development before deploying to production
-- Supabase provides built-in backup and rollback capabilities
-- When adding new Supabase queries, always add error handling and null checks
-- Do not assume data exists — always handle missing or incomplete records gracefully
+- Always add error handling and null checks to Supabase queries
+- Do not assume data exists — handle missing or incomplete records gracefully
+- Never store sensitive data (subscription tier, session tokens) in localStorage
 
 ---
 
-## Version History
+## Known Issues (Do Not Re-introduce)
 
-| Version | Key Changes |
-|---------|-------------|
-| V1.2 | Original — basic loads, deductions, summary |
-| V2.0 | Added Per Diem, IFTA, Weekly Forecast, Deadhead, Monthly chart, Lane Performance, State dropdowns |
-| V2.1 | Mileage bug fix, Load Profitability grades (A/B/C/D), AI Receipt Scanner, Subscription/Paywall, Plain English labels, ZIP-to-ZIP auto-mileage, Weekly mileage auto-fill, WeeklyForecastCard with goal tracking |
-| V2.2 | Replaced dispatcher/broker/BOL with Detention Pay, Three driver types (owner-op/lease-op/company), Lease Miles Cost weekly deduction, Company-driver per-mile and percentage pay types, Detention included in all gross totals |
-| V2.3 | Bottom tab bar (5 tabs, desktop-hidden), Add Load modal from nav, smart expense forecasting, Pay Breakdown modal, AI Receipt Scanner moved to Personal Expenses, Forgot Password + Password Recovery page, Change Password in Settings |
+1. **Mileage bug** — fixed in V2.1. Always sum per-week deltas (endMileage − startMileage per week). Never subtract first-week-start from last-week-end. Show `--` if endMileage is 0 or missing.
+
+2. **Desktop layout** — app renders wide blank columns on desktop. Acceptable for now — mobile-only. Do not attempt a desktop redesign unless asked.
+
+3. **pickupDate/deliveryDate type** — these must be `Date | undefined` objects in NewLoad state, never ISO strings. Using strings breaks the calendar `selected` prop and the date never shows as highlighted.
 
 ---
 
@@ -714,7 +607,7 @@ const IFTA_DIESEL_RATES = {
 The primary test user is **Akrom Aripov** — Sanjar's uncle, an active solo
 truck driver. His account: `akrom1980@gmail.com`. He has 47+ real loads
 entered since Jan 2026. His weekly gross averages ~$7,000–$9,000.
-He is an Early Adopter (Pro free until July 2026).
+He is an Early Adopter (Pro free always).
 
 When making UX decisions, ask: *"Can Akrom do this with one thumb while
 parked at a truck stop?"* If no, simplify it.
@@ -726,80 +619,20 @@ parked at a truck stop?"* If no, simplify it.
 - Do NOT add desktop-specific layouts (mobile-only app)
 - Do NOT use technical labels visible to users (see Language Rules above)
 - Do NOT show a negative number for miles — show `--` if data incomplete
-- Do NOT pre-fill Load Rate with a fake number like `1200.00`
+- Do NOT pre-fill Load Rate with a fake number
 - Do NOT break existing Supabase data when adding new features or migrations
 - Do NOT modify database schema without planning a migration
 - Do NOT make unnecessary network calls — batch queries where possible
-- Do NOT skip Stripe webhook verification — always validate `stripe-signature` header in the Edge Function
+- Do NOT skip Stripe webhook verification — always validate `stripe-signature`
 - Do NOT introduce new date input fields without using calendar picker Popover pattern
-- Do NOT break existing component patterns or styling conventions
-- Do NOT show the logout button as a top-level CTA in the header — it belongs inside Settings
-- Do NOT show the "WELCOME, [NAME]" greeting on the Home screen — it wastes space
-- Do NOT allow any raw code variable names (`SNAKE_CASE`, underscores, ALL_CAPS system strings) to render as user-facing text
-- Do NOT use a space as a thousands separator in numbers — always use a comma (`5,059` not `5 059`)
+- Do NOT show the logout button as a top-level CTA — it belongs inside Settings only
+- Do NOT allow raw code variable names (`SNAKE_CASE`, ALL_CAPS system strings) to render as user-facing text
+- Do NOT use a space as a thousands separator — always use a comma (`5,059` not `5 059`)
 - Do NOT expand all Personal Expense category forms by default — collapse them, expand on tap
 - Do NOT truncate lane names in Lane Performance or IFTA — allow text to wrap
-- Do NOT hardcode a domain in `redirectTo` for Supabase auth emails — always use `window.location.origin` so it works on both truckpay.app and preview deployments
-- Do NOT forget: Supabase dashboard must have `https://truckpay.app/**` in Redirect URLs allowlist for password reset emails to work on production
+- Do NOT hardcode a domain in `redirectTo` for Supabase auth emails — always use `window.location.origin`
+- Do NOT store subscription status, early adopter flag, or tier info in localStorage — DB only
+- Do NOT initialize `pickupDate` or `deliveryDate` as ISO strings — use `new Date()` (Date object)
+- Do NOT show the "Add your first load" callout unless `weekSnapshot.loadCount === 0`
+- Do NOT show the "WELCOME, [NAME]" greeting on the Home screen
 
----
-
-## Sprint Status (as of April 2026)
-
-### ✅ Done
-- Load Reports with weekly navigation, mileage, loads list
-- Deductions (fixed + weekly fuel/toll/custom)
-- Earnings Summary (multi-period, YTD, monthly chart, lane performance)
-- Per Diem page
-- IFTA Report page
-- Weekly Pay Forecast ("AT THIS PACE")
-- State dropdowns on Add Load form
-- Early Adopter Pro bonus
-- Version V2.1
-- Fixed blank space on Home screen
-- Replaced all technical labels with plain English throughout
-- Added live weekly snapshot on Home screen (Loads, Earned, Expenses, Take-Home)
-- Added info icons with tooltips on snapshot stats explaining calculations
-- Simplified Add Load form (placeholder $0.00, pre-fill dates, company deduction moved to optional)
-- Made Driver Pay the hero number on load cards
-- Converted all date input fields to calendar picker dropdowns (LoadCard, WeeklySummary, PersonalExpenses, ReceiptScanner)
-- ZIP-to-ZIP auto-mileage tracking via Google Maps (Geocoding + Distance Matrix APIs)
-- **Load Profitability grade badges (A/B/C/D)** on load cards — based on RPM, color-coded with RPM value shown
-- **Deadhead miles calculation** — total odometer miles minus sum of load estimated miles (shown in MileageTracking)
-- **Weekly mileage auto-fill** — start mileage pre-fills from previous week's end; end mileage pre-fills from next week's start
-- **Three driver types** — owner-operator, lease-operator, company-driver — with correct pay formulas for each
-- **Lease Miles Cost** — weekly cost (miles × leaseRatePerMile) deducted from net pay for lease-operator drivers only; stored in weekly_mileage table
-- **Company-driver pay types** — per-mile (fixed $/mile rate) and percentage (% of gross); configured in profile settings
-- **Detention Pay field** — replaces dispatcher/broker/BOL fields; added to gross before deductions; shown on load cards and included in all gross totals (LoadReports, ForecastSummary, home snapshot)
-- **WeeklyForecastCard** — projects weekly gross/net with confidence level (LOW/MODERATE/HIGH), progress bar toward weekly goal, loads needed to hit goal, comparison vs. historical average
-- Version V2.2
-- **Bottom tab bar** — 5-tab persistent nav (Loads | Expenses | + Add Load | Summary | More); hidden on desktop
-- **Add Load from nav** — center "+" button in bottom tab bar opens Add Load modal from any screen
-- **Add/Edit Load modals** — both forms open in Dialog modals instead of inline
-- **LoadSummaryCards responsive grid** — 1 col mobile, 2 col tablet, 3 col desktop; Take-Home card with Pay Breakdown modal
-- **Pay Breakdown moved to modal** — accessible via info icon on Take-Home card
-- **Smart expense forecasting** — WeeklyForecastCard learns historical expense-to-gross ratio for projected take-home
-- **Week navigation compact on mobile** — arrow-only buttons on mobile, full text on desktop
-- **AI Receipt Scanner in Personal Expenses** — removed from Deductions; auto-creates category if needed
-- **Forgot Password** — on login page; sends Supabase reset email
-- **Password Recovery page** — intercepts reset link, shows set-new-password form before entering app
-- **Change Password in Settings** — dedicated section above Logout button
-- Version V2.3
-
-### 🔄 In Progress / Next Up
-- Fix remaining code label strings in production (see UI/UX Improvement Backlog #1)
-- Lane Performance RPM column
-- Annual Income Goal (Settings + YTD progress bar)
-- Multi-load mileage estimation (when 6+ loads entered)
-
-### 📋 Backlog
-- Stripe payment integration — Stripe account configured (products + prices live). Edge Functions needed: `create-checkout-session`, `stripe-webhook`, `customer-portal` (see Stripe Integration section)
-- PDF export for weekly reports and IFTA (see also UI/UX Improvement Backlog #7)
-- Push notifications for end-of-week reminders
-- App Store / Google Play native wrapper (Capacitor recommended)
-- Personal Expenses accordion collapse (UI/UX Improvement Backlog #6)
-- IFTA export button (UI/UX Improvement Backlog #7)
-- Per Diem configurable tax bracket (UI/UX Improvement Backlog #20)
-- Home screen weekly goal progress bar (UI/UX Improvement Backlog #22)
-- Persist Early Adopter banner dismissal (UI/UX Improvement Backlog #13)
-- Pay Breakdown visual hierarchy (UI/UX Improvement Backlog #16)
