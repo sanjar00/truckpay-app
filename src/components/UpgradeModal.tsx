@@ -123,7 +123,7 @@ const UpgradeModal = ({ featureName, requiredTier, onClose, onSuccess }: Upgrade
                 >
                   {loadingTier === 'pro' ? (
                     <><Loader2 className="w-3 h-3 mr-1 animate-spin" />REDIRECTING...</>
-                  ) : 'UPGRADE TO PRO'}
+                  ) : 'UPGRADE'}
                 </Button>
               </CardContent>
             </Card>
@@ -158,7 +158,7 @@ const UpgradeModal = ({ featureName, requiredTier, onClose, onSuccess }: Upgrade
                 >
                   {loadingTier === 'owner' ? (
                     <><Loader2 className="w-3 h-3 mr-1 animate-spin" />REDIRECTING...</>
-                  ) : 'UPGRADE TO OWNER-OP'}
+                  ) : 'UPGRADE'}
                 </Button>
               </CardContent>
             </Card>
