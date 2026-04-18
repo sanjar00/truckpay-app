@@ -456,7 +456,7 @@ const Deductions = ({ onBack, deductions, setDeductions, onUpgrade }: Deductions
                           <Input
                             id={`amount-${type}`}
                             type="number"
-                            placeholder="150.00"
+                            placeholder="e.g. 150.00"
                             step="0.01"
                             min="0"
                             value={fixedDeductions[type]?.amount || (existingDeduction ? existingDeduction.amount : '')}

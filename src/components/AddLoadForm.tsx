@@ -286,7 +286,7 @@ const AddLoadForm = ({
                 <Input
                   id="companyDeduction"
                   type="number"
-                  placeholder="25.00"
+                  placeholder="e.g. 25.00"
                   step="0.01"
                   min="0"
                   max="100"
