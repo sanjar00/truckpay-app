@@ -46,7 +46,7 @@ const PersonalExpenses: React.FC<PersonalExpensesProps> = ({ onBack, userProfile
   const [loading, setLoading] = useState(true);
   
   // Period filter states
-  const [periodFilter, setPeriodFilter] = useState<string>('last2');
+  const [periodFilter, setPeriodFilter] = useState<string>('ytd');
   const [customDateRange, setCustomDateRange] = useState<DateRange | undefined>();
   
   // Form states
@@ -66,6 +66,10 @@ const PersonalExpenses: React.FC<PersonalExpensesProps> = ({ onBack, userProfile
     let endDate: Date;
 
     switch (periodFilter) {
+      case 'ytd':
+        startDate = new Date(today.getFullYear(), 0, 1);
+        endDate = today;
+        break;
       case 'last2':
         startDate = getUserWeekStart(subWeeks(today, 1), userProfile);
         endDate = getUserWeekEnd(today, userProfile);
@@ -88,8 +92,8 @@ const PersonalExpenses: React.FC<PersonalExpensesProps> = ({ onBack, userProfile
         }
         break;
       default:
-        startDate = getUserWeekStart(subWeeks(today, 1), userProfile);
-        endDate = getUserWeekEnd(today, userProfile);
+        startDate = new Date(today.getFullYear(), 0, 1);
+        endDate = today;
     }
 
     return { startDate, endDate };
@@ -547,6 +551,7 @@ const PersonalExpenses: React.FC<PersonalExpensesProps> = ({ onBack, userProfile
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="ytd">YEAR TO DATE</SelectItem>
                     <SelectItem value="last2">LAST 2 WEEKS</SelectItem>
                     <SelectItem value="last3">LAST 3 WEEKS</SelectItem>
                     <SelectItem value="last4">LAST 4 WEEKS</SelectItem>

@@ -674,17 +674,6 @@ const Index = () => {
                 </Button>
 
                 <Button
-                  onClick={() => navigateTo('forecast', 'forecast')}
-                  className="h-24 sm:h-32 brutal-border bg-info hover:bg-accent text-info-foreground hover:text-accent-foreground brutal-shadow-lg brutal-hover brutal-active p-4 sm:p-6 flex flex-col items-start justify-center"
-                >
-                  <DollarSign className="w-6 h-6 sm:w-10 sm:h-10 mb-2 sm:mb-3" />
-                  <div className="text-left">
-                    <p className="brutal-text text-sm sm:text-xl mb-1">SUMMARY</p>
-                    <p className="brutal-mono text-xs sm:text-sm opacity-80 mobile-text-wrap">EARNINGS BREAKDOWN</p>
-                  </div>
-                </Button>
-
-                <Button
                   onClick={() => setCurrentView('expenses')}
                   className="h-24 sm:h-32 brutal-border bg-info hover:bg-accent text-info-foreground hover:text-accent-foreground brutal-shadow-lg brutal-hover brutal-active p-4 sm:p-6 flex flex-col items-start justify-center"
                 >
@@ -692,6 +681,23 @@ const Index = () => {
                   <div className="text-left">
                     <p className="brutal-text text-sm sm:text-xl mb-1">PERSONAL EXPENSES</p>
                     <p className="brutal-mono text-xs sm:text-sm opacity-80 mobile-text-wrap">TRACK EXPENSES</p>
+                  </div>
+                </Button>
+
+                <Button
+                  onClick={() => navigateTo('forecast', 'forecast')}
+                  className="h-24 sm:h-32 brutal-border bg-info hover:bg-accent text-info-foreground hover:text-accent-foreground brutal-shadow-lg brutal-hover brutal-active p-4 sm:p-6 flex flex-col items-start justify-center relative"
+                >
+                  {!isFeatureAllowed('forecast') && (
+                    <div className="absolute top-2 right-2 flex items-center gap-1">
+                      <span className="brutal-mono text-xs font-bold px-1.5 py-0.5 rounded" style={{ background: '#f0a500', color: '#1a1a2e', fontSize: '10px', lineHeight: 1 }}>PRO</span>
+                      <Lock className="w-3 h-3 opacity-60" />
+                    </div>
+                  )}
+                  <DollarSign className="w-6 h-6 sm:w-10 sm:h-10 mb-2 sm:mb-3" />
+                  <div className="text-left">
+                    <p className="brutal-text text-sm sm:text-xl mb-1">SUMMARY</p>
+                    <p className="brutal-mono text-xs sm:text-sm opacity-80 mobile-text-wrap">EARNINGS BREAKDOWN</p>
                   </div>
                 </Button>
 

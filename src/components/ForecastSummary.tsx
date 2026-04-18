@@ -43,7 +43,7 @@ interface ForecastSummaryProps {
 
 const ForecastSummary = ({ onBack, deductions, userProfile }: ForecastSummaryProps) => {
   const { user } = useAuth();
-  const [periodFilter, setPeriodFilter] = useState('last2');
+  const [periodFilter, setPeriodFilter] = useState('ytd');
   const [customDateRange, setCustomDateRange] = useState<{from: Date, to: Date} | undefined>();
   const [loads, setLoads] = useState<Load[]>([]);
   const [weeklyDeductions, setWeeklyDeductions] = useState<Record<string, Record<string, number>>>({});
