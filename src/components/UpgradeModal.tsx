@@ -71,7 +71,7 @@ const UpgradeModal = ({ featureName, requiredTier, onClose, onSuccess }: Upgrade
           </div>
 
           {/* Billing cycle toggle */}
-          <div className="flex items-center justify-center" style={{ marginBottom: '12px' }}>
+          <div className="flex items-center justify-start" style={{ marginBottom: '12px' }}>
             <div className="brutal-border inline-flex rounded overflow-hidden">
               <button
                 className={`px-4 py-1.5 brutal-mono text-xs font-bold transition-colors ${billingCycle === 'annual' ? 'bg-primary text-primary-foreground' : 'bg-background text-foreground hover:bg-muted'}`}
