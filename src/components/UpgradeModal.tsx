@@ -92,10 +92,10 @@ const UpgradeModal = ({ featureName, requiredTier, onClose, onSuccess }: Upgrade
           </div>
 
           {/* Tier Cards — always 2-column */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px', alignItems: 'stretch' }}>
             {/* Pro */}
-            <Card className={`brutal-border brutal-shadow ${requiredTier === 'pro' ? 'border-accent bg-accent/10' : ''}`}>
-              <CardContent style={{ padding: '12px 14px' }}>
+            <Card className={`brutal-border brutal-shadow ${requiredTier === 'pro' ? 'border-accent bg-accent/10' : ''}`} style={{ display: 'flex', flexDirection: 'column' }}>
+              <CardContent style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', flex: 1 }}>
                 <div className="flex items-center gap-1" style={{ marginBottom: '4px' }}>
                   <Zap className="w-3.5 h-3.5 text-accent" />
                   <p className="brutal-text text-base font-bold">PRO</p>
@@ -109,7 +109,7 @@ const UpgradeModal = ({ featureName, requiredTier, onClose, onSuccess }: Upgrade
                     {PRICES.pro.annualTotal} billed annually
                   </p>
                 )}
-                <ul className="brutal-mono text-muted-foreground" style={{ fontSize: '12px', lineHeight: 1.5, marginBottom: '10px', marginTop: '6px', listStyle: 'none', padding: 0 }}>
+                <ul className="brutal-mono text-muted-foreground" style={{ fontSize: '12px', lineHeight: 1.5, marginTop: '6px', listStyle: 'none', padding: 0, flex: 1 }}>
                   <li>✓ Full load history</li>
                   <li>✓ IFTA reports</li>
                   <li>✓ Per Diem tracker</li>
@@ -117,7 +117,7 @@ const UpgradeModal = ({ featureName, requiredTier, onClose, onSuccess }: Upgrade
                 </ul>
                 <Button
                   className="w-full brutal-border bg-accent hover:bg-accent text-accent-foreground brutal-hover brutal-text"
-                  style={{ fontSize: '12px', height: '36px' }}
+                  style={{ fontSize: '12px', height: '36px', marginTop: '10px' }}
                   disabled={loadingTier !== null}
                   onClick={() => handleUpgrade('pro')}
                 >
@@ -129,8 +129,8 @@ const UpgradeModal = ({ featureName, requiredTier, onClose, onSuccess }: Upgrade
             </Card>
 
             {/* Owner-Op */}
-            <Card className={`brutal-border brutal-shadow ${requiredTier === 'owner' ? 'border-accent bg-accent/10' : ''}`}>
-              <CardContent style={{ padding: '12px 14px' }}>
+            <Card className={`brutal-border brutal-shadow ${requiredTier === 'owner' ? 'border-accent bg-accent/10' : ''}`} style={{ display: 'flex', flexDirection: 'column' }}>
+              <CardContent style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', flex: 1 }}>
                 <div className="flex items-center gap-1" style={{ marginBottom: '4px' }}>
                   <Star className="w-3.5 h-3.5 text-yellow-500" />
                   <p className="brutal-text text-base font-bold">OWNER-OP</p>
@@ -144,7 +144,7 @@ const UpgradeModal = ({ featureName, requiredTier, onClose, onSuccess }: Upgrade
                     {PRICES.owner.annualTotal} billed annually
                   </p>
                 )}
-                <ul className="brutal-mono text-muted-foreground" style={{ fontSize: '12px', lineHeight: 1.5, marginBottom: '10px', marginTop: '6px', listStyle: 'none', padding: 0 }}>
+                <ul className="brutal-mono text-muted-foreground" style={{ fontSize: '12px', lineHeight: 1.5, marginTop: '6px', listStyle: 'none', padding: 0, flex: 1 }}>
                   <li>✓ Everything in Pro</li>
                   <li>✓ Dispatcher book</li>
                   <li>✓ Lane analytics</li>
@@ -152,7 +152,7 @@ const UpgradeModal = ({ featureName, requiredTier, onClose, onSuccess }: Upgrade
                 </ul>
                 <Button
                   className="w-full brutal-border bg-primary hover:bg-primary text-primary-foreground brutal-hover brutal-text"
-                  style={{ fontSize: '12px', height: '36px' }}
+                  style={{ fontSize: '12px', height: '36px', marginTop: '10px' }}
                   disabled={loadingTier !== null}
                   onClick={() => handleUpgrade('owner')}
                 >
