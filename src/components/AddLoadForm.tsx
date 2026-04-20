@@ -19,6 +19,7 @@ interface AddLoadFormProps {
   onAddLoad: (overrides: Partial<NewLoad>) => void;
   onCancel: () => void;
   loading: boolean;
+  isEditing?: boolean;
   weekStart: Date;
   weekEnd: Date;
   userProfile?: any;
@@ -30,6 +31,7 @@ const AddLoadForm = ({
   onAddLoad,
   onCancel,
   loading,
+  isEditing = false,
   weekStart,
   weekEnd,
   userProfile,
@@ -47,7 +49,8 @@ const AddLoadForm = ({
         parseFloat(newLoad.rate),
         userProfile,
         zip.estimatedMiles ?? newLoad.estimatedMiles,
-        newLoad.detentionAmount ? parseFloat(newLoad.detentionAmount) : undefined
+        newLoad.detentionAmount ? parseFloat(newLoad.detentionAmount) : undefined,
+        newLoad.companyDeduction !== '' ? parseFloat(newLoad.companyDeduction) : undefined
       ).toFixed(2)
     : null;
 
@@ -79,9 +82,9 @@ const AddLoadForm = ({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg">Add New Load</CardTitle>
+        <CardTitle className="text-lg">{isEditing ? 'Edit Load' : 'Add New Load'}</CardTitle>
         <p className="text-sm text-gray-600">
-          Adding to week: {format(weekStart, 'MMM dd')} - {format(weekEnd, 'MMM dd, yyyy')}
+          {isEditing ? 'Editing load in week:' : 'Adding to week:'} {format(weekStart, 'MMM dd')} - {format(weekEnd, 'MMM dd, yyyy')}
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -336,9 +339,9 @@ const AddLoadForm = ({
             onClick={handleAddLoad}
             className="flex-1 brutal-border font-extrabold uppercase tracking-wide"
             style={{ background: '#f0a500', color: '#1a1a2e', border: '2px solid #1a1a2e' }}
-            disabled={loading || !newLoad.rate || !newLoad.pickupZip || !newLoad.deliveryZip || !zip.pickupInfo || !zip.deliveryInfo}
+            disabled={loading || !newLoad.rate || !newLoad.pickupZip || !newLoad.deliveryZip}
           >
-            {loading ? 'Adding...' : 'Add Load'}
+            {loading ? (isEditing ? 'Saving...' : 'Adding...') : (isEditing ? 'Edit Load' : 'Add Load')}
           </Button>
           <Button
             variant="outline"

@@ -20,7 +20,8 @@ export const calculateDriverPay = (
     companyPayRate?: number | string;
   },
   estimatedMiles?: number,
-  detentionAmount?: number
+  detentionAmount?: number,
+  companyDeductionOverride?: number
 ): number => {
   const driverType = userProfile?.driverType || 'owner-operator';
   const grossRate = rate + (detentionAmount || 0);
@@ -37,7 +38,10 @@ export const calculateDriverPay = (
   }
 
   // owner-operator and lease-operator both use company deduction % (applied to gross + detention)
-  const deduction = parseFloat(String(userProfile?.companyDeduction || 0));
+  const deduction =
+    companyDeductionOverride != null && !Number.isNaN(companyDeductionOverride)
+      ? companyDeductionOverride
+      : parseFloat(String(userProfile?.companyDeduction || 0));
   return grossRate * (1 - deduction / 100);
 };
 

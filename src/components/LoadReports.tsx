@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Plus, Truck } from 'lucide-react';
 import { useSubscription } from '@/hooks/useSubscription';
-import { isBefore, startOfDay } from 'date-fns';
+import { isBefore, parseISO, startOfDay } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import AddLoadForm from './AddLoadForm';
@@ -75,6 +75,11 @@ const LoadReports = ({ onBack, user, userProfile, deductions, onUpgrade }: LoadR
     
     await deleteLoad(id);
     setShowDeleteConfirm(null);
+  };
+
+  const resetLoadFormState = () => {
+    setEditingLoad(null);
+    setShowAddForm(false);
   };
 
   const handleRemoveExtraDeduction = async (id: string) => {
@@ -206,7 +211,16 @@ const LoadReports = ({ onBack, user, userProfile, deductions, onUpgrade }: LoadR
         />
 
         {/* Add/Edit Load Modal */}
-        <Dialog open={showAddForm} onOpenChange={setShowAddForm}>
+        <Dialog
+          open={showAddForm}
+          onOpenChange={(open) => {
+            if (!open) {
+              resetLoadFormState();
+              return;
+            }
+            setShowAddForm(true);
+          }}
+        >
           <DialogContent className="max-h-[90vh] overflow-y-auto brutal-border brutal-shadow-lg">
             <DialogHeader>
               <DialogTitle className="brutal-text text-2xl">
@@ -217,8 +231,9 @@ const LoadReports = ({ onBack, user, userProfile, deductions, onUpgrade }: LoadR
               newLoad={newLoad}
               setNewLoad={setNewLoad}
               onAddLoad={handleAddLoad}
-              onCancel={() => setShowAddForm(false)}
+              onCancel={resetLoadFormState}
               loading={loading}
+              isEditing={!!editingLoad}
               weekStart={weekStart}
               weekEnd={weekEnd}
               userProfile={userProfile}
@@ -236,11 +251,15 @@ const LoadReports = ({ onBack, user, userProfile, deductions, onUpgrade }: LoadR
                   load={load}
                   onDelete={handleDeleteLoad}
                   onEdit={() => {
+                    const parsedPickupDate =
+                      typeof load.pickupDate === 'string' ? parseISO(load.pickupDate) : load.pickupDate;
+                    const parsedDeliveryDate =
+                      typeof load.deliveryDate === 'string' ? parseISO(load.deliveryDate) : load.deliveryDate;
                     setNewLoad({
                       rate: load.rate.toString(),
                       companyDeduction: load.companyDeduction?.toString() || '',
-                      pickupDate: load.pickupDate,
-                      deliveryDate: load.deliveryDate,
+                      pickupDate: parsedPickupDate,
+                      deliveryDate: parsedDeliveryDate,
                       deadheadMiles: load.deadheadMiles?.toString() || '',
                       detentionAmount: load.detentionAmount?.toString() || '',
                       notes: load.notes || '',

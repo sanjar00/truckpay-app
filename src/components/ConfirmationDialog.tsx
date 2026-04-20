@@ -14,12 +14,12 @@ const ConfirmationDialog = ({ showDeleteConfirm, onConfirm, onCancel }: Confirma
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="brutal-border bg-card p-6 brutal-shadow-lg max-w-md w-full mx-4">
         <h3 className="brutal-text text-xl text-foreground mb-4">
-          CONFIRM_DELETE
+          CONFIRM DELETE
         </h3>
         <p className="brutal-mono text-sm text-muted-foreground mb-6">
           {showDeleteConfirm.type === 'load' 
-            ? 'ARE_YOU_SURE_YOU_WANT_TO_DELETE_THIS_LOAD?' 
-            : 'ARE_YOU_SURE_YOU_WANT_TO_DELETE_THIS_DEDUCTION?'
+            ? 'Are you sure you want to delete this load?' 
+            : 'Are you sure you want to delete this deduction?'
           }
         </p>
         <div className="flex gap-3">

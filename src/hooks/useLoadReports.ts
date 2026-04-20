@@ -108,44 +108,76 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
       setLoading(true);
 
       try {
-        const companyDeduction = parseFloat(load.companyDeduction) || 0;
+        const pickupDate =
+          load.pickupDate instanceof Date
+            ? load.pickupDate
+            : load.pickupDate
+              ? new Date(load.pickupDate as unknown as string)
+              : undefined;
+        const deliveryDate =
+          load.deliveryDate instanceof Date
+            ? load.deliveryDate
+            : load.deliveryDate
+              ? new Date(load.deliveryDate as unknown as string)
+              : undefined;
+
+        const parsedCompanyDeduction =
+          load.companyDeduction !== ''
+            ? parseFloat(load.companyDeduction)
+            : parseFloat(String(userProfile?.companyDeduction || 0));
+        const companyDeduction = Number.isNaN(parsedCompanyDeduction) ? 0 : parsedCompanyDeduction;
         const detentionAmount = load.detentionAmount ? parseFloat(load.detentionAmount) : undefined;
-        const driverPay = calculateDriverPay(parseFloat(load.rate), userProfile, load.estimatedMiles, detentionAmount);
+        const driverPay = calculateDriverPay(
+          parseFloat(load.rate),
+          userProfile,
+          load.estimatedMiles,
+          detentionAmount,
+          companyDeduction
+        );
         const weekPeriod = `${format(weekStart, 'MMM dd')} - ${format(weekEnd, 'MMM dd, yyyy')}`;
         const loadDate = weekStart.toISOString().split('T')[0];
+        const payload = {
+          rate: parseFloat(load.rate),
+          company_deduction: companyDeduction,
+          driver_pay: driverPay,
+          location_from: load.locationFrom || load.pickupCityState || load.pickupZip || '',
+          location_to: load.locationTo || load.deliveryCityState || load.deliveryZip || '',
+          pickup_date: pickupDate ? formatDateForDB(pickupDate) : null,
+          delivery_date: deliveryDate ? formatDateForDB(deliveryDate) : null,
+          date_added: loadDate,
+          week_period: weekPeriod,
+          deadhead_miles: load.deadheadMiles ? parseFloat(load.deadheadMiles) : null,
+          detention_amount: load.detentionAmount ? parseFloat(load.detentionAmount) : null,
+          notes: load.notes || null,
+          pickup_zip: load.pickupZip || null,
+          delivery_zip: load.deliveryZip || null,
+          pickup_city_state: load.pickupCityState || null,
+          delivery_city_state: load.deliveryCityState || null,
+          estimated_miles: load.estimatedMiles ?? null,
+        };
 
-        const { data, error } = await supabase
-          .from('load_reports')
-          .insert({
-            user_id: user.id,
-            rate: parseFloat(load.rate),
-            company_deduction: companyDeduction,
-            driver_pay: driverPay,
-            location_from: load.locationFrom || load.pickupCityState || load.pickupZip || '',
-            location_to: load.locationTo || load.deliveryCityState || load.deliveryZip || '',
-            pickup_date: load.pickupDate ? formatDateForDB(load.pickupDate) : null,
-            delivery_date: load.deliveryDate ? formatDateForDB(load.deliveryDate) : null,
-            date_added: loadDate,
-            week_period: weekPeriod,
-            deadhead_miles: null,
-            detention_amount: load.detentionAmount ? parseFloat(load.detentionAmount) : null,
-            notes: load.notes || null,
-            pickup_zip: load.pickupZip || null,
-            delivery_zip: load.deliveryZip || null,
-            pickup_city_state: load.pickupCityState || null,
-            delivery_city_state: load.deliveryCityState || null,
-            estimated_miles: load.estimatedMiles ?? null,
-          })
-          .select()
-          .single();
+        const query = editingLoad
+          ? supabase
+              .from('load_reports')
+              .update(payload)
+              .eq('id', editingLoad)
+              .eq('user_id', user.id)
+          : supabase
+              .from('load_reports')
+              .insert({
+                user_id: user.id,
+                ...payload,
+              });
+
+        const { data, error } = await query.select().single();
 
         if (error) {
-          console.error('Error adding load:', error);
+          console.error(`Error ${editingLoad ? 'updating' : 'adding'} load:`, error);
           return;
         }
 
         if (data) {
-          const newLoadEntry = {
+          const normalizedLoad = {
             id: data.id,
             rate: data.rate,
             companyDeduction: data.company_deduction,
@@ -166,7 +198,12 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
             estimatedMiles: data.estimated_miles,
           };
 
-          setLoads(prev => [...prev, newLoadEntry]);
+          if (editingLoad) {
+            setLoads(prev => prev.map(existing => (existing.id === editingLoad ? normalizedLoad : existing)));
+          } else {
+            setLoads(prev => [...prev, normalizedLoad]);
+          }
+
           setNewLoad({
             rate: '',
             companyDeduction: userProfile?.companyDeduction || '',
@@ -184,9 +221,10 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
             estimatedMiles: undefined,
           });
           setShowAddForm(false);
+          setEditingLoad(null);
         }
       } catch (error) {
-        console.error('Error adding load:', error);
+        console.error('Error saving load:', error);
       } finally {
         setLoading(false);
       }
