@@ -114,6 +114,16 @@ const Index = () => {
     }
   }, [user, userProfile, deductions]);
 
+  // Sync companyDeduction default from profile into the home-page Add Load form.
+  // The useState initializer runs before userProfile is fetched, so this effect
+  // back-fills the default once the profile loads. Only overrides the empty
+  // default — never clobbers a value the user is actively editing.
+  useEffect(() => {
+    const profileDeduction = userProfile?.companyDeduction;
+    if (profileDeduction == null || profileDeduction === '') return;
+    setNewLoad((prev) => (prev.companyDeduction === '' ? { ...prev, companyDeduction: String(profileDeduction) } : prev));
+  }, [userProfile?.companyDeduction]);
+
   const fetchDeductions = async () => {
     if (!user) return;
     
@@ -325,7 +335,7 @@ const Index = () => {
         console.error('Error:', error);
       } else {
         // Reset form and close modal
-        setNewLoad({ rate: '', companyDeduction: '', pickupDate: new Date(), deliveryDate: new Date(), deadheadMiles: '', detentionAmount: '', notes: '', pickupZip: '', deliveryZip: '', pickupCityState: '', deliveryCityState: '', locationFrom: '', locationTo: '', estimatedMiles: undefined });
+        setNewLoad({ rate: '', companyDeduction: userProfile?.companyDeduction ? String(userProfile.companyDeduction) : '', pickupDate: new Date(), deliveryDate: new Date(), deadheadMiles: '', detentionAmount: '', notes: '', pickupZip: '', deliveryZip: '', pickupCityState: '', deliveryCityState: '', locationFrom: '', locationTo: '', estimatedMiles: undefined });
         setShowAddLoadModal(false);
         // Refresh week snapshot
         fetchWeekSnapshot(deductions);
