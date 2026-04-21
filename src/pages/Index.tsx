@@ -114,15 +114,18 @@ const Index = () => {
     }
   }, [user, userProfile, deductions]);
 
-  // Sync companyDeduction default from profile into the home-page Add Load form.
-  // The useState initializer runs before userProfile is fetched, so this effect
-  // back-fills the default once the profile loads. Only overrides the empty
-  // default — never clobbers a value the user is actively editing.
+  // Sync companyDeduction default from profile every time the home Add Load
+  // modal opens. Runs again if the profile value changes (e.g. after
+  // onboarding completes and the profile is refreshed). We only prefill when
+  // the profile has a real, positive % — otherwise we leave the field empty
+  // so the placeholder "e.g. 25.00" is shown instead of a stale "0".
   useEffect(() => {
-    const profileDeduction = userProfile?.companyDeduction;
-    if (profileDeduction == null || profileDeduction === '') return;
-    setNewLoad((prev) => (prev.companyDeduction === '' ? { ...prev, companyDeduction: String(profileDeduction) } : prev));
-  }, [userProfile?.companyDeduction]);
+    if (!showAddLoadModal) return;
+    const pd = userProfile?.companyDeduction;
+    const n = pd == null || pd === '' ? NaN : Number(pd);
+    if (!Number.isFinite(n) || n <= 0) return;
+    setNewLoad((prev) => (prev.companyDeduction === '' ? { ...prev, companyDeduction: String(n) } : prev));
+  }, [showAddLoadModal, userProfile?.companyDeduction]);
 
   const fetchDeductions = async () => {
     if (!user) return;
@@ -335,7 +338,9 @@ const Index = () => {
         console.error('Error:', error);
       } else {
         // Reset form and close modal
-        setNewLoad({ rate: '', companyDeduction: userProfile?.companyDeduction ? String(userProfile.companyDeduction) : '', pickupDate: new Date(), deliveryDate: new Date(), deadheadMiles: '', detentionAmount: '', notes: '', pickupZip: '', deliveryZip: '', pickupCityState: '', deliveryCityState: '', locationFrom: '', locationTo: '', estimatedMiles: undefined });
+        const profilePctNum = Number(userProfile?.companyDeduction);
+        const resetDeduction = Number.isFinite(profilePctNum) && profilePctNum > 0 ? String(profilePctNum) : '';
+        setNewLoad({ rate: '', companyDeduction: resetDeduction, pickupDate: new Date(), deliveryDate: new Date(), deadheadMiles: '', detentionAmount: '', notes: '', pickupZip: '', deliveryZip: '', pickupCityState: '', deliveryCityState: '', locationFrom: '', locationTo: '', estimatedMiles: undefined });
         setShowAddLoadModal(false);
         // Refresh week snapshot
         fetchWeekSnapshot(deductions);
