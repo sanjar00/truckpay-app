@@ -1,0 +1,12 @@
+# Root serves the marketing landing page
+/               /landing.html    200
+
+# Dashboard and all SPA routes
+/dashboard      /index.html      200
+/dashboard/*    /index.html      200
+
+# Auth / reset flows stay on the SPA
+/reset-password /index.html      200
+
+# SPA catch-all for anything else (404 handled in React)
+/*              /index.html      200

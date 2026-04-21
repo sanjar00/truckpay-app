@@ -64,7 +64,7 @@ const LoginPage = ({ onShowRegistration }: LoginPageProps) => {
 
     setLoading(true);
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/`,
+      redirectTo: `${window.location.origin}/dashboard`,
     });
 
     if (error) {

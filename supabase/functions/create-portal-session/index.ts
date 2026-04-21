@@ -68,7 +68,7 @@ serve(async (req) => {
 
     const portalSession = await stripe.billingPortal.sessions.create({
       customer: sub.stripe_customer_id,
-      return_url: returnUrl || `${req.headers.get('origin') || 'https://truckpay.app'}/`,
+      return_url: returnUrl || `${req.headers.get('origin') || 'https://truckpay.app'}/dashboard`,
     });
 
     return new Response(JSON.stringify({ url: portalSession.url }), {

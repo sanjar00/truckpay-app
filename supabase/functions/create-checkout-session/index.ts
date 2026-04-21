@@ -96,8 +96,8 @@ serve(async (req) => {
       payment_method_types: ['card'],
       line_items: [{ price: priceId, quantity: 1 }],
       mode: 'subscription',
-      success_url: successUrl || `${req.headers.get('origin') || 'https://truckpay.app'}/?checkout=success`,
-      cancel_url: cancelUrl || `${req.headers.get('origin') || 'https://truckpay.app'}/`,
+      success_url: successUrl || `${req.headers.get('origin') || 'https://truckpay.app'}/dashboard?checkout=success`,
+      cancel_url: cancelUrl || `${req.headers.get('origin') || 'https://truckpay.app'}/dashboard`,
       // Pass user_id in both places — session metadata for checkout.session.completed,
       // subscription metadata for subscription update/delete events
       metadata: { user_id: user.id },
