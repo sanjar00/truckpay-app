@@ -27,7 +27,7 @@ const DEFAULT_SUB: Subscription = {
   stripeSubscriptionId: null,
 };
 
-export const PRO_FEATURES = ['ifta', 'perdiem', 'ytd', 'fullHistory', 'export', 'receipts', 'forecast'] as const;
+export const PRO_FEATURES = ['ifta', 'perdiem', 'ytd', 'fullHistory', 'export', 'receipts', 'forecast', 'multiStop'] as const;
 export const OWNER_FEATURES = ['dispatcher', 'laneAnalytics', 'annualGoal', 'multiTruck'] as const;
 
 type ProFeature = typeof PRO_FEATURES[number];

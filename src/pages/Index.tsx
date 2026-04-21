@@ -952,6 +952,8 @@ const Index = () => {
             weekStart={userProfile ? getUserWeekStart(new Date(), userProfile) : new Date()}
             weekEnd={userProfile ? getUserWeekEnd(new Date(), userProfile) : new Date()}
             userProfile={userProfile}
+            canUseMultiStop={isFeatureAllowed('multiStop')}
+            onUpgrade={() => setUpgradeModal({ feature: 'multiStop', tier: 'pro' })}
           />
         </DialogContent>
       </Dialog>

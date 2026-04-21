@@ -237,6 +237,8 @@ const LoadReports = ({ onBack, user, userProfile, deductions, onUpgrade }: LoadR
               weekStart={weekStart}
               weekEnd={weekEnd}
               userProfile={userProfile}
+              canUseMultiStop={isFeatureAllowed('multiStop')}
+              onUpgrade={onUpgrade}
             />
           </DialogContent>
         </Dialog>

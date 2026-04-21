@@ -60,13 +60,36 @@ serve(async (req) => {
   }
 
   try {
-    const { pickupZip, deliveryZip } = await req.json();
+    const body = await req.json();
 
-    if (!pickupZip || !deliveryZip) {
-      return new Response(JSON.stringify({ error: 'pickupZip and deliveryZip are required' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    // Accept either the legacy single-pair shape {pickupZip, deliveryZip} OR
+    // the multi-stop shape {stops: [zip, zip, zip, …]}. Multi-stop simply adds
+    // waypoints to the Directions request — the downstream polyline-sampling
+    // logic is identical regardless of stop count.
+    let origin: string | undefined;
+    let destination: string | undefined;
+    let waypoints: string[] = [];
+
+    if (Array.isArray(body?.stops)) {
+      const list = body.stops.map((s: any) => String(s || '').trim()).filter((s: string) => s.length > 0);
+      if (list.length < 2) {
+        return new Response(JSON.stringify({ error: 'At least 2 stops required' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      origin = list[0];
+      destination = list[list.length - 1];
+      waypoints = list.slice(1, -1);
+    } else {
+      origin = body?.pickupZip;
+      destination = body?.deliveryZip;
+      if (!origin || !destination) {
+        return new Response(JSON.stringify({ error: 'pickupZip and deliveryZip are required' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
     }
 
     const apiKey = Deno.env.get('GOOGLE_MAPS_API_KEY');
@@ -78,8 +101,17 @@ serve(async (req) => {
     }
 
     // ── Step 1: Get the driving route with full overview polyline ──────────────
+    const params = new URLSearchParams({
+      origin: origin!,
+      destination: destination!,
+      mode: 'driving',
+      key: apiKey,
+    });
+    if (waypoints.length > 0) {
+      params.set('waypoints', waypoints.join('|'));
+    }
     const directionsRes = await fetch(
-      `https://maps.googleapis.com/maps/api/directions/json?origin=${encodeURIComponent(pickupZip)}&destination=${encodeURIComponent(deliveryZip)}&mode=driving&key=${apiKey}`
+      `https://maps.googleapis.com/maps/api/directions/json?${params.toString()}`
     );
     const directions = await directionsRes.json();
 

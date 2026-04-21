@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
-import { MapPin, Calendar, Trash2, Edit, Save, X, MoreHorizontal, ChevronDown, ChevronUp, Loader2, DollarSign } from 'lucide-react';
+import { MapPin, Calendar, Trash2, Edit, Save, X, MoreHorizontal, ChevronDown, ChevronUp, Loader2, DollarSign, Circle } from 'lucide-react';
 import { format } from 'date-fns';
 import { formatCurrency } from '@/lib/utils';
 import { calculateDriverPay } from '@/lib/loadReportsUtils';
@@ -11,6 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { useZipLookup } from '@/hooks/useZipLookup';
+import { LoadStop } from '@/types/LoadReports';
 
 function getProfitabilityGrade(grossRate: number, miles: number) {
   if (!miles || miles <= 0) return null;
@@ -52,6 +53,9 @@ interface Load {
   pickupCityState?: string;
   deliveryCityState?: string;
   estimatedMiles?: number;
+  stopCount?: number;
+  totalStopOffFees?: number;
+  stops?: LoadStop[];
 }
 
 interface LoadCardProps {
@@ -70,6 +74,9 @@ const LoadCard = ({ load, onDelete, onEdit, estimatedMiles, userProfile }: LoadC
   const grade = milesForGrade ? getProfitabilityGrade(load.rate, milesForGrade) : null;
 
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [stopsExpanded, setStopsExpanded] = useState(false);
+
+  const hasIntermediateStops = (load.stops?.length ?? 0) > 0;
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'Not set';
@@ -99,7 +106,44 @@ const LoadCard = ({ load, onDelete, onEdit, estimatedMiles, userProfile }: LoadC
               <MapPin className="w-4 h-4 text-gray-500 mt-0.5 shrink-0" />
               <div className="flex-1 min-w-0">
                 <p className="font-medium text-sm leading-tight">{pickupLabel}</p>
-                <p className="text-xs text-gray-400 my-0.5">↓</p>
+                {hasIntermediateStops ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setStopsExpanded(s => !s)}
+                      className="text-[11px] text-blue-600 my-0.5 brutal-mono font-semibold hover:underline flex items-center gap-1"
+                    >
+                      ↓ {load.stops!.length} intermediate stop{load.stops!.length === 1 ? '' : 's'}
+                      {stopsExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                    </button>
+                    {stopsExpanded && (
+                      <div className="my-1 ml-1 pl-2 border-l-2 border-gray-200 space-y-1">
+                        {load.stops!.map((s) => (
+                          <div key={s.id || s.sequence} className="flex items-start gap-1.5">
+                            <Circle className="w-2.5 h-2.5 text-gray-400 mt-1 shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs leading-tight">
+                                <span className="brutal-mono text-[10px] font-bold text-gray-500 mr-1">
+                                  {s.stopType === 'pickup' ? 'P/U' : 'DEL'}
+                                </span>
+                                {s.zip ? `${s.zip}${s.cityState ? ` · ${s.cityState}` : ''}` : (s.cityState || '—')}
+                              </p>
+                              {(!!s.stopOffFee || !!s.detentionAmount) && (
+                                <p className="text-[10px] text-muted-foreground">
+                                  {s.stopOffFee ? `+$${formatCurrency(s.stopOffFee)} stop-off` : ''}
+                                  {s.stopOffFee && s.detentionAmount ? ' · ' : ''}
+                                  {s.detentionAmount ? `+$${formatCurrency(s.detentionAmount)} detention` : ''}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-xs text-gray-400 my-0.5">↓</p>
+                )}
                 <p className="font-medium text-sm leading-tight">{deliveryLabel}</p>
               </div>
               {grade && (

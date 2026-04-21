@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { format, addWeeks, subWeeks, isWithinInterval, parseISO } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { getUserWeekStart, getUserWeekEnd } from '@/lib/weeklyPeriodUtils';
-import { calculateDriverPay } from '@/lib/loadReportsUtils';
-import { Load, NewLoad, WeeklyMileage, ExtraDeduction } from '@/types/LoadReports';
+import { calculateDriverPay, sumStopSideEffects } from '@/lib/loadReportsUtils';
+import { Load, LoadStop, NewLoad, NewLoadStop, WeeklyMileage, ExtraDeduction } from '@/types/LoadReports';
 
 // Helper function to format dates without timezone issues
 const formatDateForDB = (date: Date): string => {
@@ -24,6 +24,7 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
     locationTo: '',
     pickupDate: new Date(),
     deliveryDate: new Date(),
+    stops: [],
   });
   const [showAddForm, setShowAddForm] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -60,11 +61,13 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
 
   const fetchLoads = async () => {
     if (!user) return;
-    
+
     try {
+      // Nested select pulls intermediate stops (load_stops) in one round-trip.
+      // For single-stop loads, load_stops is simply an empty array.
       const { data, error } = await supabase
         .from('load_reports')
-        .select('*')
+        .select('*, load_stops(*)')
         .eq('user_id', user.id)
         .order('date_added', { ascending: false });
 
@@ -74,27 +77,49 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
       }
 
       if (data) {
-        const formattedLoads = data.map(load => ({
-          id: load.id,
-          rate: load.rate,
-          companyDeduction: load.company_deduction,
-          driverPay: load.driver_pay,
-          locationFrom: load.location_from,
-          locationTo: load.location_to,
-          pickupDate: load.pickup_date,
-          deliveryDate: load.delivery_date,
-          dateAdded: load.date_added,
-          weekPeriod: load.week_period,
-          deadheadMiles: load.deadhead_miles,
-          detentionAmount: load.detention_amount,
-          notes: load.notes,
-          pickupZip: load.pickup_zip,
-          deliveryZip: load.delivery_zip,
-          pickupCityState: load.pickup_city_state,
-          deliveryCityState: load.delivery_city_state,
-          estimatedMiles: load.estimated_miles,
-        }));
-        
+        const formattedLoads: Load[] = data.map((load: any) => {
+          const rawStops: any[] = Array.isArray(load.load_stops) ? load.load_stops : [];
+          const stops: LoadStop[] = rawStops
+            .slice()
+            .sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0))
+            .map(s => ({
+              id: s.id,
+              sequence: s.sequence,
+              stopType: s.stop_type,
+              zip: s.zip ?? undefined,
+              cityState: s.city_state ?? undefined,
+              scheduledAt: s.scheduled_at ?? undefined,
+              detentionAmount: s.detention_amount ?? 0,
+              stopOffFee: s.stop_off_fee ?? 0,
+              legMiles: s.leg_miles ?? undefined,
+              notes: s.notes ?? undefined,
+            }));
+
+          return {
+            id: load.id,
+            rate: load.rate,
+            companyDeduction: load.company_deduction,
+            driverPay: load.driver_pay,
+            locationFrom: load.location_from,
+            locationTo: load.location_to,
+            pickupDate: load.pickup_date,
+            deliveryDate: load.delivery_date,
+            dateAdded: load.date_added,
+            weekPeriod: load.week_period,
+            deadheadMiles: load.deadhead_miles,
+            detentionAmount: load.detention_amount,
+            notes: load.notes,
+            pickupZip: load.pickup_zip,
+            deliveryZip: load.delivery_zip,
+            pickupCityState: load.pickup_city_state,
+            deliveryCityState: load.delivery_city_state,
+            estimatedMiles: load.estimated_miles,
+            stopCount: load.stop_count ?? 2,
+            totalStopOffFees: load.total_stop_off_fees ?? 0,
+            stops,
+          };
+        });
+
         setLoads(formattedLoads);
       }
     } catch (error) {
@@ -126,16 +151,26 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
             ? parseFloat(load.companyDeduction)
             : parseFloat(String(userProfile?.companyDeduction || 0));
         const companyDeduction = Number.isNaN(parsedCompanyDeduction) ? 0 : parsedCompanyDeduction;
-        const detentionAmount = load.detentionAmount ? parseFloat(load.detentionAmount) : undefined;
+
+        // Intermediate stops (may be empty for single-stop A→B loads).
+        const intermediateStops: NewLoadStop[] = Array.isArray(load.stops) ? load.stops : [];
+
+        // Per-stop detention and stop-off fees roll into the driver pay calculation.
+        const stopSideEffects = sumStopSideEffects(intermediateStops);
+        const headerDetention = load.detentionAmount ? parseFloat(load.detentionAmount) : 0;
+        const totalDetention = (Number.isNaN(headerDetention) ? 0 : headerDetention) + stopSideEffects.detention;
+
         const driverPay = calculateDriverPay(
           parseFloat(load.rate),
           userProfile,
           load.estimatedMiles,
-          detentionAmount,
-          companyDeduction
+          totalDetention,
+          companyDeduction,
+          stopSideEffects.stopOffFees,
         );
         const weekPeriod = `${format(weekStart, 'MMM dd')} - ${format(weekEnd, 'MMM dd, yyyy')}`;
         const loadDate = weekStart.toISOString().split('T')[0];
+        const stopCount = 2 + intermediateStops.length;
         const payload = {
           rate: parseFloat(load.rate),
           company_deduction: companyDeduction,
@@ -147,13 +182,15 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
           date_added: loadDate,
           week_period: weekPeriod,
           deadhead_miles: load.deadheadMiles ? parseFloat(load.deadheadMiles) : null,
-          detention_amount: load.detentionAmount ? parseFloat(load.detentionAmount) : null,
+          detention_amount: headerDetention ? headerDetention : null,
           notes: load.notes || null,
           pickup_zip: load.pickupZip || null,
           delivery_zip: load.deliveryZip || null,
           pickup_city_state: load.pickupCityState || null,
           delivery_city_state: load.deliveryCityState || null,
           estimated_miles: load.estimatedMiles ?? null,
+          stop_count: stopCount,
+          total_stop_off_fees: stopSideEffects.stopOffFees,
         };
 
         const query = editingLoad
@@ -177,7 +214,62 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
         }
 
         if (data) {
-          const normalizedLoad = {
+          // ── Stops write: delete-then-insert for simplicity. For single-stop
+          //    loads (empty intermediateStops) this still correctly clears any
+          //    stale rows from a prior multi-stop edit. Failures here are logged
+          //    but do NOT roll back the load_reports row — the header is the
+          //    source of truth and is the main thing the user sees.
+          const loadId = data.id as string;
+          if (editingLoad) {
+            const { error: delErr } = await supabase
+              .from('load_stops')
+              .delete()
+              .eq('load_id', loadId)
+              .eq('user_id', user.id);
+            if (delErr) console.error('Error clearing old stops:', delErr);
+          }
+
+          let savedStops: LoadStop[] = [];
+          if (intermediateStops.length > 0) {
+            const stopsPayload = intermediateStops.map((s, idx) => ({
+              load_id: loadId,
+              user_id: user.id,
+              sequence: idx + 2, // positions 2..N-1 (origin=1, destination=N)
+              stop_type: s.stopType,
+              zip: s.zip || null,
+              city_state: s.cityState || null,
+              scheduled_at: s.scheduledAt ? s.scheduledAt.toISOString() : null,
+              detention_amount: s.detentionAmount ? parseFloat(s.detentionAmount) : 0,
+              stop_off_fee: s.stopOffFee ? parseFloat(s.stopOffFee) : 0,
+              leg_miles: s.legMiles ?? null,
+              notes: s.notes || null,
+            }));
+            const { data: stopsData, error: stopsErr } = await supabase
+              .from('load_stops')
+              .insert(stopsPayload)
+              .select();
+            if (stopsErr) {
+              console.error('Error saving load stops:', stopsErr);
+            } else if (stopsData) {
+              savedStops = stopsData
+                .slice()
+                .sort((a: any, b: any) => (a.sequence ?? 0) - (b.sequence ?? 0))
+                .map((s: any) => ({
+                  id: s.id,
+                  sequence: s.sequence,
+                  stopType: s.stop_type,
+                  zip: s.zip ?? undefined,
+                  cityState: s.city_state ?? undefined,
+                  scheduledAt: s.scheduled_at ?? undefined,
+                  detentionAmount: s.detention_amount ?? 0,
+                  stopOffFee: s.stop_off_fee ?? 0,
+                  legMiles: s.leg_miles ?? undefined,
+                  notes: s.notes ?? undefined,
+                }));
+            }
+          }
+
+          const normalizedLoad: Load = {
             id: data.id,
             rate: data.rate,
             companyDeduction: data.company_deduction,
@@ -196,6 +288,9 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
             pickupCityState: data.pickup_city_state,
             deliveryCityState: data.delivery_city_state,
             estimatedMiles: data.estimated_miles,
+            stopCount: data.stop_count ?? 2,
+            totalStopOffFees: data.total_stop_off_fees ?? 0,
+            stops: savedStops,
           };
 
           if (editingLoad) {
@@ -219,6 +314,7 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
             pickupCityState: '',
             deliveryCityState: '',
             estimatedMiles: undefined,
+            stops: [],
           });
           setShowAddForm(false);
           setEditingLoad(null);

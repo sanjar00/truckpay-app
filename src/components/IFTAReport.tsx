@@ -34,6 +34,13 @@ interface ScannedFuelData {
   date: string | null;
 }
 
+interface LoadStopLite {
+  sequence: number;
+  stopType: 'pickup' | 'delivery';
+  zip?: string;
+  cityState?: string;
+}
+
 interface LoadData {
   id: string;
   pickupDate?: string;
@@ -46,6 +53,8 @@ interface LoadData {
   estimatedMiles?: number;
   statesMiles?: StateMilesEntry[];
   fuelPurchases?: FuelPurchaseEntry[];
+  // Intermediate stops (sequence 2..N-1). Empty/undefined for single-stop loads.
+  stops?: LoadStopLite[];
 }
 
 interface IFTARowData {
@@ -148,26 +157,40 @@ const IFTAReport = ({ onBack }: IFTAReportProps) => {
     const fetchLoads = async () => {
       setLoading(true);
       try {
+        // Also fetch load_stops (intermediate stops) so auto-calculate can
+        // build the correct multi-stop route when a load has them.
         const { data, error } = await supabase
           .from('load_reports')
-          .select('id, pickup_date, location_from, location_to, pickup_zip, delivery_zip, pickup_city_state, delivery_city_state, estimated_miles, states_miles, fuel_purchases')
+          .select('id, pickup_date, location_from, location_to, pickup_zip, delivery_zip, pickup_city_state, delivery_city_state, estimated_miles, states_miles, fuel_purchases, load_stops(sequence, stop_type, zip, city_state)')
           .eq('user_id', user.id);
         if (error) throw error;
         if (data) {
           setLoads(
-            data.map((l) => ({
-              id: l.id,
-              pickupDate: l.pickup_date,
-              locationFrom: l.location_from,
-              locationTo: l.location_to,
-              pickupZip: l.pickup_zip,
-              deliveryZip: l.delivery_zip,
-              pickupCityState: l.pickup_city_state,
-              deliveryCityState: l.delivery_city_state,
-              estimatedMiles: l.estimated_miles,
-              statesMiles: l.states_miles as StateMilesEntry[] | undefined,
-              fuelPurchases: l.fuel_purchases as FuelPurchaseEntry[] | undefined,
-            }))
+            data.map((l: any) => {
+              const rawStops = Array.isArray(l.load_stops) ? l.load_stops : [];
+              const stops: LoadStopLite[] = rawStops
+                .map((s: any) => ({
+                  sequence: s.sequence,
+                  stopType: s.stop_type,
+                  zip: s.zip ?? undefined,
+                  cityState: s.city_state ?? undefined,
+                }))
+                .sort((a: LoadStopLite, b: LoadStopLite) => a.sequence - b.sequence);
+              return {
+                id: l.id,
+                pickupDate: l.pickup_date,
+                locationFrom: l.location_from,
+                locationTo: l.location_to,
+                pickupZip: l.pickup_zip,
+                deliveryZip: l.delivery_zip,
+                pickupCityState: l.pickup_city_state,
+                deliveryCityState: l.delivery_city_state,
+                estimatedMiles: l.estimated_miles,
+                statesMiles: l.states_miles as StateMilesEntry[] | undefined,
+                fuelPurchases: l.fuel_purchases as FuelPurchaseEntry[] | undefined,
+                stops: stops.length > 0 ? stops : undefined,
+              };
+            })
           );
         }
       } catch (e) {
@@ -266,13 +289,27 @@ const IFTAReport = ({ onBack }: IFTAReportProps) => {
     }
   };
 
-  // Enhancement A: call the calculate-ifta-miles edge function
+  // Enhancement A: call the calculate-ifta-miles edge function.
+  // If the load has intermediate stops, send them all as an ordered list so the
+  // edge function routes through every waypoint; otherwise use the legacy
+  // single-pair shape. Either path returns the same { stateMiles } result.
   const calculateStateMiles = async (load: LoadData) => {
     if (!load.pickupZip || !load.deliveryZip) return;
     setCalculatingMiles(true);
     try {
+      const hasIntermediate = (load.stops?.length ?? 0) > 0;
+      const body = hasIntermediate
+        ? {
+            stops: [
+              load.pickupZip,
+              ...load.stops!.map((s) => s.zip).filter((z): z is string => !!z),
+              load.deliveryZip,
+            ],
+          }
+        : { pickupZip: load.pickupZip, deliveryZip: load.deliveryZip };
+
       const { data, error } = await supabase.functions.invoke('calculate-ifta-miles', {
-        body: { pickupZip: load.pickupZip, deliveryZip: load.deliveryZip },
+        body,
       });
       if (error) throw new Error(error.message || String(error));
       // Edge function returns { error } with HTTP 200 when a Google API call fails

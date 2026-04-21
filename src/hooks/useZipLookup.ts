@@ -159,11 +159,63 @@ export function useZipLookup() {
     }));
   }, []);
 
+  /**
+   * Multi-stop lookup. Takes an ordered array of 5-digit ZIP strings
+   * (origin, waypoint, waypoint, …, destination) and returns the full
+   * route in ONE edge-function request (uses Google Directions API with
+   * waypoints under the hood).
+   *
+   * Does not touch the existing pickup/delivery state — consumers manage
+   * their own multi-stop state. Returns null on any failure.
+   */
+  const resolveStops = useCallback(async (zips: string[]): Promise<{
+    totalMiles: number;
+    cityStates: string[];
+    legs: Array<{ fromZip: string; toZip: string; fromCityState: string; toCityState: string; miles: number }>;
+  } | null> => {
+    const cleaned = (zips || []).map(z => String(z || '').trim());
+    if (cleaned.length < 2) return null;
+    for (const z of cleaned) {
+      if (!/^\d{5}$/.test(z)) return null;
+    }
+
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/driving-distance`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({ stops: cleaned }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+      const data = await res.json();
+
+      if (data.error || typeof data.totalMiles !== 'number') {
+        return null;
+      }
+
+      return {
+        totalMiles: data.totalMiles,
+        cityStates: Array.isArray(data.cityStates) ? data.cityStates : [],
+        legs: Array.isArray(data.legs) ? data.legs : [],
+      };
+    } catch {
+      return null;
+    }
+  }, []);
+
   return {
     ...state,
     lookupPickupZip,
     lookupDeliveryZip,
     reset,
     preload,
+    resolveStops,
   };
 }
