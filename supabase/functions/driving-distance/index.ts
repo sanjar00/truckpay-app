@@ -9,9 +9,12 @@ const corsHeaders = {
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 // Parse "123 Main St, Chicago, IL 60601, USA" → "Chicago, IL"
+// Uses [^,]+ (any non-comma chars) so Unicode city names like
+// "La Cañada Flintridge" parse correctly. The \b before the 2-letter
+// state code ensures we match the state abbreviation, not a random all-caps word.
 function parseCityState(address: string): string {
   if (!address) return '';
-  const match = address.match(/([A-Za-z .'\-]+),\s*([A-Z]{2})\b/);
+  const match = address.match(/([^,]+),\s*([A-Z]{2})\b/);
   return match ? `${match[1].trim()}, ${match[2]}` : address;
 }
 

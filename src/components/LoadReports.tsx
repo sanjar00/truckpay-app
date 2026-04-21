@@ -272,6 +272,19 @@ const LoadReports = ({ onBack, user, userProfile, deductions, onUpgrade }: LoadR
                       locationFrom: load.locationFrom || '',
                       locationTo: load.locationTo || '',
                       estimatedMiles: load.estimatedMiles,
+                      // Hydrate intermediate stops so the edit modal re-displays them
+                      stops: (load.stops || []).map((s) => ({
+                        tempId: `edit-${s.id || s.sequence}`,
+                        existingId: s.id,
+                        stopType: s.stopType,
+                        zip: s.zip || '',
+                        cityState: s.cityState || '',
+                        scheduledAt: s.scheduledAt ? new Date(s.scheduledAt) : undefined,
+                        detentionAmount: s.detentionAmount ? String(s.detentionAmount) : '',
+                        stopOffFee: s.stopOffFee ? String(s.stopOffFee) : '',
+                        legMiles: s.legMiles,
+                        notes: s.notes,
+                      })),
                     });
                     setEditingLoad(load.id);
                     setShowAddForm(true);

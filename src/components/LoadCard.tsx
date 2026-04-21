@@ -77,6 +77,11 @@ const LoadCard = ({ load, onDelete, onEdit, estimatedMiles, userProfile }: LoadC
   const [stopsExpanded, setStopsExpanded] = useState(false);
 
   const hasIntermediateStops = (load.stops?.length ?? 0) > 0;
+  // Count-based fallback: the stop_count column on load_reports is the source
+  // of truth, so a MULTI-STOP badge still shows even when load_stops rows
+  // haven't been hydrated yet (e.g. table not in DB).
+  const intermediateCount = Math.max(0, (load.stopCount ?? 2) - 2);
+  const isMultiStop = intermediateCount > 0 || hasIntermediateStops;
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'Not set';
@@ -102,6 +107,16 @@ const LoadCard = ({ load, onDelete, onEdit, estimatedMiles, userProfile }: LoadC
       <CardContent className="p-4">
         <div className="flex justify-between items-start">
           <div className="flex-1">
+            {isMultiStop && (
+              <div className="mb-2">
+                <span
+                  className="brutal-mono text-[10px] font-bold px-2 py-0.5 rounded inline-flex items-center gap-1"
+                  style={{ background: '#f0a500', color: '#1a1a2e', letterSpacing: '1px' }}
+                >
+                  MULTI-STOP · {intermediateCount + 2} STOPS
+                </span>
+              </div>
+            )}
             <div className="flex items-start gap-2 mb-2">
               <MapPin className="w-4 h-4 text-gray-500 mt-0.5 shrink-0" />
               <div className="flex-1 min-w-0">
