@@ -37,9 +37,18 @@ interface DeductionsProps {
   deductions: Deduction[];
   setDeductions: React.Dispatch<React.SetStateAction<Deduction[]>>;
   onUpgrade?: () => void;
+  onboardingStep?: string | null;
+  onOnboardingEvent?: (event: string) => void;
 }
 
-const Deductions = ({ onBack, deductions, setDeductions, onUpgrade }: DeductionsProps) => {
+const Deductions = ({
+  onBack,
+  deductions,
+  setDeductions,
+  onUpgrade,
+  onboardingStep,
+  onOnboardingEvent,
+}: DeductionsProps) => {
   const { user } = useAuth();
   const { isFeatureAllowed } = useSubscription();
   const [fixedDeductions, setFixedDeductions] = useState({});
@@ -146,6 +155,12 @@ const Deductions = ({ onBack, deductions, setDeductions, onUpgrade }: Deductions
   };
 
   const handleFixedToggleWithConfirmation = (type: string, checked: boolean) => {
+    if (onboardingStep === 'deduction-recurring' && checked) {
+      handleFixedToggle(type, checked);
+      onOnboardingEvent?.('recurring-checked');
+      return;
+    }
+
     if (checked) {
       // Show confirmation dialog when marking as fixed
       setPendingFixAction({ type, checked });
@@ -229,6 +244,7 @@ const Deductions = ({ onBack, deductions, setDeductions, onUpgrade }: Deductions
     
         // Refresh deductions from database
         await fetchDeductions();
+        onOnboardingEvent?.('fixed-saved');
         
         // Clear the form
         setFixedDeductions(prev => ({
@@ -281,6 +297,7 @@ const Deductions = ({ onBack, deductions, setDeductions, onUpgrade }: Deductions
         }
 
         setNewDeductionType('');
+        onOnboardingEvent?.('type-added');
         
       } catch (error) {
         console.error('Error adding custom deduction type:', error);
@@ -404,7 +421,10 @@ const Deductions = ({ onBack, deductions, setDeductions, onUpgrade }: Deductions
                               id={`fix-${type}`}
                               checked={isFixed || !!existingDeduction}
                               onCheckedChange={(checked) => handleFixedToggleWithConfirmation(type, checked)}
-                              className="brutal-border w-5 h-5"
+                              data-onboarding="deduction-recurring"
+                              className={`brutal-border w-5 h-5 ${
+                                onboardingStep === 'deduction-recurring' ? 'onboarding-target' : ''
+                              }`}
                             />
                           </div>
                           <AlertDialogContent className="brutal-border bg-card brutal-shadow-lg">
@@ -460,13 +480,24 @@ const Deductions = ({ onBack, deductions, setDeductions, onUpgrade }: Deductions
                             step="0.01"
                             min="0"
                             value={fixedDeductions[type]?.amount || (existingDeduction ? existingDeduction.amount : '')}
-                            onChange={(e) => handleAmountChange(type, e.target.value)}
-                            className="brutal-border bg-background text-lg font-bold flex-1"
+                            onChange={(e) => {
+                              handleAmountChange(type, e.target.value);
+                            }}
+                            onBlur={(e) => {
+                              if (e.target.value.trim()) onOnboardingEvent?.('amount-entered');
+                            }}
+                            data-onboarding="deduction-amount"
+                            className={`brutal-border bg-background text-lg font-bold flex-1 ${
+                              onboardingStep === 'deduction-amount' ? 'onboarding-target' : ''
+                            }`}
                           />
                           <Button
                             onClick={() => handleSaveFixedDeduction(type)}
                             disabled={!fixedDeductions[type]?.amount && !existingDeduction}
-                            className="brutal-border-success bg-success text-success-foreground brutal-shadow"
+                            data-onboarding="deduction-save"
+                            className={`brutal-border-success bg-success text-success-foreground brutal-shadow ${
+                              onboardingStep === 'deduction-save' ? 'onboarding-target' : ''
+                            }`}
                           >
                             <span className="brutal-text">{existingDeduction ? 'UPDATE' : 'SAVE'}</span>
                           </Button>
@@ -504,13 +535,24 @@ const Deductions = ({ onBack, deductions, setDeductions, onUpgrade }: Deductions
               type="text"
               placeholder="Enter expense type name"
               value={newDeductionType}
-              onChange={(e) => setNewDeductionType(e.target.value)}
-              className="brutal-border bg-background text-lg font-bold flex-1"
+              onChange={(e) => {
+                setNewDeductionType(e.target.value);
+              }}
+              onBlur={(e) => {
+                if (e.target.value.trim()) onOnboardingEvent?.('type-entered');
+              }}
+              data-onboarding="deduction-type-input"
+              className={`brutal-border bg-background text-lg font-bold flex-1 ${
+                onboardingStep === 'deduction-type-input' ? 'onboarding-target' : ''
+              }`}
             />
             <Button
               onClick={handleAddCustomType}
               disabled={!newDeductionType.trim()}
-              className="brutal-border-primary bg-primary text-primary-foreground brutal-shadow-lg brutal-hover"
+              data-onboarding="deduction-type-add"
+              className={`brutal-border-primary bg-primary text-primary-foreground brutal-shadow-lg brutal-hover ${
+                onboardingStep === 'deduction-type-add' ? 'onboarding-target' : ''
+              }`}
             >
               <Plus className="w-6 h-6 mr-2" />
               <span className="brutal-text">Add</span>

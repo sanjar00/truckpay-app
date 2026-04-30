@@ -197,6 +197,96 @@
     background-size: 20px 20px;
   }
 
+  .onboarding-veil {
+    position: fixed;
+    inset: 0;
+    z-index: 45;
+    background: rgba(26, 26, 46, 0.38);
+    backdrop-filter: blur(3px);
+    pointer-events: auto;
+  }
+
+  [data-onboarding].onboarding-target {
+    position: relative;
+    z-index: 60;
+    outline: 4px solid #f0a500;
+    outline-offset: 4px;
+    box-shadow: 8px 8px 0 #000, 0 0 0 9999px rgba(26, 26, 46, 0.08);
+  }
+
+  .onboarding-cloud {
+    position: fixed;
+    z-index: 70;
+    min-height: 116px;
+    padding: 16px 18px;
+    background: #ffffff;
+    color: #1a1a2e;
+    border: 3px solid #1a1a2e;
+    border-radius: 28px;
+    box-shadow: 6px 6px 0 #000;
+    pointer-events: none;
+  }
+
+  .onboarding-cloud::before,
+  .onboarding-cloud::after {
+    content: '';
+    position: absolute;
+    background: #ffffff;
+    border: 3px solid #1a1a2e;
+    border-radius: 999px;
+  }
+
+  .onboarding-cloud::before {
+    width: 54px;
+    height: 34px;
+    left: 28px;
+    top: -20px;
+  }
+
+  .onboarding-cloud::after {
+    width: 38px;
+    height: 28px;
+    right: 38px;
+    top: -16px;
+  }
+
+  .onboarding-cloud-title,
+  .onboarding-cloud-body,
+  .onboarding-step-label {
+    position: relative;
+    z-index: 1;
+  }
+
+  .onboarding-step-label {
+    margin-bottom: 4px;
+    font-size: 10px;
+    line-height: 1.2;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: #c0392b;
+  }
+
+  .onboarding-cloud-title {
+    margin-bottom: 6px;
+    font-size: 18px;
+    line-height: 1.1;
+    letter-spacing: 0;
+  }
+
+  .onboarding-cloud-body {
+    font-size: 12px;
+    line-height: 1.45;
+    color: #1a1a2e;
+  }
+
+  .onboarding-cloud-bottom {
+    border-top-left-radius: 16px;
+  }
+
+  .onboarding-cloud-top {
+    border-bottom-right-radius: 16px;
+  }
+
   /* Mobile-specific optimizations */
   @media (max-width: 768px) {
     .brutal-shadow {
@@ -228,6 +318,20 @@
 
     .brutal-grid {
       background-size: 15px 15px;
+    }
+
+    [data-onboarding].onboarding-target {
+      outline-width: 3px;
+      outline-offset: 3px;
+      box-shadow: 4px 4px 0 #000, 0 0 0 9999px rgba(26, 26, 46, 0.08);
+    }
+
+    .onboarding-cloud {
+      width: calc(100vw - 32px) !important;
+      max-width: 300px;
+      padding: 14px 16px;
+      border-radius: 22px;
+      box-shadow: 4px 4px 0 #000;
     }
 
     /* Mobile text scaling */
