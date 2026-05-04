@@ -64,8 +64,6 @@ export interface LoadReportsProps {
   userProfile: any;
   deductions: any[];
   onUpgrade?: () => void;
-  onboardingStep?: string | null;
-  onOnboardingEvent?: (event: string) => void;
 }
 
 export interface WeeklyMileage {

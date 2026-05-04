@@ -12,12 +12,12 @@ const OnboardingWelcomeModal = ({ onStart, onSkip }: OnboardingWelcomeModalProps
         <div className="flex items-start justify-between gap-3 mb-4">
           <div>
             <p className="brutal-mono text-xs uppercase tracking-widest text-muted-foreground mb-1">Welcome to TruckPay</p>
-            <h2 className="brutal-text text-2xl text-foreground leading-tight">Want a quick setup tour?</h2>
+            <h2 className="brutal-text text-2xl text-foreground leading-tight">Drive smart. Earn more.</h2>
           </div>
           <button
             type="button"
             onClick={onSkip}
-            aria-label="Skip onboarding"
+            aria-label="Close welcome"
             className="brutal-border bg-background brutal-shadow p-2 min-w-11 min-h-11 flex items-center justify-center"
           >
             <X className="w-5 h-5" />
@@ -25,7 +25,7 @@ const OnboardingWelcomeModal = ({ onStart, onSkip }: OnboardingWelcomeModalProps
         </div>
 
         <p className="brutal-mono text-sm text-muted-foreground leading-relaxed mb-5">
-          We can walk you through adding truck expenses first, then show where to add your loads.
+          Track your loads, truck expenses, mileage, and weekly take-home in one place.
         </p>
 
         <div className="grid grid-cols-2 gap-3">
@@ -34,7 +34,7 @@ const OnboardingWelcomeModal = ({ onStart, onSkip }: OnboardingWelcomeModalProps
             onClick={onSkip}
             className="brutal-border bg-background brutal-shadow brutal-mono text-sm font-bold uppercase min-h-12"
           >
-            Skip
+            Close
           </button>
           <button
             type="button"
@@ -42,7 +42,7 @@ const OnboardingWelcomeModal = ({ onStart, onSkip }: OnboardingWelcomeModalProps
             className="brutal-border brutal-shadow brutal-mono text-sm font-bold uppercase min-h-12"
             style={{ background: '#f0a500', color: '#1a1a2e' }}
           >
-            Start
+            Get Started
           </button>
         </div>
       </div>

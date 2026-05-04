@@ -19,7 +19,7 @@ import { getUserWeekStart } from '@/lib/weeklyPeriodUtils';
 import { LoadReportsProps, DeleteConfirmation } from '@/types/LoadReports';
 import WeeklyForecastCard from './WeeklyForecastCard';
 
-const LoadReports = ({ onBack, user, userProfile, deductions, onUpgrade, onboardingStep, onOnboardingEvent }: LoadReportsProps) => {
+const LoadReports = ({ onBack, user, userProfile, deductions, onUpgrade }: LoadReportsProps) => {
   const { isFeatureAllowed } = useSubscription();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<DeleteConfirmation | null>(null);
   const [showAddExtraDeduction, setShowAddExtraDeduction] = useState(false);
@@ -136,7 +136,6 @@ const LoadReports = ({ onBack, user, userProfile, deductions, onUpgrade, onboard
       return;
     }
     setShowAddForm(true);
-    onOnboardingEvent?.('open-load-form');
   };
 
   const totalGrossPay = currentWeekLoads.reduce((total, load) => total + ((load.rate || 0) + (load.detentionAmount || 0)), 0);
@@ -180,10 +179,7 @@ const LoadReports = ({ onBack, user, userProfile, deductions, onUpgrade, onboard
         {/* Add Load Button */}
         <Button
           onClick={handleShowAddForm}
-          data-onboarding="load-add-button"
-          className={`w-full h-16 brutal-border-accent hover:brutal-border-info bg-accent hover:bg-accent text-accent-foreground brutal-hover brutal-active ${
-            onboardingStep === 'load-add-button' ? 'onboarding-target' : ''
-          }`}
+          className="w-full h-16 brutal-border-accent hover:brutal-border-info bg-accent hover:bg-accent text-accent-foreground brutal-hover brutal-active"
           size="lg"
         >
           <Plus className="w-8 h-8 mr-3" />
@@ -243,8 +239,6 @@ const LoadReports = ({ onBack, user, userProfile, deductions, onUpgrade, onboard
               userProfile={userProfile}
               canUseMultiStop={isFeatureAllowed('multiStop')}
               onUpgrade={onUpgrade}
-              onboardingStep={onboardingStep}
-              onOnboardingEvent={onOnboardingEvent}
             />
           </DialogContent>
         </Dialog>
