@@ -959,7 +959,6 @@ const Index = () => {
       {user && userProfile?.onboarded === false && showOnboardingWelcome && (
         <OnboardingWelcomeModal
           onStart={dismissWelcomeModal}
-          onSkip={dismissWelcomeModal}
         />
       )}
 
