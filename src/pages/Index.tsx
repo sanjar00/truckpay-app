@@ -24,6 +24,7 @@ import UpgradeModal from '@/components/UpgradeModal';
 import SubscriptionSuccessModal from '@/components/SubscriptionSuccessModal';
 import ReceiptScanner from '@/components/ReceiptScanner';
 import GuidedOnboardingHint from '@/components/GuidedOnboardingHint';
+import OnboardingWelcomeModal from '@/components/OnboardingWelcomeModal';
 import { SubscriptionTier } from '@/hooks/useSubscription';
 
 const SnapshotTooltip = ({ text }: { text: string }) => {
@@ -69,7 +70,14 @@ type GuidedOnboardingStep =
   | 'deduction-type-add'
   | 'deduction-recurring'
   | 'deduction-amount'
-  | 'deduction-save';
+  | 'deduction-save'
+  | 'deductions-back'
+  | 'dashboard-loads'
+  | 'load-add-button'
+  | 'load-pickup-zip'
+  | 'load-delivery-zip'
+  | 'load-rate'
+  | 'load-submit';
 
 const Index = () => {
   const { user, loading, signOut, isPasswordRecovery, isSocialAuth } = useAuth();
@@ -89,7 +97,8 @@ const Index = () => {
   const [showScanDestPicker, setShowScanDestPicker] = useState(false);
   const [showHomeReceiptScanner, setShowHomeReceiptScanner] = useState(false);
   const [scanDestination, setScanDestination] = useState<'personal' | 'work' | null>(null);
-  const [guidedOnboardingStep, setGuidedOnboardingStep] = useState<GuidedOnboardingStep | null>('dashboard-deductions');
+  const [showOnboardingWelcome, setShowOnboardingWelcome] = useState(false);
+  const [guidedOnboardingStep, setGuidedOnboardingStep] = useState<GuidedOnboardingStep | null>(null);
 
   // Remove any stale/sensitive truckpay_* keys that should not be in localStorage
   useEffect(() => {
@@ -124,7 +133,13 @@ const Index = () => {
 
   useEffect(() => {
     if (!userProfile) return;
-    setGuidedOnboardingStep(userProfile.onboarded === false ? 'dashboard-deductions' : null);
+    if (userProfile.onboarded === false) {
+      setShowOnboardingWelcome(true);
+      setGuidedOnboardingStep(null);
+    } else {
+      setShowOnboardingWelcome(false);
+      setGuidedOnboardingStep(null);
+    }
   }, [userProfile?.onboarded]);
 
   // Sync companyDeduction default from profile every time the home Add Load
@@ -287,6 +302,7 @@ const Index = () => {
 
   const finishGuidedOnboarding = async () => {
     if (!user) return;
+    setShowOnboardingWelcome(false);
     setGuidedOnboardingStep(null);
     setUserProfile((prev: any) => (prev ? { ...prev, onboarded: true } : prev));
     try {
@@ -296,8 +312,14 @@ const Index = () => {
     }
   };
 
+  const startGuidedOnboarding = () => {
+    setShowOnboardingWelcome(false);
+    setGuidedOnboardingStep('dashboard-deductions');
+    setCurrentView('dashboard');
+  };
+
   const handleGuidedOnboardingEvent = (event: string) => {
-    if (!isGuidedOnboardingActive) return;
+    if (!user || userProfile?.onboarded !== false || !guidedOnboardingStep) return;
 
     if (event === 'open-deductions' && guidedOnboardingStep === 'dashboard-deductions') {
       setGuidedOnboardingStep('deduction-type-input');
@@ -323,6 +345,11 @@ const Index = () => {
       return;
     }
 
+    if (event === 'skip-recurring' && guidedOnboardingStep === 'deduction-recurring') {
+      setGuidedOnboardingStep('deductions-back');
+      return;
+    }
+
     if (event === 'amount-entered' && guidedOnboardingStep === 'deduction-amount') {
       setGuidedOnboardingStep('deduction-save');
       return;
@@ -332,6 +359,43 @@ const Index = () => {
       event === 'fixed-saved' &&
       (guidedOnboardingStep === 'deduction-amount' || guidedOnboardingStep === 'deduction-save')
     ) {
+      setGuidedOnboardingStep('deductions-back');
+      return;
+    }
+
+    if (event === 'back-from-deductions' && guidedOnboardingStep === 'deductions-back') {
+      setCurrentView('dashboard');
+      setGuidedOnboardingStep('dashboard-loads');
+      return;
+    }
+
+    if (event === 'open-loads' && guidedOnboardingStep === 'dashboard-loads') {
+      setGuidedOnboardingStep('load-add-button');
+      setCurrentView('loads');
+      return;
+    }
+
+    if (event === 'open-load-form' && guidedOnboardingStep === 'load-add-button') {
+      setGuidedOnboardingStep('load-pickup-zip');
+      return;
+    }
+
+    if (event === 'pickup-entered' && guidedOnboardingStep === 'load-pickup-zip') {
+      setGuidedOnboardingStep('load-delivery-zip');
+      return;
+    }
+
+    if (event === 'delivery-entered' && guidedOnboardingStep === 'load-delivery-zip') {
+      setGuidedOnboardingStep('load-rate');
+      return;
+    }
+
+    if (event === 'rate-entered' && guidedOnboardingStep === 'load-rate') {
+      setGuidedOnboardingStep('load-submit');
+      return;
+    }
+
+    if (event === 'load-added' && guidedOnboardingStep === 'load-submit') {
       void finishGuidedOnboarding();
     }
   };
@@ -531,6 +595,8 @@ const Index = () => {
             onBack={() => setCurrentView('dashboard')}
             deductions={deductions}
             onUpgrade={() => setUpgradeModal({ feature: 'fullHistory', tier: 'pro' })}
+            onboardingStep={isGuidedOnboardingActive ? guidedOnboardingStep : null}
+            onOnboardingEvent={handleGuidedOnboardingEvent}
           />
         );
       case 'deductions':
@@ -538,7 +604,13 @@ const Index = () => {
           <Deductions
             deductions={deductions}
             setDeductions={setDeductions}
-            onBack={() => setCurrentView('dashboard')}
+            onBack={() => {
+              if (guidedOnboardingStep === 'deductions-back') {
+                handleGuidedOnboardingEvent('back-from-deductions');
+                return;
+              }
+              setCurrentView('dashboard');
+            }}
             onUpgrade={() => setUpgradeModal({ feature: 'AI Receipt Scanner', tier: 'pro' })}
             onboardingStep={isGuidedOnboardingActive ? guidedOnboardingStep : null}
             onOnboardingEvent={handleGuidedOnboardingEvent}
@@ -738,8 +810,17 @@ const Index = () => {
               {/* Main Actions Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                 <Button 
-                  onClick={() => setCurrentView('loads')}
-                  className="h-24 sm:h-32 brutal-border bg-info hover:bg-accent text-info-foreground hover:text-accent-foreground brutal-shadow-lg brutal-hover brutal-active p-4 sm:p-6 flex flex-col items-start justify-center"
+                  onClick={() => {
+                    if (guidedOnboardingStep === 'dashboard-loads') {
+                      handleGuidedOnboardingEvent('open-loads');
+                      return;
+                    }
+                    setCurrentView('loads');
+                  }}
+                  data-onboarding="dashboard-loads"
+                  className={`h-24 sm:h-32 brutal-border bg-info hover:bg-accent text-info-foreground hover:text-accent-foreground brutal-shadow-lg brutal-hover brutal-active p-4 sm:p-6 flex flex-col items-start justify-center ${
+                    guidedOnboardingStep === 'dashboard-loads' ? 'onboarding-target' : ''
+                  }`}
                 >
                   <FileText className="w-6 h-6 sm:w-10 sm:h-10 mb-2 sm:mb-3" />
                   <div className="text-left">
@@ -1013,10 +1094,17 @@ const Index = () => {
         />
       )}
 
+      {user && userProfile?.onboarded === false && showOnboardingWelcome && (
+        <OnboardingWelcomeModal
+          onStart={startGuidedOnboarding}
+          onSkip={finishGuidedOnboarding}
+        />
+      )}
+
       {isGuidedOnboardingActive && guidedOnboardingStep === 'dashboard-deductions' && (
         <GuidedOnboardingHint
           target="dashboard-deductions"
-          placement="left"
+          placement="top"
           stepLabel="Getting started"
           title="Start with truck expenses"
           body="Tap Deductions. We'll set up one recurring cost so your take-home is more accurate every week."
@@ -1046,10 +1134,12 @@ const Index = () => {
       {isGuidedOnboardingActive && guidedOnboardingStep === 'deduction-recurring' && (
         <GuidedOnboardingHint
           target="deduction-recurring"
-          placement="bottom"
+          placement="top"
           stepLabel="Step 3 of 5"
-          title="Make it recurring"
-          body="Check Recurring for expenses that come back every week, like insurance or admin fees."
+          title="Recurring is optional"
+          body="Use Recurring only for costs that repeat every week. You can skip this for now."
+          actionLabel="Skip"
+          onAction={() => handleGuidedOnboardingEvent('skip-recurring')}
         />
       )}
 
@@ -1070,6 +1160,76 @@ const Index = () => {
           stepLabel="Step 5 of 5"
           title="Save it"
           body="Tap Save. After this, the weekly cost will be included automatically."
+        />
+      )}
+
+      {isGuidedOnboardingActive && guidedOnboardingStep === 'deductions-back' && (
+        <GuidedOnboardingHint
+          target="deductions-back"
+          placement="bottom"
+          stepLabel="Next"
+          title="Back to the menu"
+          body="Tap the back arrow. Then we'll show where to add your loads."
+        />
+      )}
+
+      {isGuidedOnboardingActive && guidedOnboardingStep === 'dashboard-loads' && (
+        <GuidedOnboardingHint
+          target="dashboard-loads"
+          placement="top"
+          stepLabel="Load Reports"
+          title="Now add your loads"
+          body="Tap Load Reports. This is where each weekly load, mileage, and take-home total starts."
+        />
+      )}
+
+      {isGuidedOnboardingActive && guidedOnboardingStep === 'load-add-button' && (
+        <GuidedOnboardingHint
+          target="load-add-button"
+          placement="bottom"
+          stepLabel="Step 1 of 4"
+          title="Add a load"
+          body="Tap Add Load to record a trip for this week."
+        />
+      )}
+
+      {isGuidedOnboardingActive && guidedOnboardingStep === 'load-pickup-zip' && (
+        <GuidedOnboardingHint
+          target="load-pickup-zip"
+          placement="bottom"
+          stepLabel="Step 2 of 4"
+          title="Enter pickup ZIP"
+          body="Type the pickup ZIP. TruckPay will find the city and state."
+        />
+      )}
+
+      {isGuidedOnboardingActive && guidedOnboardingStep === 'load-delivery-zip' && (
+        <GuidedOnboardingHint
+          target="load-delivery-zip"
+          placement="bottom"
+          stepLabel="Step 3 of 4"
+          title="Enter delivery ZIP"
+          body="Type the delivery ZIP. Miles are calculated after both ZIPs resolve."
+        />
+      )}
+
+      {isGuidedOnboardingActive && guidedOnboardingStep === 'load-rate' && (
+        <GuidedOnboardingHint
+          target="load-rate"
+          placement="top"
+          stepLabel="Step 4 of 4"
+          title="Enter load rate"
+          body="Type the gross load rate. Your driver pay preview updates automatically."
+        />
+      )}
+
+      {isGuidedOnboardingActive && guidedOnboardingStep === 'load-submit' && (
+        <GuidedOnboardingHint
+          target="load-submit"
+          placement="top"
+          stepLabel="Finish"
+          title="Save the load"
+          body="Tap Add Load once the required fields are ready."
         />
       )}
 

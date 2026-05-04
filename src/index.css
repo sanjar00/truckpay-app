@@ -201,8 +201,8 @@
     position: fixed;
     inset: 0;
     z-index: 45;
-    background: rgba(26, 26, 46, 0.38);
-    backdrop-filter: blur(3px);
+    background: rgba(26, 26, 46, 0.28);
+    backdrop-filter: blur(1.25px);
     pointer-events: auto;
   }
 
@@ -217,37 +217,14 @@
   .onboarding-cloud {
     position: fixed;
     z-index: 70;
-    min-height: 116px;
+    min-height: 0;
     padding: 16px 18px;
     background: #ffffff;
     color: #1a1a2e;
     border: 3px solid #1a1a2e;
     border-radius: 28px;
     box-shadow: 6px 6px 0 #000;
-    pointer-events: none;
-  }
-
-  .onboarding-cloud::before,
-  .onboarding-cloud::after {
-    content: '';
-    position: absolute;
-    background: #ffffff;
-    border: 3px solid #1a1a2e;
-    border-radius: 999px;
-  }
-
-  .onboarding-cloud::before {
-    width: 54px;
-    height: 34px;
-    left: 28px;
-    top: -20px;
-  }
-
-  .onboarding-cloud::after {
-    width: 38px;
-    height: 28px;
-    right: 38px;
-    top: -16px;
+    pointer-events: auto;
   }
 
   .onboarding-cloud-title,
@@ -277,6 +254,21 @@
     font-size: 12px;
     line-height: 1.45;
     color: #1a1a2e;
+  }
+
+  .onboarding-cloud-action {
+    display: block;
+    margin: 12px 0 0 auto;
+    min-height: 32px;
+    padding: 6px 10px;
+    color: #1a1a2e;
+    border: 2px solid #1a1a2e;
+    border-radius: 4px;
+    background: #f0a500;
+    font-size: 11px;
+    line-height: 1;
+    text-transform: uppercase;
+    box-shadow: 3px 3px 0 #000;
   }
 
   .onboarding-cloud-bottom {
@@ -328,10 +320,22 @@
 
     .onboarding-cloud {
       width: calc(100vw - 32px) !important;
-      max-width: 300px;
+      max-width: 320px;
       padding: 14px 16px;
       border-radius: 22px;
       box-shadow: 4px 4px 0 #000;
+    }
+
+    .onboarding-cloud-title {
+      font-size: 17px;
+    }
+
+    .onboarding-cloud-body {
+      font-size: 12px;
+    }
+
+    .onboarding-step-label {
+      font-size: 9px;
     }
 
     /* Mobile text scaling */

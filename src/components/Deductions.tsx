@@ -370,7 +370,10 @@ const Deductions = ({
               variant="ghost" 
               size="sm" 
               onClick={onBack}
-              className="brutal-border brutal-shadow mobile-h mobile-w brutal-hover"
+              data-onboarding="deductions-back"
+              className={`brutal-border brutal-shadow mobile-h mobile-w brutal-hover ${
+                onboardingStep === 'deductions-back' ? 'onboarding-target' : ''
+              }`}
             >
               <ArrowLeft className="mobile-icon" />
             </Button>

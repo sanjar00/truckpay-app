@@ -40,6 +40,8 @@ interface AddLoadFormProps {
   canUseMultiStop?: boolean;
   /** Called when a gated action (like adding an intermediate stop) is blocked. */
   onUpgrade?: () => void;
+  onboardingStep?: string | null;
+  onOnboardingEvent?: (event: string) => void;
 }
 
 // Generate a lightweight client-side id for new stop rows (React list key only).
@@ -57,6 +59,8 @@ const AddLoadForm = ({
   userProfile,
   canUseMultiStop = true,
   onUpgrade,
+  onboardingStep,
+  onOnboardingEvent,
 }: AddLoadFormProps) => {
   const [pickupCalendarOpen, setPickupCalendarOpen] = useState(false);
   const [deliveryCalendarOpen, setDeliveryCalendarOpen] = useState(false);
@@ -212,6 +216,8 @@ const AddLoadForm = ({
   };
 
   const handleAddLoad = () => {
+    onOnboardingEvent?.('load-added');
+
     // When no intermediate stops, submit exactly as before — single-stop flow unchanged.
     if (!hasStops) {
       onAddLoad({
@@ -269,7 +275,11 @@ const AddLoadForm = ({
             placeholder="e.g. 60601"
             value={newLoad.pickupZip || ''}
             onChange={(e) => handlePickupZipChange(e.target.value)}
-            className="h-12"
+            onBlur={(e) => {
+              if (/^\d{5}$/.test(e.target.value.trim())) onOnboardingEvent?.('pickup-entered');
+            }}
+            data-onboarding="load-pickup-zip"
+            className={`h-12 ${onboardingStep === 'load-pickup-zip' ? 'onboarding-target' : ''}`}
           />
           {!hasStops && zip.loadingPickup && (
             <p className="text-xs text-muted-foreground flex items-center gap-1">
@@ -448,7 +458,11 @@ const AddLoadForm = ({
             placeholder="e.g. 77001"
             value={newLoad.deliveryZip || ''}
             onChange={(e) => handleDeliveryZipChange(e.target.value)}
-            className="h-12"
+            onBlur={(e) => {
+              if (/^\d{5}$/.test(e.target.value.trim())) onOnboardingEvent?.('delivery-entered');
+            }}
+            data-onboarding="load-delivery-zip"
+            className={`h-12 ${onboardingStep === 'load-delivery-zip' ? 'onboarding-target' : ''}`}
           />
           {!hasStops && zip.loadingDelivery && (
             <p className="text-xs text-muted-foreground flex items-center gap-1">
@@ -598,7 +612,11 @@ const AddLoadForm = ({
             step="0.01"
             value={newLoad.rate || ''}
             onChange={(e) => setNewLoad({ ...newLoad, rate: e.target.value })}
-            className="h-12"
+            onBlur={(e) => {
+              if (Number(e.target.value) > 0) onOnboardingEvent?.('rate-entered');
+            }}
+            data-onboarding="load-rate"
+            className={`h-12 ${onboardingStep === 'load-rate' ? 'onboarding-target' : ''}`}
           />
           {driverPayPreview && (
             <p className="text-xs text-green-700 font-semibold brutal-mono">
@@ -683,7 +701,10 @@ const AddLoadForm = ({
         <div className="flex gap-3 pt-4">
           <Button
             onClick={handleAddLoad}
-            className="flex-1 brutal-border font-extrabold uppercase tracking-wide"
+            data-onboarding="load-submit"
+            className={`flex-1 brutal-border font-extrabold uppercase tracking-wide ${
+              onboardingStep === 'load-submit' ? 'onboarding-target' : ''
+            }`}
             style={{ background: '#f0a500', color: '#1a1a2e', border: '2px solid #1a1a2e' }}
             disabled={
               loading ||
