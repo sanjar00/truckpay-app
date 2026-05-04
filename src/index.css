@@ -177,17 +177,17 @@
   }
 
   .brutal-hover {
-    transition: all 0.1s ease;
+    transition: transform 0.1s ease, box-shadow 0.1s ease, background-color 0.1s ease, color 0.1s ease;
   }
 
   .brutal-hover:hover {
-    transform: translate(-2px, -2px);
-    box-shadow: calc(var(--shadow-brutal) + 2px) calc(var(--shadow-brutal) + 2px) 0px 0px hsl(var(--foreground));
+    transform: translate(3px, 3px);
+    box-shadow: 1px 1px 0px 0px hsl(var(--foreground));
   }
 
   .brutal-active:active {
-    transform: translate(2px, 2px);
-    box-shadow: 2px 2px 0px 0px hsl(var(--foreground));
+    transform: translate(4px, 4px);
+    box-shadow: 0px 0px 0px 0px hsl(var(--foreground));
   }
 
   .brutal-grid {
@@ -222,8 +222,8 @@
     }
 
     .brutal-hover:hover {
-      transform: translate(-1px, -1px);
-      box-shadow: calc(var(--shadow-brutal-mobile) + 1px) calc(var(--shadow-brutal-mobile) + 1px) 0px 0px hsl(var(--foreground));
+      transform: translate(2px, 2px);
+      box-shadow: 0px 0px 0px 0px hsl(var(--foreground));
     }
 
     .brutal-grid {
