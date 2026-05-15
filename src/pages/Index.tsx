@@ -9,7 +9,7 @@ import { useSubscription } from '@/hooks/useSubscription';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { getUserWeekStart, getUserWeekEnd } from '@/lib/weeklyPeriodUtils';
-import { calculateFixedDeductionsForWeek } from '@/lib/loadReportsUtils';
+import { calculateFixedDeductionsForWeek, calculateDriverPay, sumStopSideEffects } from '@/lib/loadReportsUtils';
 import LoginPage from '@/components/LoginPage';
 import Registration from '@/components/Registration';
 import ResetPasswordPage from '@/components/ResetPasswordPage';
@@ -305,12 +305,26 @@ const Index = () => {
     setDeductions([]);
   };
 
-  const handleAddLoadFromHome = async () => {
+  // Format a Date as YYYY-MM-DD using local parts (no timezone shift). Mirrors
+  // the canonical helper in useLoadReports so home-added loads store the same
+  // date shape — required for IFTA / Per Diem (they parse pickup_date directly).
+  const formatDateForDB = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const handleAddLoadFromHome = async (overrides: any = {}) => {
     setLoadingAddLoad(true);
     try {
+      // AddLoadForm passes resolved city/state, miles, locations and (for
+      // round trips / multi-stop) the intermediate `stops` via onAddLoad.
+      const load = { ...newLoad, ...overrides } as any;
+
       // Validate minimum required fields
-      const rate = parseFloat(newLoad.rate);
-      if (!newLoad.rate || isNaN(rate) || rate <= 0) {
+      const rate = parseFloat(load.rate);
+      if (!load.rate || isNaN(rate) || rate <= 0) {
         alert('Please enter a valid load rate');
         setLoadingAddLoad(false);
         return;
@@ -321,14 +335,41 @@ const Index = () => {
         return;
       }
 
-      const companyDed = newLoad.companyDeduction ? parseFloat(newLoad.companyDeduction) : 0;
-      const driverPayAmount = rate * (1 - companyDed / 100) + (parseFloat(newLoad.detentionAmount) || 0);
+      const companyDed = load.companyDeduction ? parseFloat(load.companyDeduction) : 0;
+
+      // Intermediate stops (round-trip turnaround / multi-stop). Empty for A→B.
+      const intermediateStops: any[] = Array.isArray(load.stops) ? load.stops : [];
+      const stopSideEffects = sumStopSideEffects(intermediateStops);
+      const headerDetention = load.detentionAmount ? parseFloat(load.detentionAmount) : 0;
+      const totalDetention =
+        (Number.isNaN(headerDetention) ? 0 : headerDetention) + stopSideEffects.detention;
+
+      const driverPayAmount = calculateDriverPay(
+        rate,
+        userProfile,
+        load.estimatedMiles,
+        totalDetention,
+        companyDed,
+        stopSideEffects.stopOffFees,
+      );
+
+      const pickupDate =
+        load.pickupDate instanceof Date
+          ? load.pickupDate
+          : load.pickupDate
+            ? new Date(load.pickupDate)
+            : undefined;
+      const deliveryDate =
+        load.deliveryDate instanceof Date
+          ? load.deliveryDate
+          : load.deliveryDate
+            ? new Date(load.deliveryDate)
+            : undefined;
 
       const weekStart = getUserWeekStart(new Date(), userProfile);
-      const weekEnd = getUserWeekEnd(new Date(), userProfile);
       const weekStartStr = weekStart.toISOString().split('T')[0];
 
-      const { error } = await supabase
+      const { data: insertedLoad, error } = await supabase
         .from('load_reports')
         .insert([
           {
@@ -336,31 +377,54 @@ const Index = () => {
             rate: rate,
             company_deduction: companyDed,
             driver_pay: driverPayAmount,
-            location_from: newLoad.locationFrom || '',
-            location_to: newLoad.locationTo || '',
-            pickup_date: newLoad.pickupDate,
-            delivery_date: newLoad.deliveryDate,
+            location_from: load.locationFrom || load.pickupCityState || load.pickupZip || '',
+            location_to: load.locationTo || load.deliveryCityState || load.deliveryZip || '',
+            pickup_date: pickupDate ? formatDateForDB(pickupDate) : null,
+            delivery_date: deliveryDate ? formatDateForDB(deliveryDate) : null,
             date_added: weekStartStr,
             week_period: weekStartStr,
-            deadhead_miles: newLoad.deadheadMiles ? parseInt(newLoad.deadheadMiles) : null,
-            detention_amount: newLoad.detentionAmount ? parseFloat(newLoad.detentionAmount) : 0,
-            notes: newLoad.notes || '',
-            pickup_zip: newLoad.pickupZip || '',
-            delivery_zip: newLoad.deliveryZip || '',
-            pickup_city_state: newLoad.pickupCityState || '',
-            delivery_city_state: newLoad.deliveryCityState || '',
-            estimated_miles: newLoad.estimatedMiles || null,
+            deadhead_miles: load.deadheadMiles ? parseInt(load.deadheadMiles) : null,
+            detention_amount: headerDetention ? headerDetention : 0,
+            notes: load.notes || '',
+            pickup_zip: load.pickupZip || '',
+            delivery_zip: load.deliveryZip || '',
+            pickup_city_state: load.pickupCityState || '',
+            delivery_city_state: load.deliveryCityState || '',
+            estimated_miles: load.estimatedMiles || null,
+            stop_count: 2 + intermediateStops.length,
+            total_stop_off_fees: stopSideEffects.stopOffFees,
           }
-        ]);
+        ])
+        .select()
+        .single();
 
       if (error) {
         alert('Error adding load. Please try again.');
         console.error('Error:', error);
       } else {
+        // Persist round-trip / multi-stop intermediate stops.
+        if (insertedLoad && intermediateStops.length > 0) {
+          const stopsPayload = intermediateStops.map((s: any, idx: number) => ({
+            load_id: insertedLoad.id,
+            user_id: user?.id,
+            sequence: idx + 2,
+            stop_type: s.stopType,
+            zip: s.zip || null,
+            city_state: s.cityState || null,
+            scheduled_at: s.scheduledAt ? new Date(s.scheduledAt).toISOString() : null,
+            detention_amount: s.detentionAmount ? parseFloat(s.detentionAmount) : 0,
+            stop_off_fee: s.stopOffFee ? parseFloat(s.stopOffFee) : 0,
+            leg_miles: s.legMiles ?? null,
+            notes: s.notes || null,
+          }));
+          const { error: stopsErr } = await supabase.from('load_stops').insert(stopsPayload);
+          if (stopsErr) console.error('Error saving load stops:', stopsErr);
+        }
+
         // Reset form and close modal
         const profilePctNum = Number(userProfile?.companyDeduction);
         const resetDeduction = Number.isFinite(profilePctNum) && profilePctNum > 0 ? String(profilePctNum) : '';
-        setNewLoad({ rate: '', companyDeduction: resetDeduction, pickupDate: new Date(), deliveryDate: new Date(), deadheadMiles: '', detentionAmount: '', notes: '', pickupZip: '', deliveryZip: '', pickupCityState: '', deliveryCityState: '', locationFrom: '', locationTo: '', estimatedMiles: undefined });
+        setNewLoad({ rate: '', companyDeduction: resetDeduction, pickupDate: new Date(), deliveryDate: new Date(), deadheadMiles: '', detentionAmount: '', notes: '', pickupZip: '', deliveryZip: '', pickupCityState: '', deliveryCityState: '', locationFrom: '', locationTo: '', estimatedMiles: undefined, stops: [] } as any);
         setShowAddLoadModal(false);
         // Refresh week snapshot
         fetchWeekSnapshot(deductions);
