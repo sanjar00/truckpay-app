@@ -13,6 +13,7 @@ import {
   ArrowUp,
   ArrowDown,
   X,
+  Repeat,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -62,6 +63,17 @@ const AddLoadForm = ({
   const [deliveryCalendarOpen, setDeliveryCalendarOpen] = useState(false);
   const [showOptional, setShowOptional] = useState(false);
   const [expandedStops, setExpandedStops] = useState<Record<string, boolean>>({});
+  // A round trip is a load that returns to its pickup location (A→B→A, or A→B→C→A).
+  // It is just a multi-stop load with the final delivery ZIP mirrored to the pickup
+  // ZIP — detected here when editing an existing such load.
+  const [isRoundtrip, setIsRoundtrip] = useState<boolean>(() => {
+    const s = newLoad.stops ?? [];
+    return (
+      s.length > 0 &&
+      !!newLoad.pickupZip &&
+      newLoad.pickupZip === newLoad.deliveryZip
+    );
+  });
 
   const zip = useZipLookup();
 
@@ -159,9 +171,57 @@ const AddLoadForm = ({
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   const handlePickupZipChange = (value: string) => {
-    setNewLoad({ ...newLoad, pickupZip: value, pickupCityState: '', estimatedMiles: undefined });
+    const patch: Partial<NewLoad> = {
+      pickupZip: value,
+      pickupCityState: '',
+      estimatedMiles: undefined,
+    };
+    // Round trip: the return destination is always the pickup, so keep it mirrored.
+    if (isRoundtrip) {
+      patch.deliveryZip = value;
+      patch.deliveryCityState = '';
+    }
+    setNewLoad({ ...newLoad, ...patch });
     if (!hasStops && value.length === 5) {
       zip.lookupPickupZip(value);
+    }
+  };
+
+  const toggleRoundtrip = () => {
+    const turningOn = !isRoundtrip;
+    setIsRoundtrip(turningOn);
+
+    if (turningOn) {
+      // A round trip needs at least one real destination in the middle — add an
+      // empty stop if there are none yet so the route is A→B→A, not A→A.
+      const seededCityState =
+        newLoad.pickupCityState || zip.pickupInfo?.cityState || '';
+      const nextStops: NewLoadStop[] =
+        stops.length === 0
+          ? [
+              {
+                tempId: tempId(),
+                stopType: 'delivery',
+                zip: '',
+                cityState: '',
+                detentionAmount: '',
+                stopOffFee: '',
+              },
+            ]
+          : stops;
+      setNewLoad({
+        ...newLoad,
+        pickupCityState: seededCityState,
+        deliveryZip: newLoad.pickupZip || '',
+        deliveryCityState: seededCityState,
+        stops: nextStops,
+      });
+    } else {
+      setNewLoad({
+        ...newLoad,
+        deliveryZip: '',
+        deliveryCityState: '',
+      });
     }
   };
 
@@ -173,7 +233,8 @@ const AddLoadForm = ({
   };
 
   const handleAddStop = () => {
-    if (!canUseMultiStop) {
+    // Round trip is free for all tiers, so its stops are not Pro-gated.
+    if (!canUseMultiStop && !isRoundtrip) {
       onUpgrade?.();
       return;
     }
@@ -200,6 +261,13 @@ const AddLoadForm = ({
 
   const removeStop = (index: number) => {
     const next = stops.filter((_, i) => i !== index);
+    // Removing the last middle stop on a round trip would leave A→A (zero miles).
+    // Drop out of round-trip mode and clear the mirrored delivery ZIP.
+    if (isRoundtrip && next.length === 0) {
+      setIsRoundtrip(false);
+      setNewLoad({ ...newLoad, stops: next, deliveryZip: '', deliveryCityState: '' });
+      return;
+    }
     setNewLoad({ ...newLoad, stops: next });
   };
 
@@ -290,6 +358,38 @@ const AddLoadForm = ({
             </p>
           )}
         </div>
+
+        {/* ── Round Trip toggle ── */}
+        <button
+          type="button"
+          onClick={toggleRoundtrip}
+          className="w-full flex items-center gap-3 rounded-md border-2 p-3 transition-colors"
+          style={{
+            background: isRoundtrip ? '#fdf0e0' : '#ffffff',
+            borderColor: isRoundtrip ? '#1a1a2e' : '#d1d5db',
+          }}
+          aria-pressed={isRoundtrip}
+        >
+          <span
+            className="flex items-center justify-center rounded shrink-0"
+            style={{
+              width: 20,
+              height: 20,
+              background: isRoundtrip ? '#f0a500' : '#ffffff',
+              border: '2px solid #1a1a2e',
+            }}
+          >
+            {isRoundtrip && <Repeat className="w-3 h-3" style={{ color: '#1a1a2e' }} />}
+          </span>
+          <span className="text-left">
+            <span className="block text-sm font-bold" style={{ color: '#1a1a2e' }}>
+              Round Trip
+            </span>
+            <span className="block text-xs text-muted-foreground">
+              Returns to the pickup location
+            </span>
+          </span>
+        </button>
 
         {/* ── Intermediate stops ── */}
         {hasStops && <StopConnector />}
@@ -439,7 +539,11 @@ const AddLoadForm = ({
         <div className="space-y-2">
           <Label className="flex items-center gap-2">
             <MapPin className="w-4 h-4 text-red-600" />
-            {hasStops ? 'Final Delivery ZIP' : 'Delivery ZIP Code'}
+            {isRoundtrip
+              ? 'Return to Pickup'
+              : hasStops
+                ? 'Final Delivery ZIP'
+                : 'Delivery ZIP Code'}
           </Label>
           <Input
             type="text"
@@ -449,7 +553,14 @@ const AddLoadForm = ({
             value={newLoad.deliveryZip || ''}
             onChange={(e) => handleDeliveryZipChange(e.target.value)}
             className="h-12"
+            readOnly={isRoundtrip}
+            disabled={isRoundtrip}
           />
+          {isRoundtrip && (
+            <p className="text-xs text-muted-foreground">
+              Same as pickup ZIP — this is a round trip
+            </p>
+          )}
           {!hasStops && zip.loadingDelivery && (
             <p className="text-xs text-muted-foreground flex items-center gap-1">
               <Loader2 className="w-3 h-3 animate-spin" /> Looking up ZIP...
@@ -478,7 +589,7 @@ const AddLoadForm = ({
         >
           <Plus className="w-4 h-4" />
           ADD DESTINATION
-          {!canUseMultiStop && (
+          {!canUseMultiStop && !isRoundtrip && (
             <span className="brutal-mono text-[9px] px-1.5 py-0.5 rounded ml-1"
               style={{ background: '#f0a500', color: '#1a1a2e' }}>
               PRO
