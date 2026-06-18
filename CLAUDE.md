@@ -418,18 +418,27 @@ const ALLOWED_LOCAL_KEYS = new Set(['truckpay_weekly_goal', 'truckpay_annual_goa
 2. **Home dashboard** — "SCAN RECEIPT WITH AI" button (PRO users only) → destination picker first
 
 **Destination picker (home only):** User chooses between:
-- **Personal Expense** → saves to `personal_expenses` table (creates `personal_expense_types` row if needed)
-- **Truck / Work Expense** → saves to `weekly_extra_deductions` keyed to the week matching the receipt's date (uses `getUserWeekStart(receiptDate, userProfile)`)
+- **Personal Expense** → saves to the `expenses` table (creates an `expense_types` row if needed). NOTE: the real tables are `expense_types` / `expenses` (NOT `personal_expense_types` / `personal_expenses`, which don't exist).
+- **Truck / Work Expense** → non-fuel receipts save to `weekly_extra_deductions` keyed to the receipt's week. **Fuel receipts are auto-routed to IFTA** (see below).
 
 **Flow:**
 1. Take photo (mobile) or upload files (desktop)
 2. Images compressed: max 1024px, JPEG 0.80 quality
 3. Call `supabase/functions/scan-receipt/` with base64 image
-4. Receive: `{ merchant, category, amount, date, notes }`
-5. Review/edit in modal (merchant, category select, amount, date picker)
-6. Confirm → auto-create category if needed → save expense
+4. Receive: `{ merchant, category, amount, date, notes, state, gallons, pricePerGallon }` — the last three are populated only for FUEL receipts (null otherwise)
+5. Review/edit in modal (merchant, category, amount, date; for FUEL also state/gallons/$-per-gal)
+6. Confirm → auto-create category if needed → save expense (or route fuel, below)
 
 **Supported categories:** FUEL, TOLL, MAINTENANCE, PARTS, FOOD, LODGING, OTHER
+
+### Fuel → IFTA auto-routing (Phase 1)
+
+When a **FUEL** receipt is scanned via the home "Truck / Work Expense" path, it is matched to the specific load it belongs to and mirrored into that load's IFTA report. Logic lives in `src/lib/fuelRouting.ts`:
+
+- **Match:** candidate loads = those whose `[pickup_date … delivery_date]` window contains the receipt date. One candidate → auto-match. Multiple → disambiguate by the fuel's **state** against each load's **full pass-through route states** (`states_miles` if present, else origin/destination/stop states, else the `calculate-ifta-miles` edge function). Zero → offer nearby loads (±10 days) in a picker.
+- **Ambiguous / no match →** `FuelLoadPickerModal` lets the driver pick the load (or "Skip — just log as a truck expense"). Multiple pending fuel receipts are resolved one at a time.
+- **Recording is "both" (not double-counting):** the fuel is written ONCE to `weekly_extra_deductions` (lowers take-home like any fuel cost) AND mirrored into `load_reports.fuel_purchases` (`{ state, gallons, pricePerGallon, amount, date, source: 'scan' }`) which IFTA aggregates for the quarterly fuel-tax report. `fuel_purchases` does NOT affect take-home, so it's a mirror, not a second deduction. "Skip" records only the weekly deduction.
+- The IFTA page's own per-load fuel scanner (manual `EDIT` → scan) still works as before.
 
 ---
 

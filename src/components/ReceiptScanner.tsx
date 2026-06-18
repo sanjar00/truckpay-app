@@ -21,9 +21,16 @@ interface ScannedReceipt {
   notAReceipt: boolean;
   apiFailed: boolean;
   failReason?: string;
+  // Fuel-only fields (populated by the AI for FUEL receipts) — used to mirror
+  // the purchase into the matching load's IFTA fuel_purchases.
+  state?: string;
+  gallons?: string;
+  pricePerGallon?: string;
 }
 
 const CATEGORIES = ['FUEL', 'TOLL', 'MAINTENANCE', 'PARTS', 'FOOD', 'LODGING', 'OTHER'];
+
+const US_STATES = ['AL','AZ','AR','CA','CO','CT','DE','FL','GA','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY'];
 
 // Compress image: resize to maxPx on longest side, JPEG at quality
 async function compressImage(file: File, maxPx: number, quality: number): Promise<string> {
@@ -65,6 +72,9 @@ async function analyzeReceiptWithOpenAI(base64Image: string): Promise<{
   amount: number | null;
   date: string | null;
   notes: string;
+  state: string | null;
+  gallons: number | null;
+  pricePerGallon: number | null;
 }> {
   // Call Supabase Edge Function instead of OpenAI directly
   const { data, error } = await supabase.functions.invoke('scan-receipt', {
@@ -82,6 +92,9 @@ async function analyzeReceiptWithOpenAI(base64Image: string): Promise<{
     amount: data.amount || null,
     date: data.date || null,
     notes: data.notes || '',
+    state: data.state || null,
+    gallons: data.gallons ?? null,
+    pricePerGallon: data.pricePerGallon ?? null,
   };
 }
 
@@ -131,6 +144,9 @@ const ReceiptScanner = ({ onClose, onConfirm }: ReceiptScannerProps) => {
           amountUnclear,
           notAReceipt: false,
           apiFailed: false,
+          state: result.state || '',
+          gallons: result.gallons !== null ? String(result.gallons) : '',
+          pricePerGallon: result.pricePerGallon !== null ? String(result.pricePerGallon) : '',
         };
       } catch (err) {
         scanned = {
@@ -358,6 +374,30 @@ const ReceiptScanner = ({ onClose, onConfirm }: ReceiptScannerProps) => {
                     </PopoverContent>
                   </Popover>
                 </div>
+
+                {r.category === 'FUEL' && (
+                  <div className="col-span-2 brutal-border p-2 mt-1" style={{ background: '#e8f5e9' }}>
+                    <p className="brutal-mono text-[11px] font-bold mb-1" style={{ color: '#1a1a2e' }}>FUEL → IFTA</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div>
+                        <label className="brutal-mono text-[10px] text-muted-foreground block mb-0.5">STATE</label>
+                        <Select value={r.state || ''} onValueChange={v => updateReceipt(r.id, 'state', v)}>
+                          <SelectTrigger className="brutal-border h-8 text-xs"><SelectValue placeholder="—" /></SelectTrigger>
+                          <SelectContent>{US_STATES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <label className="brutal-mono text-[10px] text-muted-foreground block mb-0.5">GALLONS</label>
+                        <Input type="number" value={r.gallons || ''} onChange={e => updateReceipt(r.id, 'gallons', e.target.value)} placeholder="0" className="brutal-border h-8 text-xs" />
+                      </div>
+                      <div>
+                        <label className="brutal-mono text-[10px] text-muted-foreground block mb-0.5">$/GAL</label>
+                        <Input type="number" step="0.01" value={r.pricePerGallon || ''} onChange={e => updateReceipt(r.id, 'pricePerGallon', e.target.value)} placeholder="0.00" className="brutal-border h-8 text-xs" />
+                      </div>
+                    </div>
+                    <p className="brutal-mono text-[10px] text-muted-foreground mt-1">We'll add this to the matching load's IFTA fuel report.</p>
+                  </div>
+                )}
               </div>
             </div>
           ))}

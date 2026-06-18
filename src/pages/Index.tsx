@@ -25,7 +25,16 @@ import SubscriptionSuccessModal from '@/components/SubscriptionSuccessModal';
 import ReceiptScanner from '@/components/ReceiptScanner';
 import OnboardingWelcomeModal from '@/components/OnboardingWelcomeModal';
 import ExpirationReminderModal from '@/components/ExpirationReminderModal';
+import FuelLoadPickerModal from '@/components/FuelLoadPickerModal';
 import { NewLoad } from '@/types/LoadReports';
+import {
+  isFuelReceipt,
+  matchFuelReceipt,
+  attachFuelToLoad,
+  recordFuelWeeklyDeduction,
+  FuelReceipt,
+  CandidateLoad,
+} from '@/lib/fuelRouting';
 import { SubscriptionTier } from '@/hooks/useSubscription';
 
 const SnapshotTooltip = ({ text }: { text: string }) => {
@@ -83,6 +92,7 @@ const Index = () => {
   const [showScanDestPicker, setShowScanDestPicker] = useState(false);
   const [showHomeReceiptScanner, setShowHomeReceiptScanner] = useState(false);
   const [scanDestination, setScanDestination] = useState<'personal' | 'work' | null>(null);
+  const [pendingFuelPicks, setPendingFuelPicks] = useState<{ receipt: FuelReceipt; candidates: CandidateLoad[] }[]>([]);
   const [showOnboardingWelcome, setShowOnboardingWelcome] = useState(false);
 
   // Remove any stale/sensitive truckpay_* keys that should not be in localStorage
@@ -474,24 +484,57 @@ const Index = () => {
         });
       }
     } else if (scanDestination === 'work') {
-      // Save to weekly_extra_deductions under the correct week based on receipt date
-      for (const receipt of scannedReceipts) {
-        const receiptDate = receipt.date ? new Date(receipt.date + 'T00:00:00') : new Date();
-        const weekStartForReceipt = getUserWeekStart(receiptDate, userProfile);
-        const weekStartStr = weekStartForReceipt.toISOString().split('T')[0];
+      // Truck/work receipts. Fuel receipts get auto-routed into the matching
+      // load's IFTA report (and recorded as a weekly deduction); everything else
+      // is a plain weekly truck expense.
+      const pending: { receipt: FuelReceipt; candidates: CandidateLoad[] }[] = [];
 
-        await supabase.from('weekly_extra_deductions').insert({
-          user_id: user.id,
-          week_start: weekStartStr,
-          name: receipt.category || receipt.merchant || 'Expense',
-          amount: parseFloat(receipt.amount) || 0,
-          date_added: receipt.date ? new Date(receipt.date + 'T00:00:00').toISOString() : new Date().toISOString(),
-        });
+      for (const receipt of scannedReceipts) {
+        if (isFuelReceipt(receipt)) {
+          const match = await matchFuelReceipt(user.id, receipt as FuelReceipt);
+          if (match.status === 'matched') {
+            await attachFuelToLoad(user.id, match.load, receipt as FuelReceipt, userProfile);
+          } else {
+            // Ambiguous or no clean date match — let the driver pick the load.
+            pending.push({ receipt: receipt as FuelReceipt, candidates: match.candidates });
+          }
+        } else {
+          const receiptDate = receipt.date ? new Date(receipt.date + 'T00:00:00') : new Date();
+          const weekStartStr = getUserWeekStart(receiptDate, userProfile).toISOString().split('T')[0];
+          await supabase.from('weekly_extra_deductions').insert({
+            user_id: user.id,
+            week_start: weekStartStr,
+            name: receipt.category || receipt.merchant || 'Expense',
+            amount: parseFloat(receipt.amount) || 0,
+            date_added: receipt.date ? new Date(receipt.date + 'T00:00:00').toISOString() : new Date().toISOString(),
+          });
+        }
       }
+
+      if (pending.length > 0) setPendingFuelPicks(pending);
       fetchWeekSnapshot(deductions);
     }
 
     setScanDestination(null);
+  };
+
+  // Driver picked the load a scanned fuel receipt belongs to → mirror into IFTA
+  // + record the weekly deduction, then advance the queue.
+  const handleFuelPick = async (load: CandidateLoad) => {
+    if (!user || pendingFuelPicks.length === 0) return;
+    const [current, ...rest] = pendingFuelPicks;
+    await attachFuelToLoad(user.id, load, current.receipt, userProfile);
+    setPendingFuelPicks(rest);
+    fetchWeekSnapshot(deductions);
+  };
+
+  // Driver skipped IFTA matching → still log the fuel as a weekly truck expense.
+  const handleFuelSkip = async () => {
+    if (!user || pendingFuelPicks.length === 0) return;
+    const [current, ...rest] = pendingFuelPicks;
+    await recordFuelWeeklyDeduction(user.id, current.receipt, userProfile);
+    setPendingFuelPicks(rest);
+    fetchWeekSnapshot(deductions);
   };
 
   if (loading || subscriptionLoading) {
@@ -1019,6 +1062,16 @@ const Index = () => {
         <ReceiptScanner
           onClose={() => { setShowHomeReceiptScanner(false); setScanDestination(null); }}
           onConfirm={handleHomeReceiptConfirm}
+        />
+      )}
+
+      {/* Fuel → IFTA load picker (ambiguous/no auto-match) — one at a time */}
+      {pendingFuelPicks.length > 0 && (
+        <FuelLoadPickerModal
+          receipt={pendingFuelPicks[0].receipt}
+          candidates={pendingFuelPicks[0].candidates}
+          onPick={handleFuelPick}
+          onSkip={handleFuelSkip}
         />
       )}
 

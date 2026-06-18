@@ -103,14 +103,18 @@ Return ONLY a valid JSON object, no markdown, no explanation:
   "category": "FUEL or TOLL or MAINTENANCE or PARTS or FOOD or LODGING or OTHER",
   "amount": 123.45,
   "date": "YYYY-MM-DD",
-  "notes": "brief description of what was purchased"
+  "notes": "brief description of what was purchased",
+  "state": "TX",
+  "gallons": 123.4,
+  "pricePerGallon": 3.89
 }
 Rules:
 - category must be exactly one of the listed options
 - amount must be a number (the total paid, not subtotal)
 - If date is not visible, use null
 - If amount is not clear, use null
-- merchant should be the business name only, not address`;
+- merchant should be the business name only, not address
+- FUEL ONLY: if this is a fuel/diesel receipt, also fill "state" (the 2-letter US state abbreviation where the fuel was bought, from the station address), "gallons" (total gallons purchased, a number), and "pricePerGallon" (a number). For any non-fuel receipt, set "state", "gallons", and "pricePerGallon" to null.`;
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
