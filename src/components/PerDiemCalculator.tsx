@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DatePickerWithRange } from '@/components/ui/date-picker';
+import { DateRange } from 'react-day-picker';
 import { format, startOfYear, subWeeks, parseISO, isWithinInterval } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { formatCurrency } from '@/lib/utils';
@@ -69,7 +70,7 @@ const PerDiemCalculator = ({ onBack, userProfile }: PerDiemCalculatorProps) => {
   const [loads, setLoads] = useState<Load[]>([]);
   const [loading, setLoading] = useState(false);
   const [periodFilter, setPeriodFilter] = useState('ytd');
-  const [customDateRange, setCustomDateRange] = useState<{ from: Date; to: Date } | undefined>();
+  const [customDateRange, setCustomDateRange] = useState<DateRange | undefined>();
 
   const getDateRange = () => {
     const today = new Date();

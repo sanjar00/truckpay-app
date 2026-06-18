@@ -36,6 +36,7 @@ interface Expense {
 
 interface PersonalExpensesProps {
   onBack: () => void;
+  userProfile?: any;
 }
 
 const PersonalExpenses: React.FC<PersonalExpensesProps> = ({ onBack, userProfile }) => {

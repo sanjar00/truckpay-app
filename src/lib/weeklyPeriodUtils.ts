@@ -1,4 +1,4 @@
-import { startOfWeek, endOfWeek, isAfter, isBefore, startOfDay } from 'date-fns';
+import { startOfWeek, endOfWeek, isAfter, isBefore, startOfDay, type Day } from 'date-fns';
 
 // Map weekly period strings to weekStartsOn values
 const WEEKLY_PERIOD_MAP = {
@@ -11,8 +11,8 @@ const WEEKLY_PERIOD_MAP = {
   saturday: 6
 };
 
-export const getWeekStartsOn = (weeklyPeriod: string): number => {
-  return WEEKLY_PERIOD_MAP[weeklyPeriod as keyof typeof WEEKLY_PERIOD_MAP] || 0;
+export const getWeekStartsOn = (weeklyPeriod: string): Day => {
+  return (WEEKLY_PERIOD_MAP[weeklyPeriod as keyof typeof WEEKLY_PERIOD_MAP] ?? 0) as Day;
 };
 
 // Determine which weekly period to use for a specific date

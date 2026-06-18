@@ -74,7 +74,7 @@ export const useDeductionsManager = (user: any, weekStart: Date) => {
       if (error) throw error;
 
       if (data) {
-        const extras = data.map(item => ({
+        const extras = data.map((item: any) => ({
           id: item.id.toString(),
           name: item.name ?? item.deduction_type,
           amount: item.amount.toString(),

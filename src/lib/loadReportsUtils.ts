@@ -105,7 +105,7 @@ export const calculateFixedDeductionsForWeek = (deductions: any[], weekStartDate
   let totalFixedDeductions = 0;
 
   // For each deduction type, find the amount that was effective for this week
-  Object.values(deductionsByType).forEach(typeDeductions => {
+  Object.values(deductionsByType).forEach((typeDeductions: any[]) => {
     // Get all deductions for this type that were effective on or before this week
     // Parse the date properly to compare (extract just the date part from dateAdded which may be ISO string)
     const applicableDeductions = typeDeductions

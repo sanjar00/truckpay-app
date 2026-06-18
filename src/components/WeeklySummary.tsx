@@ -241,7 +241,7 @@ const WeeklySummary = ({
               <Input
                 placeholder="e.g. Truck wash"
                 value={newExtraDeduction.name}
-                onChange={(e) => setNewExtraDeduction(prev => ({ ...prev, name: e.target.value }))}
+                onChange={(e) => setNewExtraDeduction({ ...newExtraDeduction, name: e.target.value })}
               />
             </div>
             <div>
@@ -250,7 +250,7 @@ const WeeklySummary = ({
                 type="number"
                 placeholder="0.00"
                 value={newExtraDeduction.amount}
-                onChange={(e) => setNewExtraDeduction(prev => ({ ...prev, amount: e.target.value }))}
+                onChange={(e) => setNewExtraDeduction({ ...newExtraDeduction, amount: e.target.value })}
               />
             </div>
             <div>
@@ -275,7 +275,7 @@ const WeeklySummary = ({
                     onSelect={(date) => {
                       if (date) {
                         const dateStr = localDateStr(date);
-                        setNewExtraDeduction(prev => ({ ...prev, date: dateStr }));
+                        setNewExtraDeduction({ ...newExtraDeduction, date: dateStr });
                         setNewExtraDeductionDateCalendarOpen(false);
                       }
                     }}

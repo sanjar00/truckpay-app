@@ -408,7 +408,7 @@ const Deductions = ({
                             <Checkbox
                               id={`fix-${type}`}
                               checked={isFixed || !!existingDeduction}
-                              onCheckedChange={(checked) => handleFixedToggleWithConfirmation(type, checked)}
+                              onCheckedChange={(checked) => handleFixedToggleWithConfirmation(type, checked === true)}
                               className="brutal-border w-5 h-5"
                             />
                           </div>

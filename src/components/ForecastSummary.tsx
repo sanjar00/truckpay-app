@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DatePickerWithRange } from '@/components/ui/date-picker';
+import { DateRange } from 'react-day-picker';
 import { format, startOfWeek, endOfWeek, subWeeks, isWithinInterval, parseISO, addWeeks, startOfYear, getMonth } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { formatCurrency } from '@/lib/utils';
@@ -44,7 +45,7 @@ interface ForecastSummaryProps {
 const ForecastSummary = ({ onBack, deductions, userProfile }: ForecastSummaryProps) => {
   const { user } = useAuth();
   const [periodFilter, setPeriodFilter] = useState('ytd');
-  const [customDateRange, setCustomDateRange] = useState<{from: Date, to: Date} | undefined>();
+  const [customDateRange, setCustomDateRange] = useState<DateRange | undefined>();
   const [loads, setLoads] = useState<Load[]>([]);
   const [weeklyDeductions, setWeeklyDeductions] = useState<Record<string, Record<string, number>>>({});
   const [extraDeductions, setExtraDeductions] = useState<Record<string, Array<{id: string, name: string, amount: number}>>>({});
@@ -811,12 +812,11 @@ const ForecastSummary = ({ onBack, deductions, userProfile }: ForecastSummaryPro
                   : 500; // fallback per spec
                 return (
                   <div key={load.id} className="brutal-border bg-card p-4 brutal-shadow">
+                    {/* LoadCard is display-only here (analytics view); editing
+                        lives on the Load Reports page. */}
                     <LoadCard
                       load={load}
                       onDelete={handleDeleteLoad}
-                      onEdit={handleEditLoad}
-                      isEditing={editingLoad === load.id}
-                      setIsEditing={(editing) => setEditingLoad(editing ? load.id : null)}
                       estimatedMiles={estMiles}
                     />
                   </div>

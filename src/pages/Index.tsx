@@ -25,6 +25,7 @@ import SubscriptionSuccessModal from '@/components/SubscriptionSuccessModal';
 import ReceiptScanner from '@/components/ReceiptScanner';
 import OnboardingWelcomeModal from '@/components/OnboardingWelcomeModal';
 import ExpirationReminderModal from '@/components/ExpirationReminderModal';
+import { NewLoad } from '@/types/LoadReports';
 import { SubscriptionTier } from '@/hooks/useSubscription';
 
 const SnapshotTooltip = ({ text }: { text: string }) => {
@@ -77,7 +78,7 @@ const Index = () => {
   const [weekSnapshot, setWeekSnapshot] = useState<{ loadCount: number; gross: number; expenses: number; net: number; weekStart: Date; weekEnd: Date } | null>(null);
   const [showMoreSheet, setShowMoreSheet] = useState(false);
   const [showAddLoadModal, setShowAddLoadModal] = useState(false);
-  const [newLoad, setNewLoad] = useState({ rate: '', companyDeduction: '', pickupDate: new Date() as Date | undefined, deliveryDate: new Date() as Date | undefined, deadheadMiles: '', detentionAmount: '', notes: '', pickupZip: '', deliveryZip: '', pickupCityState: '', deliveryCityState: '', locationFrom: '', locationTo: '', estimatedMiles: undefined as any });
+  const [newLoad, setNewLoad] = useState<NewLoad>({ rate: '', companyDeduction: '', pickupDate: new Date(), deliveryDate: new Date(), deadheadMiles: '', detentionAmount: '', notes: '', pickupZip: '', deliveryZip: '', pickupCityState: '', deliveryCityState: '', locationFrom: '', locationTo: '', estimatedMiles: undefined, stops: [] });
   const [loadingAddLoad, setLoadingAddLoad] = useState(false);
   const [showScanDestPicker, setShowScanDestPicker] = useState(false);
   const [showHomeReceiptScanner, setShowHomeReceiptScanner] = useState(false);
@@ -447,7 +448,7 @@ const Index = () => {
       for (const receipt of scannedReceipts) {
         // Find or create expense type
         const { data: existing } = await supabase
-          .from('personal_expense_types')
+          .from('expense_types')
           .select('id')
           .eq('user_id', user.id)
           .ilike('name', receipt.category)
@@ -456,7 +457,7 @@ const Index = () => {
         let typeId = existing?.id;
         if (!typeId) {
           const { data: created } = await supabase
-            .from('personal_expense_types')
+            .from('expense_types')
             .insert({ user_id: user.id, name: receipt.category })
             .select('id')
             .single();
@@ -464,7 +465,7 @@ const Index = () => {
         }
         if (!typeId) continue;
 
-        await supabase.from('personal_expenses').insert({
+        await supabase.from('expenses').insert({
           user_id: user.id,
           expense_type_id: typeId,
           amount: parseFloat(receipt.amount) || 0,
