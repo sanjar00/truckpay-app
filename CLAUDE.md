@@ -442,6 +442,15 @@ When a **FUEL** receipt is scanned via the home "Truck / Work Expense" path, it 
 
 ---
 
+## Hardening notes (Phase 2)
+
+- **Global error boundary:** `src/components/ErrorBoundary.tsx` wraps `<App />` in `main.tsx`. A render error shows a brutal "TruckPay hit a snag" card with a Reload button instead of a white screen.
+- **Non-receipt detection:** `scan-receipt` returns `isReceipt`; `ReceiptScanner` sets `notAReceipt` from it, so the "may not be a receipt" warning is live (it was previously dead code).
+- **Scan timeout:** the OpenAI call in `scan-receipt` is time-boxed to 30s (AbortController → 504), plus auth + a 60/user/day cap + an 8MB payload guard + `mode` whitelist.
+- **One load-save path:** both add-load entry points (`useLoadReports.handleAddLoad` for the Load Reports page and `Index.handleAddLoadFromHome` for the home/bottom-bar modal) build their DB rows from `src/lib/loadPersistence.ts` (`buildLoadReportRow` + `buildStopRows`). Do NOT hand-write a `load_reports`/`load_stops` payload inline — extend the shared builder so the two paths can't drift (they previously drifted on `week_period`, `deadhead_miles` parsing, and null-vs-empty fields).
+
+---
+
 ## ZIP-to-ZIP Mileage Tracking
 
 1. User enters pickup ZIP → `useZipLookup` calls `driving-distance` edge function → resolves city/state

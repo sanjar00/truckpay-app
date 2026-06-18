@@ -49,6 +49,14 @@ serve(async (req) => {
       });
     }
 
+    // Validate mode (only the documented values are allowed).
+    if (mode !== undefined && mode !== 'fuel') {
+      return new Response(JSON.stringify({ error: 'Invalid mode' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     // Basic payload-size guard: reject anything larger than ~8MB of base64.
     if (typeof imageBase64 !== 'string' || imageBase64.length > 8_000_000) {
       return new Response(JSON.stringify({ error: 'Image payload too large' }), {
@@ -99,6 +107,7 @@ Rules:
       : `Analyze this receipt or invoice for a truck driver.
 Return ONLY a valid JSON object, no markdown, no explanation:
 {
+  "isReceipt": true,
   "merchant": "name of business or service provider",
   "category": "FUEL or TOLL or MAINTENANCE or PARTS or FOOD or LODGING or OTHER",
   "amount": 123.45,
@@ -109,6 +118,7 @@ Return ONLY a valid JSON object, no markdown, no explanation:
   "pricePerGallon": 3.89
 }
 Rules:
+- isReceipt: set to false if the image is NOT a receipt or invoice (e.g. a random photo, a person, a truck, a screenshot). Otherwise true.
 - category must be exactly one of the listed options
 - amount must be a number (the total paid, not subtotal)
 - If date is not visible, use null
@@ -116,32 +126,49 @@ Rules:
 - merchant should be the business name only, not address
 - FUEL ONLY: if this is a fuel/diesel receipt, also fill "state" (the 2-letter US state abbreviation where the fuel was bought, from the station address), "gallons" (total gallons purchased, a number), and "pricePerGallon" (a number). For any non-fuel receipt, set "state", "gallons", and "pricePerGallon" to null.`;
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o',
-        max_tokens: 500,
-        messages: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'image_url',
-                image_url: { url: `data:image/jpeg;base64,${imageBase64}` },
-              },
-              {
-                type: 'text',
-                text: promptText,
-              },
-            ],
-          },
-        ],
-      }),
-    });
+    // Time-box the OpenAI call so a slow/stuck request fails cleanly instead of
+    // hanging the scan (drivers are often on weak truck-stop connections).
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+    let response: Response;
+    try {
+      response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o',
+          max_tokens: 500,
+          messages: [
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'image_url',
+                  image_url: { url: `data:image/jpeg;base64,${imageBase64}` },
+                },
+                {
+                  type: 'text',
+                  text: promptText,
+                },
+              ],
+            },
+          ],
+        }),
+        signal: controller.signal,
+      });
+    } catch (fetchErr) {
+      clearTimeout(timeoutId);
+      const timedOut = (fetchErr as Error)?.name === 'AbortError';
+      return new Response(
+        JSON.stringify({ error: timedOut ? 'Scan timed out — please try again' : 'Could not reach the scanner service' }),
+        { status: timedOut ? 504 : 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       const err = await response.text();

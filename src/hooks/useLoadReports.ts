@@ -1,17 +1,10 @@
 import { useState, useEffect } from 'react';
-import { format, addWeeks, subWeeks, isWithinInterval, parseISO } from 'date-fns';
+import { addWeeks, subWeeks, isWithinInterval, parseISO } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { getUserWeekStart, getUserWeekEnd } from '@/lib/weeklyPeriodUtils';
 import { calculateDriverPay, sumStopSideEffects } from '@/lib/loadReportsUtils';
+import { buildLoadReportRow, buildStopRows } from '@/lib/loadPersistence';
 import { Load, LoadStop, NewLoad, NewLoadStop, WeeklyMileage, ExtraDeduction } from '@/types/LoadReports';
-
-// Helper function to format dates without timezone issues
-const formatDateForDB = (date: Date): string => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
 
 export const useLoadReports = (user: any, userProfile: any, deductions: any[]) => {
   const [currentWeek, setCurrentWeek] = useState(getUserWeekStart(new Date(), userProfile));
@@ -133,19 +126,6 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
       setLoading(true);
 
       try {
-        const pickupDate =
-          load.pickupDate instanceof Date
-            ? load.pickupDate
-            : load.pickupDate
-              ? new Date(load.pickupDate as unknown as string)
-              : undefined;
-        const deliveryDate =
-          load.deliveryDate instanceof Date
-            ? load.deliveryDate
-            : load.deliveryDate
-              ? new Date(load.deliveryDate as unknown as string)
-              : undefined;
-
         const parsedCompanyDeduction =
           load.companyDeduction !== ''
             ? parseFloat(load.companyDeduction)
@@ -168,42 +148,28 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
           companyDeduction,
           stopSideEffects.stopOffFees,
         );
-        const weekPeriod = `${format(weekStart, 'MMM dd')} - ${format(weekEnd, 'MMM dd, yyyy')}`;
-        const loadDate = weekStart.toISOString().split('T')[0];
-        const stopCount = 2 + intermediateStops.length;
-        const payload = {
-          rate: parseFloat(load.rate),
-          company_deduction: companyDeduction,
-          driver_pay: driverPay,
-          location_from: load.locationFrom || load.pickupCityState || load.pickupZip || '',
-          location_to: load.locationTo || load.deliveryCityState || load.deliveryZip || '',
-          pickup_date: pickupDate ? formatDateForDB(pickupDate) : null,
-          delivery_date: deliveryDate ? formatDateForDB(deliveryDate) : null,
-          date_added: loadDate,
-          week_period: weekPeriod,
-          deadhead_miles: load.deadheadMiles ? parseFloat(load.deadheadMiles) : null,
-          detention_amount: headerDetention ? headerDetention : null,
-          notes: load.notes || null,
-          pickup_zip: load.pickupZip || null,
-          delivery_zip: load.deliveryZip || null,
-          pickup_city_state: load.pickupCityState || null,
-          delivery_city_state: load.deliveryCityState || null,
-          estimated_miles: load.estimatedMiles ?? null,
-          stop_count: stopCount,
-          total_stop_off_fees: stopSideEffects.stopOffFees,
-        };
+        const row = buildLoadReportRow({
+          load,
+          driverPay,
+          companyDeduction,
+          headerDetention,
+          stopOffFees: stopSideEffects.stopOffFees,
+          intermediateStopCount: intermediateStops.length,
+          weekStart,
+          weekEnd,
+        });
 
         const query = editingLoad
           ? supabase
               .from('load_reports')
-              .update(payload)
+              .update(row)
               .eq('id', editingLoad)
               .eq('user_id', user.id)
           : supabase
               .from('load_reports')
               .insert({
                 user_id: user.id,
-                ...payload,
+                ...row,
               });
 
         const { data, error } = await query.select().single();
@@ -231,19 +197,7 @@ export const useLoadReports = (user: any, userProfile: any, deductions: any[]) =
 
           let savedStops: LoadStop[] = [];
           if (intermediateStops.length > 0) {
-            const stopsPayload = intermediateStops.map((s, idx) => ({
-              load_id: loadId,
-              user_id: user.id,
-              sequence: idx + 2, // positions 2..N-1 (origin=1, destination=N)
-              stop_type: s.stopType,
-              zip: s.zip || null,
-              city_state: s.cityState || null,
-              scheduled_at: s.scheduledAt ? s.scheduledAt.toISOString() : null,
-              detention_amount: s.detentionAmount ? parseFloat(s.detentionAmount) : 0,
-              stop_off_fee: s.stopOffFee ? parseFloat(s.stopOffFee) : 0,
-              leg_miles: s.legMiles ?? null,
-              notes: s.notes || null,
-            }));
+            const stopsPayload = buildStopRows(loadId, user.id, intermediateStops);
             const { data: stopsData, error: stopsErr } = await supabase
               .from('load_stops')
               .insert(stopsPayload)

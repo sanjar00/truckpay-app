@@ -27,6 +27,7 @@ import OnboardingWelcomeModal from '@/components/OnboardingWelcomeModal';
 import ExpirationReminderModal from '@/components/ExpirationReminderModal';
 import FuelLoadPickerModal from '@/components/FuelLoadPickerModal';
 import { NewLoad } from '@/types/LoadReports';
+import { buildLoadReportRow, buildStopRows } from '@/lib/loadPersistence';
 import {
   isFuelReceipt,
   matchFuelReceipt,
@@ -317,16 +318,6 @@ const Index = () => {
     setDeductions([]);
   };
 
-  // Format a Date as YYYY-MM-DD using local parts (no timezone shift). Mirrors
-  // the canonical helper in useLoadReports so home-added loads store the same
-  // date shape — required for IFTA / Per Diem (they parse pickup_date directly).
-  const formatDateForDB = (date: Date): string => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
-
   const handleAddLoadFromHome = async (overrides: any = {}) => {
     setLoadingAddLoad(true);
     try {
@@ -365,48 +356,24 @@ const Index = () => {
         stopSideEffects.stopOffFees,
       );
 
-      const pickupDate =
-        load.pickupDate instanceof Date
-          ? load.pickupDate
-          : load.pickupDate
-            ? new Date(load.pickupDate)
-            : undefined;
-      const deliveryDate =
-        load.deliveryDate instanceof Date
-          ? load.deliveryDate
-          : load.deliveryDate
-            ? new Date(load.deliveryDate)
-            : undefined;
-
       const weekStart = getUserWeekStart(new Date(), userProfile);
-      const weekStartStr = weekStart.toISOString().split('T')[0];
+      const weekEnd = getUserWeekEnd(new Date(), userProfile);
+
+      // Shared canonical row — identical to the Load Reports page path.
+      const row = buildLoadReportRow({
+        load,
+        driverPay: driverPayAmount,
+        companyDeduction: companyDed,
+        headerDetention,
+        stopOffFees: stopSideEffects.stopOffFees,
+        intermediateStopCount: intermediateStops.length,
+        weekStart,
+        weekEnd,
+      });
 
       const { data: insertedLoad, error } = await supabase
         .from('load_reports')
-        .insert([
-          {
-            user_id: user?.id,
-            rate: rate,
-            company_deduction: companyDed,
-            driver_pay: driverPayAmount,
-            location_from: load.locationFrom || load.pickupCityState || load.pickupZip || '',
-            location_to: load.locationTo || load.deliveryCityState || load.deliveryZip || '',
-            pickup_date: pickupDate ? formatDateForDB(pickupDate) : null,
-            delivery_date: deliveryDate ? formatDateForDB(deliveryDate) : null,
-            date_added: weekStartStr,
-            week_period: weekStartStr,
-            deadhead_miles: load.deadheadMiles ? parseInt(load.deadheadMiles) : null,
-            detention_amount: headerDetention ? headerDetention : 0,
-            notes: load.notes || '',
-            pickup_zip: load.pickupZip || '',
-            delivery_zip: load.deliveryZip || '',
-            pickup_city_state: load.pickupCityState || '',
-            delivery_city_state: load.deliveryCityState || '',
-            estimated_miles: load.estimatedMiles || null,
-            stop_count: 2 + intermediateStops.length,
-            total_stop_off_fees: stopSideEffects.stopOffFees,
-          }
-        ])
+        .insert([{ user_id: user?.id, ...row }])
         .select()
         .single();
 
@@ -415,20 +382,8 @@ const Index = () => {
         console.error('Error:', error);
       } else {
         // Persist round-trip / multi-stop intermediate stops.
-        if (insertedLoad && intermediateStops.length > 0) {
-          const stopsPayload = intermediateStops.map((s: any, idx: number) => ({
-            load_id: insertedLoad.id,
-            user_id: user?.id,
-            sequence: idx + 2,
-            stop_type: s.stopType,
-            zip: s.zip || null,
-            city_state: s.cityState || null,
-            scheduled_at: s.scheduledAt ? new Date(s.scheduledAt).toISOString() : null,
-            detention_amount: s.detentionAmount ? parseFloat(s.detentionAmount) : 0,
-            stop_off_fee: s.stopOffFee ? parseFloat(s.stopOffFee) : 0,
-            leg_miles: s.legMiles ?? null,
-            notes: s.notes || null,
-          }));
+        if (insertedLoad && intermediateStops.length > 0 && user) {
+          const stopsPayload = buildStopRows(insertedLoad.id, user.id, intermediateStops);
           const { error: stopsErr } = await supabase.from('load_stops').insert(stopsPayload);
           if (stopsErr) console.error('Error saving load stops:', stopsErr);
         }

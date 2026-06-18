@@ -67,6 +67,7 @@ function toBase64(dataUrl: string): string {
 }
 
 async function analyzeReceiptWithOpenAI(base64Image: string): Promise<{
+  isReceipt: boolean;
   merchant: string;
   category: string;
   amount: number | null;
@@ -87,6 +88,7 @@ async function analyzeReceiptWithOpenAI(base64Image: string): Promise<{
 
   // Edge function returns the parsed result directly
   return {
+    isReceipt: data.isReceipt !== false, // default to true unless the model says otherwise
     merchant: data.merchant || '',
     category: data.category || 'OTHER',
     amount: data.amount || null,
@@ -142,7 +144,7 @@ const ReceiptScanner = ({ onClose, onConfirm }: ReceiptScannerProps) => {
           notes: result.notes || '',
           imageDataUrl: storageImage,
           amountUnclear,
-          notAReceipt: false,
+          notAReceipt: result.isReceipt === false,
           apiFailed: false,
           state: result.state || '',
           gallons: result.gallons !== null ? String(result.gallons) : '',
