@@ -21,10 +21,17 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 
 // Maps a Stripe price ID to a TruckPay subscription tier
 const PRICE_TO_TIER: Record<string, 'pro' | 'owner'> = {
-  'price_1TLainDDJ9hkmBpwH8pF7LXu': 'pro',    // Pro Monthly
-  'price_1TLaiqDDJ9hkmBpw2EEWTeIv': 'pro',    // Pro Annual
-  'price_1TLaitDDJ9hkmBpwG40JiG5d': 'owner',  // Owner-Op Monthly
-  'price_1TLaiwDDJ9hkmBpwZ1jI886S': 'owner',  // Owner-Op Annual
+  // Current pricing — bi-weekly + annual
+  'price_1TjbA0DDJ9hkmBpwXxBFh2wR': 'pro',    // Pro Bi-weekly ($15/2wk)
+  'price_1TjbA9DDJ9hkmBpwBnCVMIOU': 'pro',    // Pro Annual ($300/yr)
+  'price_1TjbACDDJ9hkmBpwt1rRJlG8': 'owner',  // Owner-Op Bi-weekly ($30/2wk)
+  'price_1TjbAEDDJ9hkmBpw8Vyi5x74': 'owner',  // Owner-Op Annual ($600/yr)
+  // Legacy monthly/annual prices (archived) — kept so any pre-existing
+  // subscription on an old price still maps to the correct tier.
+  'price_1TLainDDJ9hkmBpwH8pF7LXu': 'pro',    // Pro Monthly (legacy)
+  'price_1TLaiqDDJ9hkmBpw2EEWTeIv': 'pro',    // Pro Annual (legacy)
+  'price_1TLaitDDJ9hkmBpwG40JiG5d': 'owner',  // Owner-Op Monthly (legacy)
+  'price_1TLaiwDDJ9hkmBpwZ1jI886S': 'owner',  // Owner-Op Annual (legacy)
 };
 
 serve(async (req) => {

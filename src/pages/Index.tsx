@@ -24,6 +24,7 @@ import UpgradeModal from '@/components/UpgradeModal';
 import SubscriptionSuccessModal from '@/components/SubscriptionSuccessModal';
 import ReceiptScanner from '@/components/ReceiptScanner';
 import OnboardingWelcomeModal from '@/components/OnboardingWelcomeModal';
+import ExpirationReminderModal from '@/components/ExpirationReminderModal';
 import { SubscriptionTier } from '@/hooks/useSubscription';
 
 const SnapshotTooltip = ({ text }: { text: string }) => {
@@ -1023,6 +1024,13 @@ const Index = () => {
       {user && userProfile?.onboarded === false && showOnboardingWelcome && (
         <OnboardingWelcomeModal
           onStart={dismissWelcomeModal}
+        />
+      )}
+
+      {/* Free-access expiry reminders (15/10/5/1 days) — only once onboarded */}
+      {user && userProfile?.onboarded !== false && !showOnboardingWelcome && (
+        <ExpirationReminderModal
+          onGetPlan={() => setUpgradeModal({ feature: 'fullHistory', tier: 'pro' })}
         />
       )}
 

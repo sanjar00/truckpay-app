@@ -8,15 +8,16 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Price IDs for each plan/billing cycle combination
+// Price IDs for each plan/billing cycle combination.
+// Bi-weekly = charged every 2 weeks ($15 Pro / $30 Owner). Annual = $300 / $600.
 const PRICE_IDS = {
   pro: {
-    monthly: 'price_1TLainDDJ9hkmBpwH8pF7LXu',
-    annual:  'price_1TLaiqDDJ9hkmBpw2EEWTeIv',
+    biweekly: 'price_1TjbA0DDJ9hkmBpwXxBFh2wR',  // $15 / 2 weeks
+    annual:   'price_1TjbA9DDJ9hkmBpwBnCVMIOU',  // $300 / year
   },
   owner: {
-    monthly: 'price_1TLaitDDJ9hkmBpwG40JiG5d',
-    annual:  'price_1TLaiwDDJ9hkmBpwZ1jI886S',
+    biweekly: 'price_1TjbACDDJ9hkmBpwt1rRJlG8',  // $30 / 2 weeks
+    annual:   'price_1TjbAEDDJ9hkmBpw8Vyi5x74',  // $600 / year
   },
 };
 
@@ -76,7 +77,7 @@ serve(async (req) => {
     );
     const { data: existingSub } = await supabaseAdmin
       .from('subscriptions')
-      .select('stripe_customer_id')
+      .select('stripe_customer_id, end_date')
       .eq('user_id', user.id)
       .maybeSingle();
 
@@ -91,6 +92,20 @@ serve(async (req) => {
       customerId = customer.id;
     }
 
+    // Delayed activation: if the user is still inside their 90-day free window,
+    // the paid plan should not start billing until that free access expires.
+    // Stripe's trial_end does exactly this — the card is collected now but the
+    // first charge happens at the free-usage expiration date. Stripe requires
+    // trial_end to be at least ~48h out, so only apply it when there's room.
+    const subscriptionData: Record<string, unknown> = { metadata: { user_id: user.id } };
+    if (existingSub?.end_date) {
+      const trialEndSec = Math.floor(new Date(existingSub.end_date).getTime() / 1000);
+      const minTrialEnd = Math.floor(Date.now() / 1000) + 49 * 60 * 60; // 49h safety margin
+      if (trialEndSec > minTrialEnd) {
+        subscriptionData.trial_end = trialEndSec;
+      }
+    }
+
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       payment_method_types: ['card'],
@@ -101,7 +116,7 @@ serve(async (req) => {
       // Pass user_id in both places — session metadata for checkout.session.completed,
       // subscription metadata for subscription update/delete events
       metadata: { user_id: user.id },
-      subscription_data: { metadata: { user_id: user.id } },
+      subscription_data: subscriptionData,
     });
 
     return new Response(JSON.stringify({ url: session.url }), {

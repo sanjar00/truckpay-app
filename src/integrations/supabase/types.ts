@@ -7,16 +7,297 @@ export type Json =
   | Json[]
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "12.2.3 (519615d)"
+  }
   public: {
     Tables: {
+      deductions: {
+        Row: {
+          amount: number
+          created_at: string
+          date_added: string
+          id: string
+          is_custom_type: boolean
+          is_fixed: boolean
+          load_report_id: string | null
+          type: string
+          updated_at: string
+          user_id: string
+          week_period: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          date_added?: string
+          id?: string
+          is_custom_type?: boolean
+          is_fixed?: boolean
+          load_report_id?: string | null
+          type: string
+          updated_at?: string
+          user_id: string
+          week_period?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          date_added?: string
+          id?: string
+          is_custom_type?: boolean
+          is_fixed?: boolean
+          load_report_id?: string | null
+          type?: string
+          updated_at?: string
+          user_id?: string
+          week_period?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deductions_load_report_id_fkey"
+            columns: ["load_report_id"]
+            isOneToOne: false
+            referencedRelation: "load_reports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      expense_types: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      expenses: {
+        Row: {
+          amount: number
+          created_at: string
+          date: string
+          expense_type_id: string
+          id: string
+          note: string | null
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          date: string
+          expense_type_id: string
+          id?: string
+          note?: string | null
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          date?: string
+          expense_type_id?: string
+          id?: string
+          note?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expenses_expense_type_id_fkey"
+            columns: ["expense_type_id"]
+            isOneToOne: false
+            referencedRelation: "expense_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ifta_rates: {
+        Row: {
+          quarter: number
+          rate: number
+          state: string
+          updated_at: string | null
+          year: number
+        }
+        Insert: {
+          quarter: number
+          rate: number
+          state: string
+          updated_at?: string | null
+          year: number
+        }
+        Update: {
+          quarter?: number
+          rate?: number
+          state?: string
+          updated_at?: string | null
+          year?: number
+        }
+        Relationships: []
+      }
+      load_reports: {
+        Row: {
+          company_deduction: number | null
+          created_at: string
+          date_added: string
+          deadhead_miles: number | null
+          delivery_city_state: string | null
+          delivery_date: string | null
+          delivery_zip: string | null
+          detention_amount: number | null
+          driver_pay: number
+          estimated_miles: number | null
+          fuel_purchases: Json | null
+          id: string
+          location_from: string
+          location_to: string
+          notes: string | null
+          pickup_city_state: string | null
+          pickup_date: string | null
+          pickup_zip: string | null
+          rate: number
+          states_miles: Json | null
+          stop_count: number
+          total_stop_off_fees: number
+          updated_at: string
+          user_id: string
+          week_period: string
+        }
+        Insert: {
+          company_deduction?: number | null
+          created_at?: string
+          date_added: string
+          deadhead_miles?: number | null
+          delivery_city_state?: string | null
+          delivery_date?: string | null
+          delivery_zip?: string | null
+          detention_amount?: number | null
+          driver_pay: number
+          estimated_miles?: number | null
+          fuel_purchases?: Json | null
+          id?: string
+          location_from: string
+          location_to: string
+          notes?: string | null
+          pickup_city_state?: string | null
+          pickup_date?: string | null
+          pickup_zip?: string | null
+          rate: number
+          states_miles?: Json | null
+          stop_count?: number
+          total_stop_off_fees?: number
+          updated_at?: string
+          user_id: string
+          week_period: string
+        }
+        Update: {
+          company_deduction?: number | null
+          created_at?: string
+          date_added?: string
+          deadhead_miles?: number | null
+          delivery_city_state?: string | null
+          delivery_date?: string | null
+          delivery_zip?: string | null
+          detention_amount?: number | null
+          driver_pay?: number
+          estimated_miles?: number | null
+          fuel_purchases?: Json | null
+          id?: string
+          location_from?: string
+          location_to?: string
+          notes?: string | null
+          pickup_city_state?: string | null
+          pickup_date?: string | null
+          pickup_zip?: string | null
+          rate?: number
+          states_miles?: Json | null
+          stop_count?: number
+          total_stop_off_fees?: number
+          updated_at?: string
+          user_id?: string
+          week_period?: string
+        }
+        Relationships: []
+      }
+      load_stops: {
+        Row: {
+          city_state: string | null
+          created_at: string
+          detention_amount: number
+          id: string
+          leg_miles: number | null
+          load_id: string
+          notes: string | null
+          scheduled_at: string | null
+          sequence: number
+          stop_off_fee: number
+          stop_type: string
+          updated_at: string
+          user_id: string
+          zip: string | null
+        }
+        Insert: {
+          city_state?: string | null
+          created_at?: string
+          detention_amount?: number
+          id?: string
+          leg_miles?: number | null
+          load_id: string
+          notes?: string | null
+          scheduled_at?: string | null
+          sequence: number
+          stop_off_fee?: number
+          stop_type: string
+          updated_at?: string
+          user_id: string
+          zip?: string | null
+        }
+        Update: {
+          city_state?: string | null
+          created_at?: string
+          detention_amount?: number
+          id?: string
+          leg_miles?: number | null
+          load_id?: string
+          notes?: string | null
+          scheduled_at?: string | null
+          sequence?: number
+          stop_off_fee?: number
+          stop_type?: string
+          updated_at?: string
+          user_id?: string
+          zip?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "load_stops_load_id_fkey"
+            columns: ["load_id"]
+            isOneToOne: false
+            referencedRelation: "load_reports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           company_deduction: number
           company_pay_rate: number | null
           company_pay_type: string | null
           created_at: string
-          driver_type: string
-          full_name: string
+          driver_type: string | null
+          full_name: string | null
           id: string
           lease_rate_per_mile: number | null
           onboarded: boolean
@@ -26,12 +307,12 @@ export type Database = {
           weekly_period_updated_at: string | null
         }
         Insert: {
-          company_deduction: number
+          company_deduction?: number
           company_pay_rate?: number | null
           company_pay_type?: string | null
           created_at?: string
-          driver_type: string
-          full_name: string
+          driver_type?: string | null
+          full_name?: string | null
           id: string
           lease_rate_per_mile?: number | null
           onboarded?: boolean
@@ -45,8 +326,8 @@ export type Database = {
           company_pay_rate?: number | null
           company_pay_type?: string | null
           created_at?: string
-          driver_type?: string
-          full_name?: string
+          driver_type?: string | null
+          full_name?: string | null
           id?: string
           lease_rate_per_mile?: number | null
           onboarded?: boolean
@@ -57,231 +338,216 @@ export type Database = {
         }
         Relationships: []
       }
-      load_reports: {
+      subscription_reminders: {
         Row: {
           id: string
+          shown_at: string
+          threshold: number
           user_id: string
-          rate: number
-          company_deduction: number
-          driver_pay: number
-          location_from: string
-          location_to: string
-          pickup_date: string | null
-          delivery_date: string | null
-          date_added: string
-          week_period: string
-          deadhead_miles: number | null
-          dispatcher_name: string | null
-          dispatcher_company: string | null
-          dispatcher_phone: string | null
-          broker_name: string | null
-          broker_company: string | null
-          bol_number: string | null
-          notes: string | null
-          pickup_zip: string | null
-          delivery_zip: string | null
-          pickup_city_state: string | null
-          delivery_city_state: string | null
-          estimated_miles: number | null
         }
         Insert: {
           id?: string
+          shown_at?: string
+          threshold: number
           user_id: string
-          rate: number
-          company_deduction: number
-          driver_pay: number
-          location_from: string
-          location_to: string
-          pickup_date?: string | null
-          delivery_date?: string | null
-          date_added: string
-          week_period: string
-          deadhead_miles?: number | null
-          dispatcher_name?: string | null
-          dispatcher_company?: string | null
-          dispatcher_phone?: string | null
-          broker_name?: string | null
-          broker_company?: string | null
-          bol_number?: string | null
-          notes?: string | null
-          pickup_zip?: string | null
-          delivery_zip?: string | null
-          pickup_city_state?: string | null
-          delivery_city_state?: string | null
-          estimated_miles?: number | null
         }
         Update: {
           id?: string
+          shown_at?: string
+          threshold?: number
           user_id?: string
-          rate?: number
-          company_deduction?: number
-          driver_pay?: number
-          location_from?: string
-          location_to?: string
-          pickup_date?: string | null
-          delivery_date?: string | null
-          date_added?: string
-          week_period?: string
-          deadhead_miles?: number | null
-          dispatcher_name?: string | null
-          dispatcher_company?: string | null
-          dispatcher_phone?: string | null
-          broker_name?: string | null
-          broker_company?: string | null
-          bol_number?: string | null
-          notes?: string | null
-          pickup_zip?: string | null
-          delivery_zip?: string | null
-          pickup_city_state?: string | null
-          delivery_city_state?: string | null
-          estimated_miles?: number | null
+        }
+        Relationships: []
+      }
+      subscriptions: {
+        Row: {
+          created_at: string | null
+          early_adopter: boolean
+          early_adopter_banner_dismissed: boolean
+          end_date: string | null
+          id: string
+          start_date: string | null
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          tier: string
+          trial_used: boolean
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          early_adopter?: boolean
+          early_adopter_banner_dismissed?: boolean
+          end_date?: string | null
+          id?: string
+          start_date?: string | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          tier?: string
+          trial_used?: boolean
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          early_adopter?: boolean
+          early_adopter_banner_dismissed?: boolean
+          end_date?: string | null
+          id?: string
+          start_date?: string | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          tier?: string
+          trial_used?: boolean
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      usage_counters: {
+        Row: {
+          counter_date: string
+          scan_count: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          counter_date?: string
+          scan_count?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          counter_date?: string
+          scan_count?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_preferences: {
+        Row: {
+          created_at: string | null
+          id: string
+          removed_predefined_types: string[] | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          removed_predefined_types?: string[] | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          removed_predefined_types?: string[] | null
+          updated_at?: string | null
+          user_id?: string
         }
         Relationships: []
       }
       weekly_deductions: {
         Row: {
-          id: string
-          user_id: string
           amount: number
+          created_at: string | null
+          deduction_date: string | null
+          deduction_type: string
+          id: string
+          updated_at: string | null
+          user_id: string | null
           week_start: string
         }
         Insert: {
-          id?: string
-          user_id: string
           amount: number
+          created_at?: string | null
+          deduction_date?: string | null
+          deduction_type: string
+          id?: string
+          updated_at?: string | null
+          user_id?: string | null
           week_start: string
         }
         Update: {
-          id?: string
-          user_id?: string
           amount?: number
+          created_at?: string | null
+          deduction_date?: string | null
+          deduction_type?: string
+          id?: string
+          updated_at?: string | null
+          user_id?: string | null
           week_start?: string
         }
         Relationships: []
       }
       weekly_extra_deductions: {
         Row: {
-          id: string
-          user_id: string
           amount: number
+          created_at: string | null
+          date_added: string | null
+          id: number
+          name: string
+          updated_at: string | null
+          user_id: string
           week_start: string
         }
         Insert: {
-          id?: string
-          user_id: string
           amount: number
+          created_at?: string | null
+          date_added?: string | null
+          id?: number
+          name: string
+          updated_at?: string | null
+          user_id: string
           week_start: string
         }
         Update: {
-          id?: string
-          user_id?: string
           amount?: number
+          created_at?: string | null
+          date_added?: string | null
+          id?: number
+          name?: string
+          updated_at?: string | null
+          user_id?: string
           week_start?: string
         }
         Relationships: []
       }
       weekly_mileage: {
         Row: {
+          created_at: string
+          end_mileage: number | null
           id: string
+          lease_miles_cost: number | null
+          start_mileage: number | null
+          total_miles: number | null
+          updated_at: string
           user_id: string
           week_start: string
-          start_mileage: number | null
-          end_mileage: number | null
-          lease_miles_cost: number | null
-          updated_at: string
         }
         Insert: {
+          created_at?: string
+          end_mileage?: number | null
           id?: string
+          lease_miles_cost?: number | null
+          start_mileage?: number | null
+          total_miles?: number | null
+          updated_at?: string
           user_id: string
           week_start: string
-          start_mileage?: number | null
-          end_mileage?: number | null
-          lease_miles_cost?: number | null
-          updated_at?: string
         }
         Update: {
+          created_at?: string
+          end_mileage?: number | null
           id?: string
+          lease_miles_cost?: number | null
+          start_mileage?: number | null
+          total_miles?: number | null
+          updated_at?: string
           user_id?: string
           week_start?: string
-          start_mileage?: number | null
-          end_mileage?: number | null
-          lease_miles_cost?: number | null
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      deductions: {
-        Row: {
-          id: string
-          user_id: string
-          type: string
-          amount: number
-          is_fixed: boolean
-          is_custom_type: boolean
-          date_added: string
-        }
-        Insert: {
-          id?: string
-          user_id: string
-          type: string
-          amount: number
-          is_fixed?: boolean
-          is_custom_type?: boolean
-          date_added?: string
-        }
-        Update: {
-          id?: string
-          user_id?: string
-          type?: string
-          amount?: number
-          is_fixed?: boolean
-          is_custom_type?: boolean
-          date_added?: string
-        }
-        Relationships: []
-      }
-      subscriptions: {
-        Row: {
-          id: string
-          user_id: string
-          tier: string
-          start_date: string | null
-          end_date: string | null
-          trial_used: boolean
-          early_adopter: boolean
-          early_adopter_banner_dismissed: boolean
-          stripe_customer_id: string | null
-          stripe_subscription_id: string | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          user_id: string
-          tier?: string
-          start_date?: string | null
-          end_date?: string | null
-          trial_used?: boolean
-          early_adopter?: boolean
-          early_adopter_banner_dismissed?: boolean
-          stripe_customer_id?: string | null
-          stripe_subscription_id?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          user_id?: string
-          tier?: string
-          start_date?: string | null
-          end_date?: string | null
-          trial_used?: boolean
-          early_adopter?: boolean
-          early_adopter_banner_dismissed?: boolean
-          stripe_customer_id?: string | null
-          stripe_subscription_id?: string | null
-          created_at?: string
-          updated_at?: string
         }
         Relationships: []
       }
@@ -290,7 +556,9 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      delete_user: { Args: never; Returns: undefined }
+      dismiss_early_adopter_banner: { Args: never; Returns: undefined }
+      try_consume_scan: { Args: { p_max: number }; Returns: boolean }
     }
     Enums: {
       [_ in never]: never
@@ -301,21 +569,25 @@ export type Database = {
   }
 }
 
-type DefaultSchema = Database[Extract<keyof Database, "public">]
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-    | { schema: keyof Database },
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof DatabaseWithoutInternals
   }
-    ? keyof (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-        Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
     : never = never,
-> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
-  ? (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-      Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
     ? R
@@ -333,14 +605,16 @@ export type Tables<
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
-    | { schema: keyof Database },
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof DatabaseWithoutInternals
   }
-    ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
-> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
-  ? Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Insert: infer I
     }
     ? I
@@ -356,14 +630,16 @@ export type TablesInsert<
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
-    | { schema: keyof Database },
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof DatabaseWithoutInternals
   }
-    ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
-> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
-  ? Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Update: infer U
     }
     ? U
@@ -379,14 +655,16 @@ export type TablesUpdate<
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
-    | { schema: keyof Database },
+    | { schema: keyof DatabaseWithoutInternals },
   EnumName extends DefaultSchemaEnumNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof DatabaseWithoutInternals
   }
-    ? keyof Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
     : never = never,
-> = DefaultSchemaEnumNameOrOptions extends { schema: keyof Database }
-  ? Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
     ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
     : never
@@ -394,14 +672,16 @@ export type Enums<
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
-    | { schema: keyof Database },
+    | { schema: keyof DatabaseWithoutInternals },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof DatabaseWithoutInternals
   }
-    ? keyof Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
     : never = never,
-> = PublicCompositeTypeNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
     ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never

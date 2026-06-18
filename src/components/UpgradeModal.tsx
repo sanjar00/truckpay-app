@@ -26,13 +26,15 @@ const FEATURE_DESCRIPTIONS: Record<string, string> = {
   multiTruck: 'Multi-Truck Management',
 };
 
+// Bi-weekly = charged every 2 weeks. Annual is billed once a year and works out
+// to two months free versus paying bi-weekly all year.
 const PRICES = {
-  pro:   { monthly: '$14.99', annual: '$9.99', annualTotal: '$119.88' },
-  owner: { monthly: '$29.99', annual: '$19.99', annualTotal: '$239.88' },
+  pro:   { biweekly: '$15', annual: '$300' },
+  owner: { biweekly: '$30', annual: '$600' },
 };
 
-const UpgradeModal = ({ featureName, requiredTier, onClose, onSuccess }: UpgradeModalProps) => {
-  const { subscription, upgradeTo, startTrial } = useSubscription();
+const UpgradeModal = ({ featureName, requiredTier, onClose }: UpgradeModalProps) => {
+  const { upgradeTo, isInFreePeriod, freeAccessEndDate } = useSubscription();
   const [billingCycle, setBillingCycle] = useState<BillingCycle>('annual');
   const [loadingTier, setLoadingTier] = useState<SubscriptionTier | null>(null);
   const featureLabel = FEATURE_DESCRIPTIONS[featureName] || featureName;
@@ -42,6 +44,8 @@ const UpgradeModal = ({ featureName, requiredTier, onClose, onSuccess }: Upgrade
     await upgradeTo(tier, billingCycle);
     setLoadingTier(null);
   };
+
+  const cycleSuffix = billingCycle === 'biweekly' ? '/2 wks' : '/yr';
 
   return (
     <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-3">
@@ -80,14 +84,14 @@ const UpgradeModal = ({ featureName, requiredTier, onClose, onSuccess }: Upgrade
                 ANNUAL
               </button>
               <button
-                className={`px-4 py-1.5 brutal-mono text-xs font-bold transition-colors ${billingCycle === 'monthly' ? 'bg-primary text-primary-foreground' : 'bg-background text-foreground hover:bg-muted'}`}
-                onClick={() => setBillingCycle('monthly')}
+                className={`px-4 py-1.5 brutal-mono text-xs font-bold transition-colors ${billingCycle === 'biweekly' ? 'bg-primary text-primary-foreground' : 'bg-background text-foreground hover:bg-muted'}`}
+                onClick={() => setBillingCycle('biweekly')}
               >
-                MONTHLY
+                BI-WEEKLY
               </button>
             </div>
             {billingCycle === 'annual' && (
-              <span className="ml-2 brutal-mono text-xs text-green-600 font-bold">SAVE ~33%</span>
+              <span className="ml-2 brutal-mono text-xs text-green-600 font-bold">2 MONTHS FREE</span>
             )}
           </div>
 
@@ -101,12 +105,12 @@ const UpgradeModal = ({ featureName, requiredTier, onClose, onSuccess }: Upgrade
                   <p className="brutal-text text-base font-bold">PRO</p>
                 </div>
                 <p className="brutal-text text-xl font-bold" style={{ lineHeight: 1.1 }}>
-                  {billingCycle === 'annual' ? PRICES.pro.annual : PRICES.pro.monthly}
-                  <span className="brutal-mono font-normal" style={{ fontSize: '11px' }}>/mo</span>
+                  {billingCycle === 'annual' ? PRICES.pro.annual : PRICES.pro.biweekly}
+                  <span className="brutal-mono font-normal" style={{ fontSize: '11px' }}>{cycleSuffix}</span>
                 </p>
                 {billingCycle === 'annual' && (
-                  <p className="brutal-mono text-muted-foreground" style={{ fontSize: '10px', marginBottom: '6px' }}>
-                    {PRICES.pro.annualTotal} billed annually
+                  <p className="brutal-mono text-green-600 font-bold" style={{ fontSize: '10px', marginBottom: '6px' }}>
+                    2 months free
                   </p>
                 )}
                 <ul className="brutal-mono text-muted-foreground" style={{ fontSize: '12px', lineHeight: 1.5, marginTop: '6px', listStyle: 'none', padding: 0, flex: 1 }}>
@@ -123,7 +127,7 @@ const UpgradeModal = ({ featureName, requiredTier, onClose, onSuccess }: Upgrade
                 >
                   {loadingTier === 'pro' ? (
                     <><Loader2 className="w-3 h-3 mr-1 animate-spin" />REDIRECTING...</>
-                  ) : 'UPGRADE'}
+                  ) : 'CHOOSE PRO'}
                 </Button>
               </CardContent>
             </Card>
@@ -136,12 +140,12 @@ const UpgradeModal = ({ featureName, requiredTier, onClose, onSuccess }: Upgrade
                   <p className="brutal-text text-base font-bold">OWNER-OP</p>
                 </div>
                 <p className="brutal-text text-xl font-bold" style={{ lineHeight: 1.1 }}>
-                  {billingCycle === 'annual' ? PRICES.owner.annual : PRICES.owner.monthly}
-                  <span className="brutal-mono font-normal" style={{ fontSize: '11px' }}>/mo</span>
+                  {billingCycle === 'annual' ? PRICES.owner.annual : PRICES.owner.biweekly}
+                  <span className="brutal-mono font-normal" style={{ fontSize: '11px' }}>{cycleSuffix}</span>
                 </p>
                 {billingCycle === 'annual' && (
-                  <p className="brutal-mono text-muted-foreground" style={{ fontSize: '10px', marginBottom: '6px' }}>
-                    {PRICES.owner.annualTotal} billed annually
+                  <p className="brutal-mono text-green-600 font-bold" style={{ fontSize: '10px', marginBottom: '6px' }}>
+                    2 months free
                   </p>
                 )}
                 <ul className="brutal-mono text-muted-foreground" style={{ fontSize: '12px', lineHeight: 1.5, marginTop: '6px', listStyle: 'none', padding: 0, flex: 1 }}>
@@ -158,25 +162,18 @@ const UpgradeModal = ({ featureName, requiredTier, onClose, onSuccess }: Upgrade
                 >
                   {loadingTier === 'owner' ? (
                     <><Loader2 className="w-3 h-3 mr-1 animate-spin" />REDIRECTING...</>
-                  ) : 'UPGRADE'}
+                  ) : 'CHOOSE OWNER-OP'}
                 </Button>
               </CardContent>
             </Card>
           </div>
 
-          {/* Trial CTA */}
-          {!subscription.trialUsed && (
-            <div style={{ marginBottom: '8px' }}>
-              <Button
-                className="brutal-border font-extrabold uppercase tracking-wide w-full"
-                style={{ background: '#f0a500', color: '#1a1a2e', border: '2px solid #1a1a2e', fontSize: '13px', height: '44px' }}
-                disabled={loadingTier !== null}
-                onClick={() => { startTrial(); onClose(); onSuccess?.('pro', true); }}
-              >
-                START 7-DAY FREE TRIAL (PRO)
-              </Button>
-              <p className="brutal-mono text-xs text-muted-foreground text-center" style={{ marginTop: '4px' }}>No payment required to start trial</p>
-            </div>
+          {/* Delayed-activation reassurance while still on the free window */}
+          {isInFreePeriod && freeAccessEndDate && (
+            <p className="brutal-mono text-center text-foreground" style={{ fontSize: '11px', marginBottom: '6px' }}>
+              You won't be charged until your free access ends on{' '}
+              <strong>{freeAccessEndDate.toLocaleDateString()}</strong>. Keep everything until then.
+            </p>
           )}
 
           <p className="brutal-mono text-center text-muted-foreground" style={{ fontSize: '10px' }}>

@@ -1,10 +1,15 @@
 // @ts-nocheck
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { createClient } from 'npm:@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// Per-user daily scan cap. Each scan calls OpenAI gpt-4o (real cost), so this
+// guards against a single account running up the bill (denial-of-wallet).
+const MAX_SCANS_PER_DAY = 60;
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -12,6 +17,29 @@ serve(async (req) => {
   }
 
   try {
+    // ── Auth: require a valid Supabase JWT (no anonymous calls) ──────────────
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'Missing authorization header' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const { imageBase64, mode } = await req.json();
 
     if (!imageBase64) {
@@ -19,6 +47,27 @@ serve(async (req) => {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
+    }
+
+    // Basic payload-size guard: reject anything larger than ~8MB of base64.
+    if (typeof imageBase64 !== 'string' || imageBase64.length > 8_000_000) {
+      return new Response(JSON.stringify({ error: 'Image payload too large' }), {
+        status: 413,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // ── Rate limit: atomically consume one of today's scans for this user ────
+    const { data: allowed, error: rlError } = await supabase.rpc('try_consume_scan', {
+      p_max: MAX_SCANS_PER_DAY,
+    });
+    if (rlError) {
+      console.error('rate-limit rpc error:', rlError);
+    } else if (allowed === false) {
+      return new Response(
+        JSON.stringify({ error: `Daily scan limit reached (${MAX_SCANS_PER_DAY}/day). Try again tomorrow.` }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
     }
 
     const apiKey = Deno.env.get('OPENAI_API_KEY');

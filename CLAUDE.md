@@ -248,8 +248,10 @@ Week period display strings (from `getWeeklyPeriodDisplay()` in `loadReportsUtil
 | Tier | Price | Gated Features |
 |------|-------|----------------|
 | Free | $0 | Current week only, max 5 loads/week |
-| Pro | $14.99/mo or $9.99/mo (annual, $119.88/yr) | Full history, IFTA, Per Diem, CSV export, YTD, AI Receipt Scanner, Weekly Forecast |
-| Owner-Op | $29.99/mo or $19.99/mo (annual, $239.88/yr) | Everything in Pro + Dispatcher Book, Lane Analytics, Annual Goal |
+| Pro | $15 bi-weekly (every 2 weeks) **or** $300/yr (annual, marketed "2 months free") | Full history, IFTA, Per Diem, CSV export, YTD, AI Receipt Scanner, Weekly Forecast |
+| Owner-Op | $30 bi-weekly (every 2 weeks) **or** $600/yr (annual, marketed "2 months free") | Everything in Pro + Dispatcher Book, Lane Analytics, Annual Goal |
+
+Billing cycles are `'biweekly'` (Stripe `week` × 2) and `'annual'`. There is **no monthly** plan anymore.
 
 **PRO features** (from `useSubscription.tsx`):
 `ifta`, `perdiem`, `ytd`, `fullHistory`, `export`, `receipts`, `forecast`
@@ -257,9 +259,13 @@ Week period display strings (from `getWeeklyPeriodDisplay()` in `loadReportsUtil
 **OWNER features** (in addition to Pro):
 `dispatcher`, `laneAnalytics`, `annualGoal`, `multiTruck`
 
-**Early Adopter rule:** Users with pre-existing loads/deductions get `earlyAdopter: true` and 90 days of Pro free. The auto-detection code is currently disabled (TODO in useSubscription.tsx line ~210) — early adopter status is set manually.
+**90-day free Pro (all users):** Every new signup gets 90 days of full Pro free, granted **server-side** by a Postgres trigger (`handle_new_user_subscription` on `auth.users`) that creates the subscription row with `tier='pro'`, `early_adopter=true`, `end_date=now()+90 days`. The client never writes tier. A one-time welcome modal (`OnboardingWelcomeModal`) announces the 90 days free on first onboarding.
 
-**Trial:** 7-day free Pro trial, no payment required. One-time per account (`trialUsed` flag).
+**Free-expiry reminders:** Escalating modals (`ExpirationReminderModal`) appear at 15 / 10 / 5 / 1 days before the free window ends (more urgent as it approaches; the 5- and 1-day ones warn about losing access/data). Each fires once — "shown" state is tracked in the `subscription_reminders` table. Buttons: "Get a Plan" (opens UpgradeModal) and Close. If the user subscribes during the free window, billing is **deferred** to the expiry date via Stripe `trial_end` (set in `create-checkout-session`), so they keep free access until then.
+
+**Security (Phase 0):** The `subscriptions` table is **read-only to clients** (SELECT-only RLS). Tier/dates/stripe ids are written only by the Stripe webhook (service role) or the signup trigger. The single client-allowed mutation — dismissing the early-adopter banner — goes through the `dismiss_early_adopter_banner()` SECURITY DEFINER RPC. The old 7-day trial and all client-side tier writes have been removed.
+
+**Scan cost guard:** `scan-receipt` requires a valid JWT and enforces a per-user daily cap (`try_consume_scan()` RPC + `usage_counters` table, 60/day) to prevent denial-of-wallet on the OpenAI calls.
 
 **Paywall triggers:**
 - Navigating to SUMMARY, IFTA, or PER DIEM (Free tier)
@@ -268,11 +274,11 @@ Week period display strings (from `getWeeklyPeriodDisplay()` in `loadReportsUtil
 - Adding 6th load in a week (Free tier)
 
 **UpgradeModal defaults:**
-- Billing toggle defaults to `'annual'` (Annual shown first, saves ~33%)
+- Billing toggle defaults to `'annual'` (Annual shown first); annual shows a "2 MONTHS FREE" badge. Other option is `'biweekly'` ($15/$30 per 2 weeks).
 - Cards always render side-by-side (2-column grid, no mobile stack)
 - Pro features listed: Full load history, IFTA reports, Per Diem tracker, AI receipt scanner
 - Owner-Op features listed: Everything in Pro, Dispatcher book, Lane analytics, Annual goal tracking
-- Trial button at bottom (amber primary style) — shown only if `!subscription.trialUsed`
+- No trial button (the 7-day trial was removed; everyone already gets 90 days free). While still in the free window the modal reassures: "You won't be charged until your free access ends on {date}."
 
 ---
 
@@ -284,15 +290,18 @@ Week period display strings (from `getWeeklyPeriodDisplay()` in `loadReportsUtil
 
 | Plan | Billing | Price ID | Amount | Payment Link |
 |------|---------|----------|--------|--------------|
-| Pro | Monthly | `price_1TLainDDJ9hkmBpwH8pF7LXu` | $14.99/mo | https://buy.stripe.com/dRmdR9f19aEsb49ayag7e00 |
-| Pro | Annual | `price_1TLaiqDDJ9hkmBpw2EEWTeIv` | $119.88/yr | https://buy.stripe.com/eVq28r6uD5k8got21Eg7e01 |
-| Owner-Op | Monthly | `price_1TLaitDDJ9hkmBpwG40JiG5d` | $29.99/mo | https://buy.stripe.com/eVq00j6uDcMA1tzfSug7e02 |
-| Owner-Op | Annual | `price_1TLaiwDDJ9hkmBpwZ1jI886S` | $239.88/yr | https://buy.stripe.com/14AaEX7yH3c03BH0XAg7e03 |
+| Pro | Bi-weekly | `price_1TjbA0DDJ9hkmBpwXxBFh2wR` | $15 / 2 wks | (Checkout via edge fn) |
+| Pro | Annual | `price_1TjbA9DDJ9hkmBpwBnCVMIOU` | $300/yr | (Checkout via edge fn) |
+| Owner-Op | Bi-weekly | `price_1TjbACDDJ9hkmBpwt1rRJlG8` | $30 / 2 wks | (Checkout via edge fn) |
+| Owner-Op | Annual | `price_1TjbAEDDJ9hkmBpw8Vyi5x74` | $600/yr | (Checkout via edge fn) |
+
+Products: TruckPay Pro `prod_UKFDC6PGYVFyy4`, TruckPay Owner-Op `prod_UKFDp0tlwSiXqk`. The 4 old monthly/annual prices ($14.99/$119.88/$29.99/$239.88) are **archived** in Stripe. Checkout always goes through the `create-checkout-session` edge function (not Payment Links).
 
 ### Edge Functions (all deployed)
 
-1. **`create-checkout-session`** — Creates Stripe Checkout session
-   - Receives: `{ priceId, userId }`
+1. **`create-checkout-session`** — Creates Stripe Checkout session (requires JWT; verifies caller via `auth.getUser()`)
+   - Receives: `{ tier, billingCycle, successUrl, cancelUrl }` (tier `pro`|`owner`, cycle `biweekly`|`annual`)
+   - Maps tier+cycle → price ID server-side; sets `subscription_data.trial_end` to the user's free-access `end_date` when still in the 90-day window (deferred billing)
    - Returns: `{ url }` — redirect to Stripe-hosted checkout
    - On success, Stripe redirects to `https://truckpay.app/?checkout=success`
 
@@ -302,10 +311,16 @@ Week period display strings (from `getWeeklyPeriodDisplay()` in `loadReportsUtil
    - Price-to-tier map:
      ```javascript
      const PRICE_TO_TIER = {
+       // Current — bi-weekly + annual
+       'price_1TjbA0DDJ9hkmBpwXxBFh2wR': 'pro',    // Pro Bi-weekly
+       'price_1TjbA9DDJ9hkmBpwBnCVMIOU': 'pro',    // Pro Annual
+       'price_1TjbACDDJ9hkmBpwt1rRJlG8': 'owner',  // Owner-Op Bi-weekly
+       'price_1TjbAEDDJ9hkmBpw8Vyi5x74': 'owner',  // Owner-Op Annual
+       // Legacy (archived) prices kept in the map for any old subscriptions
        'price_1TLainDDJ9hkmBpwH8pF7LXu': 'pro',
        'price_1TLaiqDDJ9hkmBpw2EEWTeIv': 'pro',
-       'price_1TLaitDDJ9hkmBpwG40JiG5d': 'owner-op',
-       'price_1TLaiwDDJ9hkmBpwZ1jI886S': 'owner-op',
+       'price_1TLaitDDJ9hkmBpwG40JiG5d': 'owner',
+       'price_1TLaiwDDJ9hkmBpwZ1jI886S': 'owner',
      };
      ```
 

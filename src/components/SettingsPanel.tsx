@@ -21,7 +21,7 @@ const SettingsPanel = ({ userProfile, setUserProfile, onBack, onLogout }) => {
   const { toast } = useToast();
   const { user, signOut, isSocialAuth } = useAuth();
   const { subscription, upgradeTo, openCustomerPortal } = useSubscription();
-  const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>('annual');
   const [upgradingTier, setUpgradingTier] = useState<SubscriptionTier | null>(null);
   const [portalLoading, setPortalLoading] = useState(false);
 
@@ -37,10 +37,12 @@ const SettingsPanel = ({ userProfile, setUserProfile, onBack, onLogout }) => {
     setPortalLoading(false);
   };
 
+  // Bi-weekly = charged every 2 weeks. Annual = billed once a year (two months free).
   const PRICES = {
-    pro:   { monthly: '$14.99', annual: '$9.99', annualTotal: '$119.88' },
-    owner: { monthly: '$29.99', annual: '$19.99', annualTotal: '$239.88' },
+    pro:   { biweekly: '$15', annual: '$300' },
+    owner: { biweekly: '$30', annual: '$600' },
   };
+  const cycleSuffix = billingCycle === 'biweekly' ? '/2 wks' : '/yr';
 
   const currentTier = subscription.tier;
   const isEarlyAdopter = subscription.earlyAdopter;
@@ -672,20 +674,20 @@ const SettingsPanel = ({ userProfile, setUserProfile, onBack, onLogout }) => {
           <div className="flex items-center gap-3 mb-5">
             <div className="brutal-border inline-flex rounded overflow-hidden">
               <button
-                className={`px-4 py-2 brutal-mono text-xs font-bold transition-colors ${billingCycle === 'monthly' ? 'bg-primary text-primary-foreground' : 'bg-background text-foreground hover:bg-muted'}`}
-                onClick={() => setBillingCycle('monthly')}
-              >
-                MONTHLY
-              </button>
-              <button
                 className={`px-4 py-2 brutal-mono text-xs font-bold transition-colors ${billingCycle === 'annual' ? 'bg-primary text-primary-foreground' : 'bg-background text-foreground hover:bg-muted'}`}
                 onClick={() => setBillingCycle('annual')}
               >
                 ANNUAL
               </button>
+              <button
+                className={`px-4 py-2 brutal-mono text-xs font-bold transition-colors ${billingCycle === 'biweekly' ? 'bg-primary text-primary-foreground' : 'bg-background text-foreground hover:bg-muted'}`}
+                onClick={() => setBillingCycle('biweekly')}
+              >
+                BI-WEEKLY
+              </button>
             </div>
             {billingCycle === 'annual' && (
-              <span className="brutal-mono text-xs text-green-600 font-bold">SAVE ~33%</span>
+              <span className="brutal-mono text-xs text-green-600 font-bold">2 MONTHS FREE</span>
             )}
           </div>
 
@@ -720,11 +722,11 @@ const SettingsPanel = ({ userProfile, setUserProfile, onBack, onLogout }) => {
                 <p className="brutal-text text-base font-bold">PRO</p>
               </div>
               <p className="brutal-text text-2xl font-bold mb-0">
-                {billingCycle === 'annual' ? PRICES.pro.annual : PRICES.pro.monthly}
-                <span className="brutal-mono text-sm font-normal">/mo</span>
+                {billingCycle === 'annual' ? PRICES.pro.annual : PRICES.pro.biweekly}
+                <span className="brutal-mono text-sm font-normal">{cycleSuffix}</span>
               </p>
               {billingCycle === 'annual' && (
-                <p className="brutal-mono text-xs text-muted-foreground mb-2">Billed {PRICES.pro.annualTotal}/yr</p>
+                <p className="brutal-mono text-xs text-green-600 font-bold mb-2">2 months free</p>
               )}
               <ul className="brutal-mono text-xs space-y-1 text-muted-foreground mb-4 mt-2">
                 <li>✓ Full load history</li>
@@ -769,11 +771,11 @@ const SettingsPanel = ({ userProfile, setUserProfile, onBack, onLogout }) => {
                 <p className="brutal-text text-base font-bold">OWNER-OP</p>
               </div>
               <p className="brutal-text text-2xl font-bold mb-0">
-                {billingCycle === 'annual' ? PRICES.owner.annual : PRICES.owner.monthly}
-                <span className="brutal-mono text-sm font-normal">/mo</span>
+                {billingCycle === 'annual' ? PRICES.owner.annual : PRICES.owner.biweekly}
+                <span className="brutal-mono text-sm font-normal">{cycleSuffix}</span>
               </p>
               {billingCycle === 'annual' && (
-                <p className="brutal-mono text-xs text-muted-foreground mb-2">Billed {PRICES.owner.annualTotal}/yr</p>
+                <p className="brutal-mono text-xs text-green-600 font-bold mb-2">2 months free</p>
               )}
               <ul className="brutal-mono text-xs space-y-1 text-muted-foreground mb-4 mt-2">
                 <li>✓ Everything in Pro</li>

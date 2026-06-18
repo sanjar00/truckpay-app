@@ -11,6 +11,22 @@ const OnboardingWelcomeModal = ({ onStart }: OnboardingWelcomeModalProps) => {
           <h2 className="brutal-text text-2xl text-foreground leading-tight">Drive smart. Earn more.</h2>
         </div>
 
+        {/* 90-day free Pro highlight */}
+        <div
+          className="brutal-border p-4 mb-4"
+          style={{ background: '#f0a500', borderRadius: '6px' }}
+        >
+          <p className="brutal-text text-3xl font-extrabold leading-none" style={{ color: '#1a1a2e' }}>
+            90 DAYS FREE
+          </p>
+          <p className="brutal-mono text-sm font-bold mt-1" style={{ color: '#1a1a2e' }}>
+            Full Pro access — on us. 🎉
+          </p>
+          <p className="brutal-mono text-xs mt-2" style={{ color: '#1a1a2e' }}>
+            IFTA reports, Per Diem, AI receipt scanner, full history & more. No card needed to start.
+          </p>
+        </div>
+
         <p className="brutal-mono text-sm text-muted-foreground leading-relaxed mb-5">
           Track your loads, truck expenses, mileage, and weekly take-home in one place.
         </p>
@@ -20,9 +36,9 @@ const OnboardingWelcomeModal = ({ onStart }: OnboardingWelcomeModalProps) => {
             type="button"
             onClick={onStart}
             className="w-full brutal-border brutal-shadow brutal-mono text-sm font-bold uppercase min-h-12"
-            style={{ background: '#f0a500', color: '#1a1a2e' }}
+            style={{ background: '#1a1a2e', color: '#f0a500' }}
           >
-            Get Started
+            Start My 90 Days Free
           </button>
         </div>
       </div>
