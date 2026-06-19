@@ -64,9 +64,12 @@ interface LoadCardProps {
   onEdit?: () => void;
   estimatedMiles?: number;
   userProfile?: any;
+  /** When true, render content without LoadCard's own card chrome (border/shadow/bg).
+   *  Use when the parent already wraps it in a card, to avoid a double-card look. */
+  flush?: boolean;
 }
 
-const LoadCard = ({ load, onDelete, onEdit, estimatedMiles, userProfile }: LoadCardProps) => {
+const LoadCard = ({ load, onDelete, onEdit, estimatedMiles, userProfile, flush }: LoadCardProps) => {
   const isCompanyDriver = userProfile?.driverType === 'company-driver';
   // Use load's own estimatedMiles if available, fall back to prop
   const milesForGrade = load.estimatedMiles || estimatedMiles;
@@ -103,8 +106,8 @@ const LoadCard = ({ load, onDelete, onEdit, estimatedMiles, userProfile }: LoadC
     : load.locationTo;
 
   return (
-    <Card className="border-l-4 border-l-blue-500">
-      <CardContent className="p-4">
+    <Card className={cn(flush ? "border-0 rounded-none bg-transparent shadow-none" : "border-l-4 border-l-blue-500")}>
+      <CardContent className={flush ? "p-0" : "p-4"}>
         <div className="flex justify-between items-start">
           <div className="flex-1">
             {isMultiStop && (

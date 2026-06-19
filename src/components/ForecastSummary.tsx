@@ -813,11 +813,13 @@ const ForecastSummary = ({ onBack, deductions, userProfile }: ForecastSummaryPro
                 return (
                   <div key={load.id} className="brutal-border bg-card p-4 brutal-shadow">
                     {/* LoadCard is display-only here (analytics view); editing
-                        lives on the Load Reports page. */}
+                        lives on the Load Reports page. `flush` removes LoadCard's
+                        own card chrome so the brutal wrapper is the single card. */}
                     <LoadCard
                       load={load}
                       onDelete={handleDeleteLoad}
                       estimatedMiles={estMiles}
+                      flush
                     />
                   </div>
                 );
