@@ -292,39 +292,37 @@ const SettingsPanel = ({ userProfile, setUserProfile, onBack, onLogout }) => {
     
     try {
       setIsLoading(true);
-      
-      // Delete load reports and deductions
-      await Promise.all([
-        supabase.from('load_reports').delete().eq('user_id', user.id),
-        supabase.from('deductions').delete().eq('user_id', user.id)
-      ]);
 
       if (deleteAccountToo) {
-        // Delete profile first
-        await supabase.from('profiles').delete().eq('id', user.id);
-        
-        // Delete the actual user account via RPC (requires a delete_user function in Supabase)
+        // Deleting the auth user cascades to every public user table, so this
+        // single RPC removes the account and ALL data.
         const { error: userDeleteError } = await supabase.rpc('delete_user');
-
         if (userDeleteError) {
           throw new Error('Failed to delete account. Please contact support at dev@saaz.site.');
         }
-        
+
         // Clear all local user data then sign out
         Object.keys(localStorage)
           .filter(k => k.startsWith('truckpay_'))
           .forEach(k => localStorage.removeItem(k));
         await supabase.auth.signOut();
-        
+
         toast({
           title: "Account deleted",
           description: "Your account and all data have been permanently deleted.",
           duration: 5000,
         });
       } else {
+        // Clear ALL trucking data (loads, deductions, mileage, expenses) but keep
+        // the account/login.
+        const { error: clearError } = await supabase.rpc('clear_user_data');
+        if (clearError) {
+          throw new Error('Failed to clear data. Please try again.');
+        }
+
         toast({
           title: "Data cleared",
-          description: "All your load reports and deductions have been deleted.",
+          description: "All your loads, deductions, mileage, and expenses have been deleted.",
           duration: 5000,
         });
       }

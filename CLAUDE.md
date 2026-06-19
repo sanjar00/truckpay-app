@@ -449,6 +449,12 @@ When a **FUEL** receipt is scanned via the home "Truck / Work Expense" path, it 
 - **Scan timeout:** the OpenAI call in `scan-receipt` is time-boxed to 30s (AbortController → 504), plus auth + a 60/user/day cap + an 8MB payload guard + `mode` whitelist.
 - **One load-save path:** both add-load entry points (`useLoadReports.handleAddLoad` for the Load Reports page and `Index.handleAddLoadFromHome` for the home/bottom-bar modal) build their DB rows from `src/lib/loadPersistence.ts` (`buildLoadReportRow` + `buildStopRows`). Do NOT hand-write a `load_reports`/`load_stops` payload inline — extend the shared builder so the two paths can't drift (they previously drifted on `week_period`, `deadhead_miles` parsing, and null-vs-empty fields).
 
+## Polish notes (Phase 3)
+
+- **Account deletion:** Settings → delete account calls the `delete_user()` SECURITY DEFINER RPC, which deletes `auth.users` and cascades to every public user table. (Earlier, `weekly_extra_deductions.user_id` had no ON DELETE CASCADE and blocked deletion — fixed.) "Clear my data" (keep account) calls `clear_user_data()`, which wipes all trucking data (loads, deductions, mileage, expenses) but leaves the profile + subscription.
+- **IFTA roundtrip miles:** `startEditLoad` pre-fills **all distinct route states** (origin + intermediate stops + destination) at 0 miles for multi-state routes, including round trips A→B→A where origin == destination but B is a real IFTA state. Single-state loads still get all estimated miles. Use Auto-calculate to split.
+- **Offline banner:** `src/components/OfflineBanner.tsx` (rendered in `App.tsx`) shows a red "You're offline" bar via `navigator.onLine` + online/offline events.
+
 ---
 
 ## ZIP-to-ZIP Mileage Tracking

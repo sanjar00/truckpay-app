@@ -556,6 +556,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      clear_user_data: { Args: never; Returns: undefined }
       delete_user: { Args: never; Returns: undefined }
       dismiss_early_adopter_banner: { Args: never; Returns: undefined }
       try_consume_scan: { Args: { p_max: number }; Returns: boolean }

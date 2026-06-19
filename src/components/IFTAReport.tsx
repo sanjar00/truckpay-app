@@ -241,23 +241,25 @@ const IFTAReport = ({ onBack }: IFTAReportProps) => {
     if (load.statesMiles && load.statesMiles.length > 0) {
       setEditStatesMiles([...load.statesMiles]);
     } else {
-      const pickupState = extractState(load.pickupCityState);
-      const deliveryState = extractState(load.deliveryCityState);
-      const totalMilesForLoad = load.estimatedMiles || 0;
+      // Collect every distinct state on the route: origin, destination, and any
+      // intermediate stops. This is what fixes round trips (A→B→A): the pickup
+      // and final-delivery states are identical, but the turnaround state (B) is
+      // a real IFTA state and must be pre-filled too.
+      const states: string[] = [];
+      const add = (s: string | null) => { if (s && !states.includes(s)) states.push(s); };
+      add(extractState(load.pickupCityState));
+      for (const stop of load.stops || []) add(extractState(stop.cityState));
+      add(extractState(load.deliveryCityState));
 
-      if (pickupState && deliveryState && pickupState !== deliveryState) {
-        // Pre-fill origin and destination states with 0 miles.
-        // Mileage intentionally left at 0 — use Auto-calculate or enter manually.
-        // A 50/50 split would be wrong for multi-state routes (e.g. IL→MO→AR→TX).
-        setEditStatesMiles([
-          { state: pickupState, miles: 0 },
-          { state: deliveryState, miles: 0 },
-        ]);
-      } else if (pickupState) {
-        // Same-state load — full estimated miles go to that state
-        setEditStatesMiles([{ state: pickupState, miles: totalMilesForLoad }]);
-      } else {
+      if (states.length === 0) {
         setEditStatesMiles([{ state: 'TX', miles: 0 }]);
+      } else if (states.length === 1) {
+        // Genuinely single-state load — all estimated miles go to that state.
+        setEditStatesMiles([{ state: states[0], miles: load.estimatedMiles || 0 }]);
+      } else {
+        // Multi-state route (including round trips) — list each distinct state at
+        // 0 and let the driver tap Auto-calculate. A naive split would be wrong.
+        setEditStatesMiles(states.map((state) => ({ state, miles: 0 })));
       }
     }
 
