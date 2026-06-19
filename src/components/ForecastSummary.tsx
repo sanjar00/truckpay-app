@@ -46,6 +46,13 @@ const ForecastSummary = ({ onBack, deductions, userProfile }: ForecastSummaryPro
   const { user } = useAuth();
   const [periodFilter, setPeriodFilter] = useState('ytd');
   const [customDateRange, setCustomDateRange] = useState<DateRange | undefined>();
+  const LOADS_PAGE_SIZE = 15;
+  const [visibleLoadCount, setVisibleLoadCount] = useState(LOADS_PAGE_SIZE);
+
+  // Reset the loads list back to the first page whenever the period changes.
+  useEffect(() => {
+    setVisibleLoadCount(LOADS_PAGE_SIZE);
+  }, [periodFilter, customDateRange]);
   const [loads, setLoads] = useState<Load[]>([]);
   const [weeklyDeductions, setWeeklyDeductions] = useState<Record<string, Record<string, number>>>({});
   const [extraDeductions, setExtraDeductions] = useState<Record<string, Array<{id: string, name: string, amount: number}>>>({});
@@ -804,7 +811,7 @@ const ForecastSummary = ({ onBack, deductions, userProfile }: ForecastSummaryPro
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {filteredLoads.map((load) => {
+              {filteredLoads.slice(0, visibleLoadCount).map((load) => {
                 const wMileage = weeklyMileageData[load.dateAdded];
                 const loadsInWeek = filteredLoads.filter(l => l.dateAdded === load.dateAdded).length;
                 const estMiles = (wMileage && wMileage.totalMiles > 0 && loadsInWeek > 0)
@@ -824,6 +831,15 @@ const ForecastSummary = ({ onBack, deductions, userProfile }: ForecastSummaryPro
                   </div>
                 );
               })}
+
+              {visibleLoadCount < filteredLoads.length && (
+                <Button
+                  onClick={() => setVisibleLoadCount((n) => n + LOADS_PAGE_SIZE)}
+                  className="w-full brutal-border bg-secondary text-secondary-foreground brutal-shadow brutal-hover brutal-text"
+                >
+                  LOAD MORE
+                </Button>
+              )}
             </CardContent>
           </Card>
         )}

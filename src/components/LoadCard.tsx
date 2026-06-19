@@ -106,9 +106,15 @@ const LoadCard = ({ load, onDelete, onEdit, estimatedMiles, userProfile, flush }
     : load.locationTo;
 
   return (
-    <Card className={cn(flush ? "border-0 rounded-none bg-transparent shadow-none" : "border-l-4 border-l-blue-500")}>
+    <Card
+      className={flush ? undefined : "border-l-4 border-l-blue-500"}
+      // `brutal-border`/`brutal-shadow` are custom classes tailwind-merge can't
+      // dedupe, so strip the inner card's chrome with inline styles (which win
+      // over classes) when the parent already provides the card.
+      style={flush ? { border: 'none', boxShadow: 'none', background: 'transparent', borderRadius: 0 } : undefined}
+    >
       <CardContent className={flush ? "p-0" : "p-4"}>
-        <div className="flex justify-between items-start">
+        <div className="flex justify-between items-start gap-3">
           <div className="flex-1">
             {isMultiStop && (
               <div className="mb-2">
